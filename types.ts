@@ -1,7 +1,14 @@
 
 export type Theme = 'light' | 'dark';
-export type Screen = 'onboarding' | 'dashboard' | 'ride' | 'marketplace' | 'earn' | 'profile' | 'checkout' | 'business-detail' | 'store';
+export type Screen = 'onboarding' | 'dashboard' | 'ride' | 'marketplace' | 'earn' | 'profile' | 'checkout' | 'business-detail' | 'store' | 'order-tracking';
 export type RideStatus = 'idle' | 'payment-select' | 'searching' | 'accepted' | 'arrived' | 'in-progress' | 'completed' | 'review';
+
+export interface Category {
+  id: string;
+  name: string;
+  icon: string | null;
+  displayOrder: number;
+}
 
 export interface Product {
   id: string;
@@ -26,6 +33,8 @@ export interface Business {
   logo: string;
   products: Product[];
   phone: string;
+  waveNumber?: string;
+  owner_id?: string;
   location: string;
   isOpen: boolean;
   distance: string;
@@ -40,12 +49,22 @@ export interface CartItem extends Product {
 export interface Activity {
   id: string;
   type: 'ride' | 'order';
+  ride_type?: 'ride' | 'delivery';
   title: string;
   subtitle: string;
   price: number;
   date: string;
   status: 'completed' | 'cancelled';
   rating?: number;
+}
+
+export interface SavedLocation {
+  id: string;
+  label: string; // 'Home' | 'Work' | 'Gym'
+  emoji: string;
+  address: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface UserData {
@@ -55,4 +74,29 @@ export interface UserData {
   location: string | null;
   photo: string | null;
   rating: number;
+  role?: 'customer' | 'driver' | 'merchant' | 'both';
+  referralCode?: string;
+  referralBalance?: number;
+}
+
+export interface Reward {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  discountAmount: number;
+  isPercentage: boolean;
+  expiryDate: string;
+  isUsed: boolean;
+}
+
+export interface AppSettings {
+  min_ride_price: number;
+  min_delivery_fee: number;
+  driver_search_radius_km: number;
+  referral_reward_amount: number;
+  currency_symbol: string;
+  commission_percentage: number;
+  rating_window_limit: number;
+  is_rating_enabled: boolean;
 }

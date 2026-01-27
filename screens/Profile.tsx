@@ -1,9 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star } from 'lucide-react';
-import { Theme, Screen, UserData, Activity, Business } from '../types';
+import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
+import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
 import { BottomNav } from '../components/Navigation';
 import { triggerHaptic } from '../index';
+import { supabase } from '../supabaseClient';
+import { LocationPicker } from '../components/LocationPicker';
 
 interface Props {
     theme: Theme;
@@ -16,6 +18,7 @@ interface Props {
     businesses: Business[];
     isScrolling: boolean;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+    settings: AppSettings;
 }
 
 type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
@@ -95,7 +98,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
-export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivity, favorites, businesses, isScrolling, handleScroll }: Props) => {
+export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivity, favorites, businesses, isScrolling, handleScroll, settings }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
 
@@ -104,9 +107,38 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
     const [editPhone, setEditPhone] = useState(user.phone);
     const [editEmail, setEditEmail] = useState(user.email);
     const [editLocation, setEditLocation] = useState(user.location || '');
+    const [loading, setLoading] = useState(false);
+    const [photoFile, setPhotoFile] = useState<File | null>(null);
 
     // Image Upload Ref
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [homeLocData, setHomeLocData] = useState<{ address: string; lat: number; lng: number } | null>(null);
+    const [showLP, setShowLP] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+    useEffect(() => {
+        fetchHomeLocation();
+    }, []);
+
+    const fetchHomeLocation = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const { data, error } = await supabase
+                .from('user_saved_locations')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .eq('label', 'Home')
+                .single();
+
+            if (data) {
+                setHomeLocData({ address: data.address, lat: data.latitude, lng: data.longitude });
+                setEditLocation(data.address);
+            }
+        } catch (err) {
+            console.error("Fetch Home Location Error:", err);
+        }
+    };
 
     const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
     const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -128,15 +160,94 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         }, 280); // Slightly less than CSS animation duration
     };
 
-    const handleSaveProfile = () => {
+    const handleSaveProfile = async () => {
         triggerHaptic();
-        setUser({ ...user, name: editName, phone: editPhone, email: editEmail, location: editLocation });
-        closeDrawer();
+        setLoading(true);
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userId = session?.user?.id;
+
+            if (!userId) throw new Error("No active session found");
+
+            let finalAvatarUrl = user.photo;
+
+            // 1. Upload new photo if selected
+            if (photoFile) {
+                console.log("Uploading Profile Photo...");
+                const fileExt = photoFile.name.split('.').pop();
+                const fileName = `${userId}-${Math.random()}.${fileExt}`;
+                const filePath = `user-avatars/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('avatars')
+                    .upload(filePath, photoFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(filePath);
+
+                finalAvatarUrl = publicUrl;
+                console.log("Uploaded! URL:", finalAvatarUrl);
+            }
+
+            // 2. Update Profiles Table
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: editName,
+                    email: editEmail,
+                    location: editLocation,
+                    phone: editPhone,
+                    avatar_url: finalAvatarUrl,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', userId);
+
+            if (updateError) throw updateError;
+
+            // 2.1 Update Saved Locations (Home)
+            if (homeLocData) {
+                const { error: locError } = await supabase
+                    .from('user_saved_locations')
+                    .upsert({
+                        user_id: userId,
+                        label: 'Home',
+                        emoji: '🏠',
+                        address: homeLocData.address,
+                        latitude: homeLocData.lat,
+                        longitude: homeLocData.lng
+                    }, { onConflict: 'user_id, label' });
+
+                if (locError) throw locError;
+            }
+
+            // 3. Update Global State
+            setUser({
+                ...user,
+                name: editName,
+                phone: editPhone,
+                email: editEmail,
+                location: editLocation,
+                photo: finalAvatarUrl
+            });
+
+            console.log("Profile updated successfully!");
+            closeDrawer();
+        } catch (err: any) {
+            console.error("Failed to update profile:", err);
+            alert(`Update Failed: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+            setPhotoFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setUser({ ...user, photo: reader.result as string });
@@ -150,22 +261,33 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             <div className="flex-1 overflow-y-auto pt-safe px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
                 <h1 className="text-3xl font-bold mb-6">Profile</h1>
                 <div className="flex items-center gap-4 mb-8">
-                    <div className={`w-20 h-20 rounded-full bg-gray-300 bg-cover border-2 border-white dark:border-[#333]`} style={{ backgroundImage: `url(${user.photo || 'https://i.pravatar.cc/150?img=68'})` }}></div>
+                    <div
+                        className={`w-20 h-20 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333]`}
+                        style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
+                    >
+                        {!user.photo && (
+                            <span className="text-[#00D68F] font-bold text-2xl">
+                                {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                            </span>
+                        )}
+                    </div>
                     <div>
                         <h2 className="text-xl font-bold">{user.name || 'User'}</h2>
                         <p className={`${textSec} text-sm`}>{user.phone}</p>
 
                         {/* Rating Score */}
-                        <div className="flex items-center gap-1.5 mt-1.5">
-                            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
+                        {settings.is_rating_enabled && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
                                     user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
                                         'bg-red-500/10 text-red-500'
-                                }`}>
-                                <Star size={12} fill="currentColor" />
-                                <span className="text-xs font-black">{user.rating.toFixed(1)}</span>
+                                    }`}>
+                                    <Star size={12} fill="currentColor" />
+                                    <span className="text-xs font-black">{user.rating.toFixed(1)}</span>
+                                </div>
+                                <span className={`text-[10px] font-medium ${textSec}`}>Rating</span>
                             </div>
-                            <span className={`text-[10px] font-medium ${textSec}`}>Rating</span>
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -220,10 +342,15 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             accept="image/*"
                         />
                         <div
-                            className={`w-24 h-24 rounded-full bg-gray-300 bg-cover border-2 border-white dark:border-[#333] relative cursor-pointer`}
-                            style={{ backgroundImage: `url(${user.photo || 'https://i.pravatar.cc/150?img=68'})` }}
+                            className={`w-24 h-24 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333] relative cursor-pointer`}
+                            style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
                             onClick={() => fileInputRef.current?.click()}
                         >
+                            {!user.photo && (
+                                <span className="text-[#00D68F] font-bold text-3xl">
+                                    {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                                </span>
+                            )}
                             <div className="absolute bottom-0 right-0 bg-[#00D68F] p-1.5 rounded-full border-2 border-white dark:border-black cursor-pointer shadow-sm">
                                 <Camera size={14} className="text-black" />
                             </div>
@@ -231,6 +358,13 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                     </div>
 
                     <div className="space-y-4 mb-8">
+                        {/* Status Message */}
+                        {loading && (
+                            <div className="flex items-center gap-2 justify-center py-2 text-[#00D68F] animate-pulse">
+                                <Loader2 size={16} className="animate-spin" />
+                                <span className="text-xs font-bold uppercase tracking-widest">Saving Changes...</span>
+                            </div>
+                        )}
                         <div>
                             <label className={`text-xs font-bold ${textSec} mb-1 block`}>Full Name</label>
                             <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
@@ -244,22 +378,59 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
                         </div>
                         <div>
-                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Location</label>
-                            <input value={editLocation} onChange={e => setEditLocation(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
+                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
+                            <div
+                                onClick={() => setShowLP(true)}
+                                className={`w-full p-3 rounded-xl ${inputBg} border-2 border-transparent active:border-[#00D68F] transition-all cursor-pointer flex items-center justify-between group`}
+                            >
+                                <span className={`flex-1 font-medium truncate ${!editLocation ? 'opacity-30' : ''}`}>
+                                    {editLocation || 'Set Home Location'}
+                                </span>
+                                <MapPin size={18} className="text-[#00D68F] opacity-50 group-active:opacity-100" />
+                            </div>
                         </div>
+
+                        {showLP && (
+                            <LocationPicker
+                                theme={theme}
+                                title="Home Address"
+                                onClose={() => setShowLP(false)}
+                                onConfirm={(loc) => {
+                                    setHomeLocData(loc);
+                                    setEditLocation(loc.address);
+                                    setShowLP(false);
+                                }}
+                            />
+                        )}
                     </div>
 
-                    <button onClick={handleSaveProfile} className="w-full bg-[#00D68F] text-black font-bold py-4 rounded-xl mb-4 shadow-md">
-                        Save Changes
+                    <button
+                        onClick={handleSaveProfile}
+                        disabled={loading}
+                        className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
+                    >
+                        {loading ? <Loader2 className="animate-spin" /> : 'Save Changes'}
                     </button>
 
                     <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
 
-                    <button onClick={() => { setScreen('onboarding'); }} className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4">
+                    <button
+                        onClick={async () => {
+                            await supabase.auth.signOut();
+                            setScreen('onboarding');
+                        }}
+                        className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform"
+                    >
                         <LogOut size={20} /> Log Out
                     </button>
 
-                    <button className="w-full p-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2">
+                    <button
+                        onClick={() => {
+                            triggerHaptic();
+                            setShowDeleteModal(true);
+                        }}
+                        className="w-full p-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    >
                         <Trash2 size={20} /> Delete Account
                     </button>
                 </Drawer>

@@ -1,30 +1,95 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Gift, Copy, Share2, ChevronRight, Award } from 'lucide-react';
-import { Theme, Screen } from '../types';
+import { Theme, Screen, Reward, AppSettings } from '../types';
 import { BottomNav } from '../components/Navigation';
 import { triggerHaptic } from '../index';
+import { supabase } from '../supabaseClient';
 
 interface Props {
-  theme: Theme;
-  navigate: (scr: Screen) => void;
-  isScrolling: boolean;
+    theme: Theme;
+    navigate: (scr: Screen) => void;
+    isScrolling: boolean;
+    handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
+    settings: AppSettings;
 }
 
-export const EarnScreen = ({ theme, navigate, isScrolling }: Props) => {
+export const EarnScreen = ({ theme, navigate, isScrolling, handleScroll, settings }: Props) => {
     const [copied, setCopied] = useState(false);
-    const referralCode = "ALEX2025";
+    const [referralCode, setReferralCode] = useState<string | null>(null);
+    const [referralBalance, setReferralBalance] = useState(0);
+    const [activeRewards, setActiveRewards] = useState<Reward[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
     const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
     const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
     const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
 
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+
+                // 1. Fetch Profile for Code & Balance
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('referral_code, referral_balance, full_name')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profile) {
+                    setReferralBalance(profile.referral_balance || 0);
+
+                    if (profile.referral_code) {
+                        setReferralCode(profile.referral_code);
+                    } else {
+                        // Generate Code if missing: Firstname + 4 random digits
+                        const namePart = (profile.full_name || 'USER').split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+                        const randomPart = Math.floor(1000 + Math.random() * 9000);
+                        const newCode = `${namePart}${randomPart}`;
+
+                        await supabase
+                            .from('profiles')
+                            .update({ referral_code: newCode })
+                            .eq('id', session.user.id);
+
+                        setReferralCode(newCode);
+                    }
+                }
+
+                // 2. Fetch Active Rewards
+                const { data: rewards } = await supabase
+                    .from('user_rewards')
+                    .select('*')
+                    .eq('user_id', session.user.id)
+                    .eq('is_used', false)
+                    .gt('expiry_date', new Date().toISOString());
+
+                if (rewards) {
+                    setActiveRewards(rewards as Reward[]);
+                }
+
+            } catch (err) {
+                console.error("Earn Logic Error:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+
+        // Subscription would go here...
+    }, []);
+
     const copyCode = () => {
         triggerHaptic();
-        navigator.clipboard.writeText(referralCode);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (referralCode) {
+            navigator.clipboard.writeText(referralCode);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     return (
@@ -33,19 +98,21 @@ export const EarnScreen = ({ theme, navigate, isScrolling }: Props) => {
                 <h1 className="text-3xl font-bold">Gifts & Earn</h1>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-32">
+            <div className="flex-1 overflow-y-auto px-6 pb-32" onScroll={handleScroll}>
                 {/* Hero Card */}
                 <div className="bg-[#00D68F] rounded-[32px] p-6 text-black shadow-lg mb-6 relative overflow-hidden">
                     <div className="relative z-10">
                         <div className="w-12 h-12 bg-black/10 rounded-full flex items-center justify-center mb-4">
                             <Gift size={24} className="text-black" />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">Invite friends,<br/>get D50.00</h2>
+                        <h2 className="text-2xl font-bold mb-2">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount).toFixed(2)}</h2>
                         <p className="opacity-70 mb-6 text-sm font-medium">Share your code and earn rewards when your friends take their first ride or order.</p>
-                        
+
                         <div className="flex gap-3">
                             <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-xl p-3 flex items-center justify-between border border-black/5">
-                                <span className="font-mono font-bold tracking-widest">{referralCode}</span>
+                                <span className="font-mono font-bold tracking-widest">
+                                    {loading ? "..." : (referralCode || "Generating...")}
+                                </span>
                                 <button onClick={copyCode} className="p-1.5 hover:bg-black/10 rounded-lg transition-colors">
                                     {copied ? <span className="text-xs font-bold">Copied!</span> : <Copy size={18} />}
                                 </button>
@@ -64,7 +131,7 @@ export const EarnScreen = ({ theme, navigate, isScrolling }: Props) => {
                 <div className={`${bgCard} rounded-[24px] p-5 mb-6 flex items-center justify-between shadow-sm`}>
                     <div>
                         <p className={`text-xs font-bold uppercase ${textSec} mb-1`}>Rewards Balance</p>
-                        <h3 className="text-3xl font-bold">D150.00</h3>
+                        <h3 className="text-3xl font-bold">D{referralBalance.toFixed(2)}</h3>
                     </div>
                     <button className={`${theme === 'light' ? 'bg-gray-100' : 'bg-white/10'} px-4 py-2 rounded-full text-sm font-bold`}>
                         History
@@ -74,26 +141,26 @@ export const EarnScreen = ({ theme, navigate, isScrolling }: Props) => {
                 {/* Active Rewards / Offers */}
                 <h3 className="font-bold text-lg mb-4">Active Rewards</h3>
                 <div className="space-y-3">
-                    <div className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-sm`}>
-                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                            <Award size={24} />
+                    {activeRewards.length === 0 && !loading && (
+                        <div className={`p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center opacity-60`}>
+                            <Gift size={32} className="mb-2" />
+                            <p className="font-bold">No active rewards</p>
+                            <p className="text-xs">Invite friends to some earn perks!</p>
                         </div>
-                        <div className="flex-1">
-                            <h4 className="font-bold">Free Delivery</h4>
-                            <p className={`text-xs ${textSec}`}>Valid for your next 3 food orders</p>
+                    )}
+
+                    {activeRewards.map(reward => (
+                        <div key={reward.id} className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-sm`}>
+                            <div className={`w-12 h-12 rounded-full ${reward.type.includes('delivery') ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
+                                {reward.type.includes('delivery') ? <Award size={24} /> : <Gift size={24} />}
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-bold">{reward.title}</h4>
+                                <p className={`text-xs ${textSec}`}>{reward.description}</p>
+                            </div>
+                            <ChevronRight size={16} className={textSec} />
                         </div>
-                        <ChevronRight size={16} className={textSec} />
-                    </div>
-                    
-                    <div className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-sm opacity-50`}>
-                        <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
-                            <Gift size={24} />
-                        </div>
-                        <div className="flex-1">
-                            <h4 className="font-bold">20% Off Rides</h4>
-                            <p className={`text-xs ${textSec}`}>Expired yesterday</p>
-                        </div>
-                    </div>
+                    ))}
                 </div>
             </div>
 

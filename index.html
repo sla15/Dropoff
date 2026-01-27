@@ -1,105 +1,155 @@
-
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>SuperApp</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-      :root {
-        --safe-top: env(safe-area-inset-top);
-        --safe-bottom: env(safe-area-inset-bottom);
-        --ios-blue: #00D68F; /* Changed from Blue to Green */
-        --ios-gray-6: #F2F2F7;
-        --ios-gray-5: #E5E5EA;
-        --ios-gray-4: #D1D1D6;
-        --ios-gray-6-dark: #1C1C1E;
-        --ios-gray-5-dark: #2C2C2E;
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
-        overscroll-behavior-y: none;
-        -webkit-tap-highlight-color: transparent;
-        -webkit-touch-callout: none;
-        user-select: none;
-      }
-      
-      /* Global Scrollbar Hide */
-      * {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
-      }
-      *::-webkit-scrollbar {
-        display: none; /* Chrome, Safari and Opera */
-      }
-      
-      /* Safe Area Utilities */
-      .pt-safe {
-        padding-top: calc(env(safe-area-inset-top) + 1.25rem);
-      }
-      .pb-safe {
-        padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-      }
-      
-      /* Glassmorphism */
-      .glass {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: saturate(180%) blur(20px);
-        -webkit-backdrop-filter: saturate(180%) blur(20px);
-        border-bottom: 0.5px solid rgba(0,0,0,0.1);
-      }
-      .glass-dark {
-        background: rgba(28, 28, 30, 0.85);
-        backdrop-filter: saturate(180%) blur(20px);
-        -webkit-backdrop-filter: saturate(180%) blur(20px);
-        border-bottom: 0.5px solid rgba(255,255,255,0.1);
-      }
-      
-      /* Apple Map Simulation Colors */
-      .map-bg-light { background-color: #FBF8F4; }
-      .map-road-light { background-color: #FFFFFF; border: 1px solid #E5E5EA; }
-      .map-bg-dark { background-color: #242426; }
-      .map-road-dark { background-color: #3A3A3C; border: 1px solid #48484A; }
 
-      /* Animation Utilities */
-      .ios-slide-up {
-        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      @keyframes slideUp {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-      }
-      
-      .ios-slide-down {
-        animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-      @keyframes slideDown {
-        from { transform: translateY(0); }
-        to { transform: translateY(100%); }
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>SuperApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+      --ios-blue: #00D68F;
+      /* Changed from Blue to Green */
+      --ios-gray-6: #F2F2F7;
+      --ios-gray-5: #E5E5EA;
+      --ios-gray-4: #D1D1D6;
+      --ios-gray-6-dark: #1C1C1E;
+      --ios-gray-5-dark: #2C2C2E;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+
+    /* Global Scrollbar Hide */
+    * {
+      -ms-overflow-style: none;
+      /* IE and Edge */
+      scrollbar-width: none;
+      /* Firefox */
+    }
+
+    *::-webkit-scrollbar {
+      display: none;
+      /* Chrome, Safari and Opera */
+    }
+
+    /* Safe Area Utilities */
+    .pt-safe {
+      padding-top: calc(env(safe-area-inset-top) + 1.25rem);
+    }
+
+    .pb-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+    }
+
+    /* Glassmorphism */
+    .glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .glass-dark {
+      background: rgba(28, 28, 30, 0.85);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Apple Map Simulation Colors */
+    .map-bg-light {
+      background-color: #FBF8F4;
+    }
+
+    .map-road-light {
+      background-color: #FFFFFF;
+      border: 1px solid #E5E5EA;
+    }
+
+    .map-bg-dark {
+      background-color: #242426;
+    }
+
+    .map-road-dark {
+      background-color: #3A3A3C;
+      border: 1px solid #48484A;
+    }
+
+    /* Animation Utilities */
+    .ios-slide-up {
+      animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
       }
 
-      /* Screen Transitions */
-      .animate-scale-in {
-        animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      to {
+        transform: translateY(0);
       }
-      @keyframes scaleIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
+    }
+
+    .ios-slide-down {
+      animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translateY(0);
       }
 
-      .animate-slide-in {
-        animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      to {
+        transform: translateY(100%);
       }
-      @keyframes slideInRight {
-        from { opacity: 0; transform: translateX(20px); }
-        to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Screen Transitions */
+    .animate-scale-in {
+      animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
       }
-    </style>
-    <script type="importmap">
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .animate-slide-in {
+      animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+  </style>
+  <script type="importmap">
     {
       "imports": {
         "react": "https://esm.sh/react@^19.2.3",
@@ -111,10 +161,13 @@
       }
     }
     </script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_MAPS_API_KEY%&libraries=places"></script>
   <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-[#F2F2F7] dark:bg-black text-black dark:text-white overflow-hidden fixed inset-0">
-    <div id="root" class="h-full w-full"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body class="bg-[#F2F2F7] dark:bg-black text-black dark:text-white overflow-hidden fixed inset-0">
+  <div id="root" class="h-full w-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>
