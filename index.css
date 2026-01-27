@@ -1,3 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Screen Transitions */
 .screen-fade-enter {
@@ -26,13 +29,16 @@
 .slide-right-enter {
   transform: translateX(100%);
 }
+
 .slide-right-enter-active {
   transform: translateX(0);
   transition: transform 300ms ease-out;
 }
+
 .slide-right-exit {
   transform: translateX(0);
 }
+
 .slide-right-exit-active {
   transform: translateX(-100%);
   transition: transform 300ms ease-in;
