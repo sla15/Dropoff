@@ -17,6 +17,7 @@ interface Props {
     favorites: string[];
     businesses: Business[];
     isScrolling: boolean;
+    isNavVisible: boolean;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
 }
@@ -98,7 +99,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
-export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivity, favorites, businesses, isScrolling, handleScroll, settings }: Props) => {
+export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivity, favorites, businesses, isScrolling, isNavVisible, handleScroll, settings }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
 
@@ -326,7 +327,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 </div>
             </div>
 
-            <BottomNav active="profile" navigate={navigate} theme={theme} isScrolling={isScrolling} />
+            <BottomNav active="profile" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
 
             {/* --- DRAWERS --- */}
 

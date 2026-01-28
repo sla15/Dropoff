@@ -90,3 +90,14 @@ img[src*="car_premium"] {
 img[src*="car_scooter"] {
   filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.6));
 }
+
+/* Navigation Animations */
+.nav-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.nav-hidden {
+  transform: translateY(120%);
+  opacity: 0;
+}

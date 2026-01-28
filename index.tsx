@@ -494,12 +494,28 @@ const App = () => {
     }
   };
 
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const currentScrollY = e.currentTarget.scrollTop;
+
+    // Hide nav when scrolling down, show when scrolling up
+    if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+      if (isNavVisible) setIsNavVisible(false);
+    } else if (currentScrollY < lastScrollY.current) {
+      if (!isNavVisible) setIsNavVisible(true);
+    }
+
+    lastScrollY.current = currentScrollY;
+
     setIsScrolling(true);
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       setIsScrolling(false);
-    }, 150);
+      // Auto show nav when scroll stops for a bit (optional but feels safe)
+      setIsNavVisible(true);
+    }, 400); // Increased timeout for a more stable feel
   };
 
   const renderScreen = () => {
@@ -507,17 +523,17 @@ const App = () => {
       case 'onboarding':
         return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} />;
       case 'dashboard':
-        return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivity={recentActivity} setRecentActivity={setRecentActivity} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setMarketSearchQuery={setMarketSearchQuery} settings={settings} />;
+        return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivity={recentActivity} setRecentActivity={setRecentActivity} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setMarketSearchQuery={setMarketSearchQuery} settings={settings} />;
       case 'marketplace':
-        return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} />;
+        return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} />;
       case 'earn':
-        return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} handleScroll={handleScroll} settings={settings} />;
+        return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} />;
       case 'business-detail':
         return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} />;
       case 'checkout':
         return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} />;
       case 'profile':
-        return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivity={recentActivity} favorites={favorites} businesses={businesses} isScrolling={isScrolling} handleScroll={handleScroll} settings={settings} />;
+        return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivity={recentActivity} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} />;
       case 'order-tracking':
         return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivity={setRecentActivity} />;
       default:
@@ -526,7 +542,7 @@ const App = () => {
   };
 
   return (
-    <div className={`flex h-screen w-full ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-black'} transition-colors overflow-hidden`}>
+    <div className={`flex h-[100dvh] w-full ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-black'} transition-colors overflow-hidden`}>
       {isLoading && <SplashScreen theme={theme} />}
       {!isLoading && screen !== 'onboarding' && <Sidebar active={screen} navigate={navigate} theme={theme} />}
       <div className={`flex-1 relative flex justify-center bg-gray-100 dark:bg-black/50 overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>

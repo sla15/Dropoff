@@ -11,6 +11,7 @@ interface Props {
    categories: Category[];
    setSelectedBusiness: (b: Business | null) => void;
    isScrolling: boolean;
+   isNavVisible: boolean;
    handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
    toggleFavorite: (id: string, e?: React.MouseEvent) => void;
    favorites: string[];
@@ -18,7 +19,7 @@ interface Props {
    setSearchQuery: (q: string) => void;
 }
 
-export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery }: Props) => {
+export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
 
    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
@@ -143,7 +144,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                </div>
             )}
          </div>
-         <BottomNav active="marketplace" navigate={navigate} theme={theme} isScrolling={isScrolling} />
+         <BottomNav active="marketplace" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
       </div>
    );
 };

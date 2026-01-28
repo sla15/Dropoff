@@ -10,11 +10,12 @@ interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
     isScrolling: boolean;
+    isNavVisible: boolean;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
 }
 
-export const EarnScreen = ({ theme, navigate, isScrolling, handleScroll, settings }: Props) => {
+export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleScroll, settings }: Props) => {
     const [copied, setCopied] = useState(false);
     const [referralCode, setReferralCode] = useState<string | null>(null);
     const [referralBalance, setReferralBalance] = useState(0);
@@ -164,7 +165,7 @@ export const EarnScreen = ({ theme, navigate, isScrolling, handleScroll, setting
                 </div>
             </div>
 
-            <BottomNav active="earn" navigate={navigate} theme={theme} isScrolling={isScrolling} />
+            <BottomNav active="earn" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
         </div>
     );
 };

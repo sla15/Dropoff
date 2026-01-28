@@ -8,20 +8,21 @@ interface NavProps {
     navigate: (scr: Screen) => void;
     theme: Theme;
     isScrolling?: boolean;
+    isNavVisible?: boolean;
 }
 
-export const BottomNav = ({ active, navigate, theme, isScrolling }: NavProps) => {
+export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible = true }: NavProps) => {
     if (active === 'checkout' || active === 'business-detail' || active === 'order-tracking') return null;
 
     return (
-        <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className={`fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isNavVisible ? 'nav-visible' : 'nav-hidden'}`}>
             <div
                 className={`
           pointer-events-auto
-          ${theme === 'light' ? 'bg-white text-black border-white' : 'bg-[#1C1C1E] text-white border-white/5'} 
-          rounded-[32px] px-2 shadow-2xl flex items-center justify-between relative border ring-1 ring-black/5
+          ${theme === 'light' ? 'bg-white/80 text-black border-white' : 'bg-[#1C1C1E]/80 text-white border-white/5'} 
+          backdrop-blur-2xl rounded-[32px] px-2 shadow-2xl flex items-center justify-between relative border ring-1 ring-black/5
           transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
-          ${isScrolling ? 'w-[320px] py-2' : 'w-[90%] md:w-[400px] py-3'}
+          ${isScrolling ? 'w-[320px] py-1.5' : 'w-[92%] md:w-[400px] py-3'}
         `}
             >
 

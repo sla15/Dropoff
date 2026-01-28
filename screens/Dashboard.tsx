@@ -19,6 +19,7 @@ interface Props {
   setRecentActivity: React.Dispatch<React.SetStateAction<Activity[]>>;
   setSelectedBusiness: (b: Business | null) => void;
   isScrolling: boolean;
+  isNavVisible: boolean;
   handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
   setPrefilledDestination: (dest: string | null) => void;
   setMarketSearchQuery: (q: string) => void;
@@ -27,7 +28,7 @@ interface Props {
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivity, setRecentActivity, setSelectedBusiness, isScrolling, handleScroll, setPrefilledDestination, setMarketSearchQuery, settings }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivity, setRecentActivity, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setMarketSearchQuery, settings }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -534,7 +535,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
       )}
 
-      <BottomNav active="dashboard" navigate={navigate} theme={theme} isScrolling={isScrolling} />
+      <BottomNav active="dashboard" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
     </div>
   );
 };
