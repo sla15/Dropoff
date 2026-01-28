@@ -23,41 +23,10 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     const [userComment, setUserComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!selectedBusiness) return null;
-
-    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
-    const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
-    const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
-    const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
-
-    const addToCart = (product: Product, variation?: string) => {
-        triggerHaptic();
-        setCart(prev => {
-            // Create a unique ID based on product ID and variation to differentiate in cart
-            const cartItemId = variation ? `${product.id}-${variation}` : product.id;
-            const productName = variation ? `${product.name} (${variation})` : product.name;
-
-            const existing = prev.find(i => i.id === cartItemId);
-            if (existing) {
-                return prev.map(i => i.id === cartItemId ? { ...i, quantity: i.quantity + 1 } : i);
-            }
-            return [...prev, {
-                ...product,
-                id: cartItemId, // Override ID for cart uniqueness
-                name: productName, // Override name to include variation
-                quantity: 1,
-                businessId: selectedBusiness.id,
-                businessName: selectedBusiness.name
-            }];
-        });
-    };
-
-    const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-
     // Extract unique categories/tags from all products
     const filters = useMemo(() => {
+        if (!selectedBusiness) return ['All'];
         const tags = new Set<string>(['All']);
-        // Add Main Categories
         selectedBusiness.products.forEach(p => {
             if (p.mainCategory) tags.add(p.mainCategory);
         });
@@ -74,9 +43,10 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
         if (!selectedBusiness) return;
         setLoadingReviews(true);
         try {
+            // Explicitly specify the relationship to avoid ambiguity
             const { data, error } = await supabase
                 .from('reviews')
-                .select('*, profiles(full_name)')
+                .select('*, profiles!reviewer_id(full_name)')
                 .eq('target_id', selectedBusiness.id)
                 .order('created_at', { ascending: false });
 
@@ -88,6 +58,37 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
             setLoadingReviews(false);
         }
     };
+
+    const addToCart = (product: Product, variation?: string) => {
+        if (!selectedBusiness) return;
+        triggerHaptic();
+        setCart(prev => {
+            const cartItemId = variation ? `${product.id}-${variation}` : product.id;
+            const productName = variation ? `${product.name} (${variation})` : product.name;
+
+            const existing = prev.find(i => i.id === cartItemId);
+            if (existing) {
+                return prev.map(i => i.id === cartItemId ? { ...i, quantity: i.quantity + 1 } : i);
+            }
+            return [...prev, {
+                ...product,
+                id: cartItemId,
+                name: productName,
+                quantity: 1,
+                businessId: selectedBusiness.id,
+                businessName: selectedBusiness.name
+            }];
+        });
+    };
+
+    if (!selectedBusiness) return null;
+
+    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
+    const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
+    const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
+    const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
+
+    const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
     const filteredProducts = selectedBusiness.products.filter(p => {
         if (selectedFilter === 'All') return true;

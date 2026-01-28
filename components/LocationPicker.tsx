@@ -4,6 +4,14 @@ import { Search, MapPin, Map as MapIcon, Locate, X, ArrowRight, Loader2 } from '
 import { Theme } from '../types';
 import { triggerHaptic } from '../index';
 
+// Helper for generating standard UUID tokens
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 interface Props {
     theme: Theme;
     onConfirm: (location: { address: string; lat: number; lng: number }) => void;
@@ -87,7 +95,13 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
         setMap(newMap);
         setMarker(newMarker);
-        setSessionToken(new google.maps.places.AutocompleteSessionToken());
+    };
+
+    const startNewSession = () => {
+        if (!sessionToken) {
+            setSessionToken(generateUUID());
+            console.log("Maps: Started new search session");
+        }
     };
 
     const reverseGeocode = (coords: { lat: number; lng: number }) => {
@@ -138,8 +152,8 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
                 setAddress(results[0].formatted_address);
                 setPredictions([]);
 
-                // Refresh session token for the next search sequence to save cost
-                setSessionToken(new google.maps.places.AutocompleteSessionToken());
+                // Discard session token after successful selection to save cost
+                setSessionToken(null);
             }
         });
     };
@@ -210,6 +224,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
                         <input
                             placeholder="Search address..."
                             value={address}
+                            onFocus={startNewSession}
                             onChange={(e) => handleSearch(e.target.value)}
                             className="flex-1 bg-transparent outline-none font-medium text-sm"
                         />

@@ -6,6 +6,13 @@ import { triggerHaptic, sendPushNotification } from '../index';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
+
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
@@ -90,7 +97,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
             }));
 
             autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-            sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+            // Start with no session token; generate on focus
+            sessionToken.current = null;
 
             // 1. Center on User Location
             if (navigator.geolocation) {
@@ -462,7 +470,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         }
 
         if (autocompleteService.current) {
-            autocompleteService.current.getPredictions({
+            // Start session if not exists
+            if (!sessionToken.current) {
+                sessionToken.current = generateUUID();
+                console.log("Maps Ride: Started new session");
+            }
+
+            autocompleteService.current.getPlacePredictions({
                 input: val,
                 sessionToken: sessionToken.current,
                 componentRestrictions: { country: 'gm' } // Restrict to Gambia
@@ -479,8 +493,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         setPredictions([]);
         setActiveInputIndex(null);
 
-        // Refresh session token for next search
-        sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+        // Clear session token to save cost
+        sessionToken.current = null;
 
         // Geocode and update map
         const geocoder = new (window as any).google.maps.Geocoder();
@@ -990,7 +1004,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
                                                             className="bg-transparent outline-none flex-1 font-bold text-sm"
                                                             value={dest}
                                                             onChange={(e) => handleSearch(e.target.value, idx)}
-                                                            onFocus={() => setActiveInputIndex(idx)}
+                                                            onFocus={() => {
+                                                                setActiveInputIndex(idx);
+                                                                if (!sessionToken.current) {
+                                                                    sessionToken.current = generateUUID();
+                                                                }
+                                                            }}
                                                         />
                                                         {destinations.length > 1 && (
                                                             <button onClick={() => removeDestination(idx)} className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">

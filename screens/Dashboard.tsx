@@ -25,6 +25,14 @@ interface Props {
   settings: AppSettings;
 }
 
+const generateUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+
 export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivity, setRecentActivity, setSelectedBusiness, isScrolling, handleScroll, setPrefilledDestination, setMarketSearchQuery, settings }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
@@ -148,8 +156,11 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     }
 
     if (!(window as any).google) return;
+
+    // Start session if not exists
     if (!sessionToken.current) {
-      sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+      sessionToken.current = generateUUID();
+      console.log("Maps Dash: Started new session");
     }
 
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -163,7 +174,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       }, (preds: any) => {
         setPredictions(preds || []);
       });
-    }, 500); // Increased debounce to 500ms
+    }, 500);
   };
 
   const selectMapPrediction = (pred: any) => {
@@ -172,10 +183,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     setPredictions([]);
     setPrefilledDestination(pred.description);
 
-    // Refresh session token for the next sequence
-    if (google) {
-      sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-    }
+    // End session correctly to save cost
+    sessionToken.current = null;
 
     triggerHaptic();
     navigate('ride');
@@ -230,6 +239,11 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${textSec}`} size={20} />
             <input
               value={searchQuery}
+              onFocus={() => {
+                if (searchMode === 'maps' && !sessionToken.current) {
+                  sessionToken.current = generateUUID();
+                }
+              }}
               onChange={(e) => searchMode === 'market' ? setSearchQuery(e.target.value) : handleMapSearch(e.target.value)}
               onKeyDown={handleSearch}
               placeholder={searchMode === 'market' ? "What to order?" : "Where to go?"}
