@@ -337,21 +337,21 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             <div className="absolute bottom-[-10%] left-[-20%] w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[80px] animate-[pulse_5s_ease-in-out_infinite_1s]"></div>
 
             <div className="flex-1 flex flex-col justify-end pb-10 z-10">
-               <div className="mb-10 relative">
+               <div className="mb-12 relative w-full">
                   {/* Animated Logo */}
-                  <div className="w-24 h-24 mb-8 flex items-center justify-center animate-[bounce_3s_infinite]">
+                  <div className="w-[30vw] h-[30vw] max-w-[160px] max-h-[160px] mb-12 flex items-center justify-center animate-[bounce_3s_infinite]">
                      <img
                         src="/assets/logo.png"
                         alt="DROPOFF"
-                        className="w-full h-full object-contain rounded-[2rem] shadow-2xl"
+                        className="w-full h-full object-contain rounded-[20%] shadow-2xl"
                      />
                   </div>
 
-                  <h1 className="text-6xl font-black tracking-tighter mb-6 leading-[0.95]">
+                  <h1 className="text-[14vw] sm:text-7xl font-black tracking-tighter mb-8 leading-[0.9]">
                      Move<br />
                      <span className="text-[#00D68F]">Freely.</span>
                   </h1>
-                  <p className={`text-lg ${textSec} leading-relaxed max-w-[280px] font-medium`}>
+                  <p className={`text-xl ${textSec} leading-relaxed max-w-[320px] font-medium`}>
                      The professional way to ride, shop, and manage your business.
                   </p>
                </div>

@@ -8,25 +8,25 @@ export const SplashScreen = ({ theme }: { theme: Theme }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden">
-      <div className="relative flex flex-col items-center">
+      <div className="relative flex flex-col items-center w-full px-6">
         {/* Main Logo Container */}
-        <div className="relative flex flex-col items-center justify-center">
+        <div className="relative flex flex-col items-center justify-center w-full max-w-sm">
           {/* Logo: Slide from above */}
           <div className="relative z-10 animate-logo-drop will-change-transform">
             <img
               src="/assets/logo.png"
               alt="Logo"
-              className="w-80 h-80 object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)] rounded-[80px]"
+              className="w-[50vw] h-[50vw] max-w-[320px] max-h-[320px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)] rounded-[20%]"
             />
           </div>
 
           {/* Logo Text: Slide from left inside/behind the logo area */}
-          <div className="mt-[-20px] overflow-hidden">
-            <div className="animate-text-reveal will-change-transform flex items-center">
-              <span className="text-8xl font-black tracking-tighter text-[#8E8E93]">
+          <div className="mt-[-4vw] overflow-hidden">
+            <div className="animate-text-reveal will-change-transform flex items-center justify-center">
+              <span className="text-[12vw] sm:text-8xl font-black tracking-tighter text-[#8E8E93]">
                 DROP
               </span>
-              <span className="text-8xl font-black tracking-tighter text-[#00D68F]">
+              <span className="text-[12vw] sm:text-8xl font-black tracking-tighter text-[#00D68F]">
                 OFF
               </span>
             </div>
@@ -36,8 +36,8 @@ export const SplashScreen = ({ theme }: { theme: Theme }) => {
 
       <style>{`
         @keyframes logo-drop {
-          0% { transform: translateY(-300px); opacity: 0; }
-          60% { transform: translateY(20px); opacity: 1; }
+          0% { transform: translateY(-40vh); opacity: 0; }
+          60% { transform: translateY(2vh); opacity: 1; }
           100% { transform: translateY(0); opacity: 1; }
         }
         @keyframes text-reveal {
