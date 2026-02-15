@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
 import { BottomNav } from '../components/Navigation';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 
@@ -13,13 +13,24 @@ interface Props {
     setScreen: React.Dispatch<React.SetStateAction<Screen>>;
     user: UserData;
     setUser: React.Dispatch<React.SetStateAction<UserData>>;
-    recentActivity: Activity[];
+    recentActivities: Activity[];
+    setRecentActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
     favorites: string[];
     businesses: Business[];
     isScrolling: boolean;
     isNavVisible: boolean;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
 }
 
 type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
@@ -69,7 +80,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
             <div
                 ref={drawerRef}
-                className={`w-full ${bgCard} rounded-t-[32px] pb-safe relative z-10 max-h-[90vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+                className={`w-full ${theme === 'light' ? 'bg-white/80' : 'bg-[#1C1C1E]/80'} backdrop-blur-xl rounded-t-[32px] pb-safe relative z-10 max-h-[90vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
                 style={{
                     transform: `translateY(${dragY}px)`,
                     transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
@@ -99,7 +110,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
-export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivity, favorites, businesses, isScrolling, isNavVisible, handleScroll, settings }: Props) => {
+export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, handleScroll, settings, showAlert }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
 
@@ -130,7 +141,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 .select('*')
                 .eq('user_id', session.user.id)
                 .eq('label', 'Home')
-                .single();
+                .maybeSingle();
 
             if (data) {
                 setHomeLocData({ address: data.address, lat: data.latitude, lng: data.longitude });
@@ -170,6 +181,17 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             const userId = session?.user?.id;
 
             if (!userId) throw new Error("No active session found");
+
+            if (!editName.trim()) {
+                showAlert("Missing Name", "Full Name cannot be empty.", "error");
+                setLoading(false);
+                return;
+            }
+            if (!editLocation.trim()) {
+                showAlert("Missing Location", "Home Location cannot be empty.", "error");
+                setLoading(false);
+                return;
+            }
 
             let finalAvatarUrl = user.photo;
 
@@ -239,7 +261,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             closeDrawer();
         } catch (err: any) {
             console.error("Failed to update profile:", err);
-            alert(`Update Failed: ${err.message}`);
+            showAlert("Update Failed", err.message, "error");
         } finally {
             setLoading(false);
         }
@@ -284,7 +306,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                         'bg-red-500/10 text-red-500'
                                     }`}>
                                     <Star size={12} fill="currentColor" />
-                                    <span className="text-xs font-black">{user.rating.toFixed(1)}</span>
+                                    <span className="text-xs font-black">{(user.rating || 5.0).toFixed(1)}</span>
                                 </div>
                                 <span className={`text-[10px] font-medium ${textSec}`}>Rating</span>
                             </div>
@@ -368,21 +390,21 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         )}
                         <div>
                             <label className={`text-xs font-bold ${textSec} mb-1 block`}>Full Name</label>
-                            <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
+                            <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
                         </div>
                         <div>
                             <label className={`text-xs font-bold ${textSec} mb-1 block`}>Phone Number</label>
-                            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
+                            <input value={editPhone} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
                         </div>
                         <div>
                             <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>
-                            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${inputBg} outline-none font-medium`} />
+                            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
                         </div>
                         <div>
                             <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
                             <div
                                 onClick={() => setShowLP(true)}
-                                className={`w-full p-3 rounded-xl ${inputBg} border-2 border-transparent active:border-[#00D68F] transition-all cursor-pointer flex items-center justify-between group`}
+                                className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md cursor-pointer flex items-center justify-between group`}
                             >
                                 <span className={`flex-1 font-medium truncate ${!editLocation ? 'opacity-30' : ''}`}>
                                     {editLocation || 'Set Home Location'}
@@ -395,6 +417,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             <LocationPicker
                                 theme={theme}
                                 title="Home Address"
+                                user={user}
                                 onClose={() => setShowLP(false)}
                                 onConfirm={(loc) => {
                                     setHomeLocData(loc);
@@ -440,19 +463,60 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             {/* History Drawer */}
             {activeDrawer === 'history' && (
                 <Drawer title="Ride & Order History" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard}>
-                    {recentActivity.length === 0 ? (
+                    {recentActivities.length === 0 ? (
                         <div className={`text-center py-10 ${textSec}`}>No history yet.</div>
                     ) : (
                         <div className="space-y-4">
-                            {recentActivity.map(item => (
-                                <div key={item.id} className={`p-4 rounded-2xl ${inputBg} flex items-center gap-4`}>
+                            {recentActivities.map(item => (
+                                <div key={item.id} className={`p-4 rounded-2xl ${inputBg} flex items-center gap-4 group/item`}>
                                     <div className={`w-12 h-12 rounded-full ${item.type === 'ride' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
                                         {item.type === 'ride' ? <Car size={20} /> : <ShoppingBag size={20} />}
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex justify-between">
                                             <h4 className="font-bold">{item.title}</h4>
-                                            <span className="font-bold">D{item.price}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold">D{item.price}</span>
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        triggerHaptic();
+                                                        showAlert(
+                                                            "Delete Activity",
+                                                            `Are you sure you want to permanently delete this ${item.type} from your history? This action cannot be undone.`,
+                                                            "info",
+                                                            async () => {
+                                                                try {
+                                                                    // Update local state first for immediate UI feedback
+                                                                    setRecentActivities(prev => prev.filter(a => a.id !== item.id));
+
+                                                                    // Delete from Supabase
+                                                                    const table = item.type === 'ride' ? 'rides' : 'orders';
+                                                                    const { error } = await supabase.from(table).delete().eq('id', item.id);
+
+                                                                    if (error) {
+                                                                        console.error(`Error deleting ${item.type}:`, error);
+                                                                        showAlert("Delete Failed", `Failed to delete ${item.type} from history.`, "error");
+                                                                        // Revert local state on error
+                                                                        setRecentActivities(prev => [...prev, item].sort((a, b) =>
+                                                                            new Date(b.date).getTime() - new Date(a.date).getTime()
+                                                                        ));
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error("Delete Activity Error:", err);
+                                                                    showAlert("Delete Failed", "An unexpected error occurred.", "error");
+                                                                }
+                                                            },
+                                                            true,
+                                                            "Yes, Delete",
+                                                            "Cancel"
+                                                        );
+                                                    }}
+                                                    className="p-2 -mr-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-all text-red-500 active:scale-95"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="flex justify-between mt-1">
                                             <span className={`text-xs ${textSec}`}>{item.subtitle}</span>
@@ -529,7 +593,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
                         <p>Version 1.0.5 (Build 202)</p>
-                        <p>© 2025 SuperApp Inc.</p>
+                        <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>
             )}

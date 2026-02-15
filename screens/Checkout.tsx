@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, MapPin, ChevronRight, Truck, Plus, Minus, Trash2, Copy, Check } from 'lucide-react';
 import { Theme, Screen, CartItem, UserData, AppSettings } from '../types';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 
@@ -13,9 +13,20 @@ interface Props {
     setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
     user: UserData;
     settings: AppSettings;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
+    setActiveOrderId: (id: string | null) => void;
 }
 
-export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings }: Props) => {
+export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId }: Props) => {
     const [deliveryNote, setDeliveryNote] = useState('');
     const [merchants, setMerchants] = useState<Record<string, { name: string, phone: string }>>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -23,8 +34,8 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [showPicker, setShowPicker] = useState(false);
     const [deliveryLocation, setDeliveryLocation] = useState<{ address: string; lat: number; lng: number }>({
         address: user.location || 'Banjul, The Gambia',
-        lat: 13.4432,
-        lng: -16.6322
+        lat: user.last_lat || 13.4432,
+        lng: user.last_lng || -16.6322
     });
 
 
@@ -128,15 +139,15 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         delivery_instructions: deliveryNote,
                         delivery_address: deliveryLocation.address
                     })
-                    .select()
-                    .single();
+                    .eq('label', 'Home')
+                    .maybeSingle();
 
                 if (orderError) throw orderError;
 
                 // 2. Insert Order Items
                 const orderItemsToInsert = items.map(item => ({
                     order_id: orderData.id,
-                    product_id: item.id,
+                    product_id: item.originalProductId, // Use the preserved UUID
                     quantity: item.quantity,
                     price_at_time: item.price
                 }));
@@ -146,6 +157,9 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     .insert(orderItemsToInsert);
 
                 if (itemsError) throw itemsError;
+
+                // Track this order specifically for real-time tracking
+                setActiveOrderId(orderData.id);
             }
 
             // 3. Success
@@ -154,7 +168,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             // Success feedback would usually be a cleaner modal
         } catch (err: any) {
             console.error("Order Placement Error:", err);
-            alert(`Order Failed: ${err.message}`);
+            showAlert("Order Failed", err.message, "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -179,7 +193,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     </h2>
                     <div
                         onClick={() => { triggerHaptic(); setShowPicker(true); }}
-                        className={`flex items-center justify-between p-3 rounded-xl ${inputBg} cursor-pointer active:opacity-80`}
+                        className={`flex items-center justify-between p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md cursor-pointer active:opacity-80`}
                     >
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-white dark:bg-black flex items-center justify-center">
@@ -199,8 +213,8 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         <input
                             value={deliveryNote}
                             onChange={(e) => setDeliveryNote(e.target.value)}
-                            placeholder="e.g. Call when outside"
-                            className={`w-full p-3 rounded-xl ${inputBg} outline-none text-sm font-medium`}
+                            className={`w-full p-4 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`}
+                            placeholder="e.g. Ring the doorbell, Leave at front desk"
                         />
                     </div>
                 </div>
@@ -341,6 +355,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     onClose={() => setShowPicker(false)}
                     title="Set Delivery Location"
                     initialLocation={{ lat: deliveryLocation.lat, lng: deliveryLocation.lng }}
+                    user={user}
                 />
             )}
         </div>

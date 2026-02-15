@@ -1,11 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift } from 'lucide-react';
+import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, SavedLocation, AppSettings } from '../types';
-import { triggerHaptic, GreenGlow } from '../index';
+import { triggerHaptic } from '../utils/helpers';
+import { GreenGlow } from '../components/GreenGlow';
 import { BottomNav } from '../components/Navigation';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
+import { NotificationPrompt } from '../components/NotificationPrompt';
+import { initFCM } from '../utils/fcm';
 
 interface Props {
   user: UserData;
@@ -15,20 +18,33 @@ interface Props {
   setShowAssistant: (s: boolean) => void;
   favorites: string[];
   businesses: Business[];
-  recentActivity: Activity[];
-  setRecentActivity: React.Dispatch<React.SetStateAction<Activity[]>>;
+  recentActivities: Activity[];
+  setRecentActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
   setSelectedBusiness: (b: Business | null) => void;
   isScrolling: boolean;
   isNavVisible: boolean;
   handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
   setPrefilledDestination: (dest: string | null) => void;
+  setPrefilledTier: (tier: string | null) => void;
+  setPrefilledDistance: (dist: number | null) => void;
   setMarketSearchQuery: (q: string) => void;
   settings: AppSettings;
+  showAlert: (
+    title: string,
+    message: string,
+    type?: 'success' | 'error' | 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText?: string,
+    cancelText?: string,
+    onCancel?: () => void
+  ) => void;
+  activeOrderId: string | null;
 }
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivity, setRecentActivity, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setMarketSearchQuery, settings }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
@@ -46,6 +62,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
   const EMOJIS = ['🏠', '💼', '🏋️', '🏫', '🌳', '🛍️', '🍽️', '🎾'];
   const LABELS = ['Home', 'Work', 'Gym', 'School', 'Park', 'Mall', 'Restaurant', 'Club'];
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     fetchLocations();
@@ -84,6 +101,96 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     }
   };
 
+  useEffect(() => {
+    // Check if we should show the notification prompt
+    const checkNotificationStatus = async () => {
+      // Only prompt if they are logged in
+      if (!user.id) return;
+
+      const permission = (Notification as any)?.permission;
+      const hasPromptedThisSession = sessionStorage.getItem('notif_prompt_seen');
+
+      // If they haven't granted permission AND haven't been prompted in this session
+      if (permission === 'default' && !hasPromptedThisSession) {
+        console.log('🔔 Dashboard: User needs a notification prompt (permission is default)');
+        setTimeout(() => setShowNotificationPrompt(true), 3000); // Wait 3s after load
+      } else if (permission === 'granted') {
+        // If already granted but maybe no ID in DB, try to sync
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('fcm_token')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!profile?.fcm_token) {
+          console.log('🔔 Dashboard: Permission granted but no FCM token in DB, syncing...');
+          await initFCM(user.id);
+        }
+      }
+    };
+
+    if (user.id) {
+      checkNotificationStatus();
+    }
+  }, [user.id, user.role]);
+
+  const handleDeleteActivity = async (activity: Activity, e: React.MouseEvent) => {
+    e.stopPropagation();
+    showAlert(
+      "Delete Activity",
+      `Are you sure you want to permanently delete this ${activity.type} from your history? This will also remove any cached distance data.`,
+      "info",
+      async () => {
+        triggerHaptic();
+        try {
+          // 1. Remove from UI immediately
+          setRecentActivities(prev => prev.filter(a => a.id !== activity.id));
+
+          // 2. Determine target ID (use reference_id if available, fallback to activity.id)
+          const targetId = activity.reference_id || activity.id;
+          const table = activity.type === 'ride' ? 'rides' : 'orders';
+
+          // 3. If it's a ride, attempt to delete from distance_cache first
+          if (activity.type === 'ride') {
+            const { data: ride } = await supabase
+              .from('rides')
+              .select('pickup_lat, pickup_lng, dropoff_lat, dropoff_lng')
+              .eq('id', targetId)
+              .maybeSingle();
+
+            if (ride) {
+              // Delete both direct and reverse cache entries
+              await supabase
+                .from('distance_cache')
+                .delete()
+                .or(`and(origin_lat.eq.${ride.pickup_lat},origin_lng.eq.${ride.pickup_lng},dest_lat.eq.${ride.dropoff_lat},dest_lng.eq.${ride.dropoff_lng}),and(origin_lat.eq.${ride.dropoff_lat},origin_lng.eq.${ride.dropoff_lng},dest_lat.eq.${ride.pickup_lat},dest_lng.eq.${ride.pickup_lng})`);
+            }
+          }
+
+          // 4. Delete from source table (rides/orders)
+          await supabase
+            .from(table)
+            .delete()
+            .eq('id', targetId);
+
+          // 5. Delete the activity record itself
+          await supabase
+            .from('user_activities')
+            .delete()
+            .eq('id', activity.id);
+
+          console.log(`✅ ${activity.type} and associated data deleted.`);
+        } catch (err) {
+          console.error("Delete Activity Error:", err);
+          showAlert("Error", "Something went wrong during deletion.", "error");
+        }
+      },
+      true, // showCancel
+      "Yes, Delete",
+      "Cancel"
+    );
+  };
+
   const handleSaveLocation = async (locData: { address: string; lat: number; lng: number }) => {
     setIsLoading(true);
     try {
@@ -91,7 +198,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       if (!session) return;
 
       if (savedLocations.some(sl => sl.address === locData.address)) {
-        alert("This location is already saved!");
+        showAlert("Duplicate Location", "This location is already saved in your places.", "info");
         setIsLoading(false);
         return;
       }
@@ -110,8 +217,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       setShowMapPicker(false);
       setShowSaveDrawer(false);
       fetchLocations();
+      showAlert("Success", "Location saved successfully!", "success");
     } catch (err: any) {
-      alert(`Error saving location: ${err.message}`);
+      showAlert("Error", `Could not save location: ${err.message}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -219,8 +327,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                     user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
                       'bg-red-500/10 text-red-500'
                     }`}>
-                    <Star size={10} fill="currentColor" />
-                    <span className="text-[10px] font-black">{user.rating.toFixed(1)}</span>
+                    <span className="text-[10px] font-black">{(user.rating || 5.0).toFixed(1)}</span>
                   </div>
                 )}
               </div>
@@ -246,7 +353,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               onChange={(e) => searchMode === 'market' ? setSearchQuery(e.target.value) : handleMapSearch(e.target.value)}
               onKeyDown={handleSearch}
               placeholder={searchMode === 'market' ? "What to order?" : "Where to go?"}
-              className={`w-full h-14 pl-12 pr-12 rounded-[20px] ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#1C1C1E]'} font-medium outline-none text-base placeholder:opacity-50 focus:ring-2 focus:ring-[#00D68F] transition-all cursor-text shadow-sm`}
+              className={`w-full h-14 pl-12 pr-12 rounded-[20px] ${theme === 'light' ? 'bg-[#F2F2F7]/50 border border-white/40' : 'bg-[#1C1C1E]/50 border border-white/5'} backdrop-blur-md font-medium outline-none text-base placeholder:opacity-50 focus:ring-2 focus:ring-[#00D68F] transition-all cursor-text shadow-sm`}
             />
             {searchQuery && (
               <button
@@ -280,7 +387,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 </div>
                 <div>
                   <div className={`text-[10px] uppercase font-black text-[#00D68F] tracking-widest`}>Available Credit</div>
-                  <div className="text-lg font-black">{settings.currency_symbol}{user.referralBalance.toFixed(2)}</div>
+                  <div className="text-lg font-black">{settings.currency_symbol}{(user.referralBalance || 0).toFixed(2)}</div>
                 </div>
               </div>
               <button
@@ -312,7 +419,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         )}
       </div>
 
-      <div className="flex-1 px-5 pt-2 flex flex-col gap-4 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
+      <div className="flex-1 px-5 pt-2 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
         <div className="grid grid-cols-2 gap-4">
           <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[24px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-sm cursor-pointer`}>
             <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
@@ -335,36 +442,12 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           </div>
         </div>
 
-        {/* Featured Favorites */}
-        {favorites.length > 0 && (
-          <div className="mt-2">
-            <h3 className={`text-lg font-bold mb-3 ${textMain}`}>My Favorites</h3>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-              {businesses.filter(b => favorites.includes(b.id)).map(b => (
-                <div
-                  key={b.id}
-                  onClick={() => { triggerHaptic(); setSelectedBusiness(b); navigate('business-detail', true); }}
-                  className={`min-w-[160px] p-4 rounded-[24px] ${bgCard} shadow-sm cursor-pointer border-2 border-transparent hover:border-[#00D68F] transition-all flex flex-col gap-2`}
-                >
-                  <div className="w-full h-24 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                    <img src={b.logo || b.image} className="w-full h-full object-cover" alt={b.name} />
-                  </div>
-                  <div className="px-1">
-                    <div className="font-bold text-sm truncate">{b.name}</div>
-                    <div className={`text-[10px] ${textSec} flex items-center gap-1`}>
-                      <Star size={10} fill="currentColor" className="text-orange-400" /> {b.rating} • {b.category}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* 1. Saved Places Section (Top) */}
+        <div className="w-full">
+          <div className="flex justify-center mb-5">
+            <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Saved Places</h3>
           </div>
-        )}
-
-        {/* Saved Places Section */}
-        <div className="mt-2">
-          <h3 className={`text-lg font-bold mb-3 ${textMain}`}>Saved Places</h3>
-          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+          <div className="flex justify-center gap-4 flex-wrap">
             {savedLocations.map(place => (
               <div
                 key={place.id}
@@ -373,72 +456,127 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                   setPrefilledDestination(place.address);
                   navigate('ride');
                 }}
-                className={`min-w-[120px] p-4 rounded-[20px] ${bgCard} shadow-sm cursor-pointer border-2 border-transparent hover:border-[#00D68F] transition-all flex flex-col items-center gap-2`}
+                className={`w-[100px] h-[100px] p-2 rounded-[28px] ${bgCard} shadow-[0_8px_20px_rgba(0,0,0,0.06)] dark:shadow-none cursor-pointer border border-gray-100 dark:border-white/5 hover:border-[#00D68F] active:scale-95 transition-all flex flex-col items-center justify-center gap-2 group`}
               >
-                <span className="text-2xl">{place.emoji}</span>
-                <div className="text-center">
-                  <div className="font-bold text-xs">{place.label}</div>
-                  <div className={`text-[9px] ${textSec} truncate w-20`}>{place.address}</div>
+                <div className="text-3xl group-hover:scale-110 transition-transform">{place.emoji}</div>
+                <div className="text-center w-full">
+                  <div className="font-bold text-[11px] truncate w-full px-1">{place.label}</div>
                 </div>
               </div>
             ))}
 
-            {savedLocations.length < 3 && (
-              <div
-                onClick={() => { triggerHaptic(); setShowSaveDrawer(true); }}
-                className={`min-w-[120px] p-4 rounded-[20px] border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}
-              >
-                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <Plus size={16} className={textSec} />
-                </div>
-                <div className={`text-xs font-bold ${textSec}`}>Add New</div>
+            <div
+              onClick={() => { triggerHaptic(); setShowSaveDrawer(true); }}
+              className={`w-[100px] h-[100px] p-2 rounded-[28px] border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 transition-all`}
+            >
+              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <Plus size={20} className={textSec} />
               </div>
-            )}
+              <div className={`text-[10px] font-bold ${textSec}`}>Add New</div>
+            </div>
           </div>
         </div>
 
-        {/* Recent Activity Mini List */}
-        <div className="mt-2 mb-4">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className={`text-lg font-bold ${textMain}`}>Recent Activity</h3>
-            <button onClick={() => navigate('profile')} className="text-xs font-bold text-[#00D68F] flex items-center gap-1">
-              View All <ArrowRight size={12} />
+        {/* 2. Featured Favorites (Middle) - Limit 5 */}
+        {favorites.length > 0 && (
+          <div className="w-full">
+            <div className="flex justify-center mb-5">
+              <h3 className={`text-xl font-black ${textMain} tracking-tight`}>My Favorites</h3>
+            </div>
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 px-1">
+              {businesses.filter(b => favorites.includes(b.id)).slice(0, 5).map(b => (
+                <div
+                  key={b.id}
+                  onClick={() => { triggerHaptic(); setSelectedBusiness(b); navigate('business-detail', true); }}
+                  className={`min-w-[170px] p-4 rounded-[28px] ${bgCard} shadow-sm cursor-pointer border border-gray-100 dark:border-white/5 hover:border-[#00D68F] active:scale-98 transition-all flex flex-col gap-3 group`}
+                >
+                  <div className="w-full h-28 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
+                    <img src={b.logo || b.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={b.name} />
+                  </div>
+                  <div className="px-1 text-center">
+                    <div className="font-bold text-sm truncate">{b.name}</div>
+                    <div className={`text-[10px] ${textSec} flex items-center justify-center gap-1 mt-1`}>
+                      <Star size={10} fill="currentColor" className={b.rating >= 4.5 ? 'text-[#00D68F]' : 'text-orange-400'} /> {b.rating} • {b.category}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-2 w-full">
+          <div className="flex flex-col items-center mb-5 relative px-4 text-center">
+            <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Recent Activities</h3>
+            <button onClick={() => navigate('profile')} className="mt-2 text-xs font-bold text-[#00D68F] flex items-center gap-1 bg-[#00D68F]/10 px-4 py-2 rounded-full hover:bg-[#00D68F]/20 transition-colors">
+              View History <ArrowRight size={12} />
             </button>
           </div>
-          <div className="space-y-3">
-            {recentActivity.slice(0, 3).map(activity => (
+          <div className="space-y-4 px-2">
+            {recentActivities.slice(0, 7).map(activity => (
+
               <div
                 key={activity.id}
-                onClick={() => setExpandedActivity(expandedActivity === activity.id ? null : activity.id)}
-                className={`${bgCard} p-4 rounded-[20px] shadow-sm cursor-pointer active:scale-[0.99] transition-all`}
+                onClick={() => {
+                  triggerHaptic();
+                  setExpandedActivity(expandedActivity === activity.id ? null : activity.id);
+                }}
+                className={`${bgCard} p-4 rounded-[20px] shadow-sm cursor-pointer active:scale-[0.99] transition-all duration-300 group overflow-hidden relative`}
               >
+                {/* Liquid Shimmer Highlight */}
+                <div className="absolute -top-10 -left-10 w-24 h-24 bg-gradient-to-br from-white/20 to-transparent blur-xl pointer-events-none rotate-45"></div>
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.type === 'ride' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${activity.type === 'ride' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
                     {activity.type === 'ride' ? <Car size={20} /> : <ShoppingBag size={20} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                       <h4 className="font-bold text-sm truncate">{activity.title}</h4>
-                      <span className="text-sm font-black">D{activity.price}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-black">D{activity.price}</span>
+                        <button
+                          onClick={(e) => handleDeleteActivity(activity, e)}
+                          className="p-2 -mr-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-all text-red-500 active:scale-95"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
                     </div>
                     <p className={`text-[10px] ${textSec}`}>{activity.subtitle} • {activity.date}</p>
                   </div>
                 </div>
-                {expandedActivity === activity.id && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-white/5 animate-slide-down">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${activity.status === 'completed' ? 'bg-[#00D68F]' : 'bg-red-500'}`}></span>
-                        <span className="text-xs font-bold capitalize">{activity.status}</span>
-                      </div>
-                      <button className="text-[10px] font-black uppercase tracking-wider text-[#00D68F]">Reorder</button>
-                    </div>
+
+                {/* Expandable Reorder Section */}
+                <div
+                  className={`grid transition-all duration-300 ease-in-out ${expandedActivity === activity.id ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0 mt-0'}`}
+                >
+                  <div className="overflow-hidden">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerHaptic();
+                        if (activity.type === 'ride') {
+                          setPrefilledDestination(activity.title);
+                          const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
+                          setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
+                          setPrefilledDistance(activity.distance_km || null);
+                          navigate('ride');
+                        } else {
+                          // For marketplace reorders, we might just navigate to market or specific store
+                          navigate('marketplace');
+                        }
+                      }}
+                      className="w-full bg-[#00D68F] text-black font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    >
+                      <span>Reorder</span>
+                      <ArrowRight size={16} />
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
             ))}
-            {recentActivity.length === 0 && (
-              <div className={`py-6 text-center text-xs ${textSec} opacity-50`}>No recent activity</div>
+            {recentActivities.length === 0 && (
+              <div className={`py-2 text-center text-[10px] ${textSec} opacity-40 font-medium`}>No recently completed activities.</div>
             )}
           </div>
         </div>
@@ -523,6 +661,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           }}
           onClose={() => setShowMapPicker(false)}
           theme={theme}
+          user={user}
         />
       )}
 
@@ -535,7 +674,36 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
       )}
 
+      {activeOrderId && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] md:max-w-[400px] z-50">
+          <button
+            onClick={() => navigate('order-tracking')}
+            className="w-full h-16 bg-[#00D68F] rounded-[24px] shadow-[0_8px_30px_rgb(0,214,143,0.3)] flex items-center justify-between px-6 active:scale-95 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-black/10 flex items-center justify-center">
+                <Truck className="text-black" size={20} />
+              </div>
+              <div className="text-left">
+                <p className="text-black font-black text-sm">Active Order In Progress</p>
+                <p className="text-black/60 text-[10px] uppercase font-bold">Tap to track delivery</p>
+              </div>
+            </div>
+            <ArrowRight size={20} className="text-black" />
+          </button>
+        </div>
+      )}
+
       <BottomNav active="dashboard" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
+
+      <NotificationPrompt
+        isOpen={showNotificationPrompt}
+        onClose={() => {
+          setShowNotificationPrompt(false);
+          sessionStorage.setItem('notif_prompt_seen', 'true');
+        }}
+        theme={theme}
+      />
     </div>
   );
 };

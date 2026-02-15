@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Gift, Copy, Share2, ChevronRight, Award } from 'lucide-react';
 import { Theme, Screen, Reward, AppSettings } from '../types';
 import { BottomNav } from '../components/Navigation';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 
 interface Props {
@@ -12,10 +12,20 @@ interface Props {
     isScrolling: boolean;
     isNavVisible: boolean;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-    settings: AppSettings;
+    settings: any;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
 }
 
-export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleScroll, settings }: Props) => {
+export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleScroll, settings, showAlert }: Props) => {
     const [copied, setCopied] = useState(false);
     const [referralCode, setReferralCode] = useState<string | null>(null);
     const [referralBalance, setReferralBalance] = useState(0);
@@ -106,7 +116,7 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                         <div className="w-12 h-12 bg-black/10 rounded-full flex items-center justify-center mb-4">
                             <Gift size={24} className="text-black" />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount).toFixed(2)}</h2>
+                        <h2 className="text-2xl font-bold mb-2">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount || 0).toFixed(2)}</h2>
                         <p className="opacity-70 mb-6 text-sm font-medium">Share your code and earn rewards when your friends take their first ride or order.</p>
 
                         <div className="flex gap-3">
@@ -132,7 +142,7 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                 <div className={`${bgCard} rounded-[24px] p-5 mb-6 flex items-center justify-between shadow-sm`}>
                     <div>
                         <p className={`text-xs font-bold uppercase ${textSec} mb-1`}>Rewards Balance</p>
-                        <h3 className="text-3xl font-bold">D{referralBalance.toFixed(2)}</h3>
+                        <h3 className="text-3xl font-bold">D{(referralBalance || 0).toFixed(2)}</h3>
                     </div>
                     <button className={`${theme === 'light' ? 'bg-gray-100' : 'bg-white/10'} px-4 py-2 rounded-full text-sm font-bold`}>
                         History

@@ -7,40 +7,49 @@ export const SplashScreen = ({ theme }: { theme: Theme }) => {
   const text = theme === 'light' ? 'text-black' : 'text-white';
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center ${bg} transition-colors duration-500`}>
-      <div className="relative flex flex-col items-center animate-scale-in">
-        
-        {/* Apple-style App Icon Container */}
-        <div className={`w-32 h-32 rounded-[2.5rem] ${theme === 'light' ? 'bg-white shadow-[0_20px_40px_rgba(0,0,0,0.1)]' : 'bg-[#1C1C1E] shadow-[0_20px_40px_rgba(0,0,0,0.4)]'} flex items-center justify-center mb-8 relative overflow-hidden`}>
-            
-            {/* Subtle Gradient Glow behind logo */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#00D68F]/20 to-transparent opacity-50"></div>
-            
-            {/* Logo */}
-            <div className="w-16 h-16 bg-[#00D68F] rounded-full relative overflow-hidden shadow-lg animate-[pulse_3s_ease-in-out_infinite]">
-                <div className="absolute top-0 right-0 w-8 h-8 bg-white/30 rounded-bl-full"></div>
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden">
+      <div className="relative flex flex-col items-center">
+        {/* Main Logo Container */}
+        <div className="relative flex flex-col items-center justify-center">
+          {/* Logo: Slide from above */}
+          <div className="relative z-10 animate-logo-drop will-change-transform">
+            <img
+              src="/assets/logo.png"
+              alt="Logo"
+              className="w-80 h-80 object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)] rounded-[80px]"
+            />
+          </div>
+
+          {/* Logo Text: Slide from left inside/behind the logo area */}
+          <div className="mt-[-20px] overflow-hidden">
+            <div className="animate-text-reveal will-change-transform flex items-center">
+              <span className="text-8xl font-black tracking-tighter text-[#8E8E93]">
+                DROP
+              </span>
+              <span className="text-8xl font-black tracking-tighter text-[#00D68F]">
+                OFF
+              </span>
             </div>
+          </div>
         </div>
-        
-        {/* App Name */}
-        <h1 className={`text-3xl font-bold tracking-tight ${text} mb-2 opacity-0 animate-[fadeIn_0.8s_ease-out_0.3s_forwards]`}>
-          SuperApp
-        </h1>
-        
-        {/* Loading Spinner */}
-        <div className="mt-8">
-            <div className="w-6 h-6 border-2 border-[#00D68F] border-t-transparent rounded-full animate-spin"></div>
-        </div>
-        
-        <p className={`absolute bottom-12 text-xs font-semibold uppercase tracking-widest opacity-30 ${text}`}>
-            Secure • Fast • Simple
-        </p>
       </div>
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes logo-drop {
+          0% { transform: translateY(-300px); opacity: 0; }
+          60% { transform: translateY(20px); opacity: 1; }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes text-reveal {
+          0% { transform: translateX(-150%); opacity: 0; filter: blur(15px); }
+          50% { opacity: 0.5; }
+          100% { transform: translateX(0); opacity: 1; filter: blur(0px); }
+        }
+        .animate-logo-drop {
+          animation: logo-drop 1.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+        }
+        .animate-text-reveal {
+          animation: text-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.4s both;
         }
       `}</style>
     </div>

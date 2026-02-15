@@ -59,36 +59,19 @@
   height: 100%;
 }
 
-/* Driver Icon Floating and Glow Effect - Targeting image src since Marker class isn't reliable */
+/* Yango-style Professional Vehicle Markers */
 img[src*="drivers%20vehicle%20types"] {
-  filter: drop-shadow(0 0 12px rgba(0, 214, 143, 0.7));
-  animation: marker-float 2.5s ease-in-out infinite;
-  transform-origin: center bottom;
-  border-radius: 50%;
-  /* Helps with the glow shape */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  object-fit: contain !important;
+  width: 50px !important;
+  height: 50px !important;
+  display: block;
 }
 
-@keyframes marker-float {
-
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: translateY(-10px) scale(1.1);
-    opacity: 0.9;
-  }
-}
-
-/* Specific glows for different vehicles */
+/* Enhancing depth for premium vehicles */
 img[src*="car_premium"] {
-  filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.5));
-}
-
-img[src*="car_scooter"] {
-  filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.6));
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.5));
 }
 
 /* Navigation Animations */

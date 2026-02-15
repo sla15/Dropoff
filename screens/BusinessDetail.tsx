@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2 } from 'lucide-react';
 import { Theme, Screen, Business, Product, CartItem } from '../types';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 
 interface Props {
@@ -12,11 +12,23 @@ interface Props {
     selectedBusiness: Business | null;
     cart: CartItem[];
     setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
 }
 
-export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness, cart, setCart }: Props) => {
+export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness, cart, setCart, showAlert }: Props) => {
     const [selectedFilter, setSelectedFilter] = useState('All');
     const [realReviews, setRealReviews] = useState<any[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
     const [loadingReviews, setLoadingReviews] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [userRating, setUserRating] = useState(5);
@@ -27,17 +39,62 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     const filters = useMemo(() => {
         if (!selectedBusiness) return ['All'];
         const tags = new Set<string>(['All']);
-        selectedBusiness.products.forEach(p => {
+        products.forEach(p => {
             if (p.mainCategory) tags.add(p.mainCategory);
         });
         return Array.from(tags);
-    }, [selectedBusiness]);
+    }, [products]);
 
     React.useEffect(() => {
         if (selectedBusiness) {
+            fetchProducts();
             fetchReviews();
+
+            // Real-time subscription for products of THIS business
+            const channel = supabase
+                .channel(`business-products-${selectedBusiness.id}`)
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'products',
+                    filter: `business_id=eq.${selectedBusiness.id}`
+                }, () => fetchProducts())
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
         }
     }, [selectedBusiness]);
+
+    const fetchProducts = async () => {
+        if (!selectedBusiness) return;
+        setLoadingProducts(true);
+        try {
+            const { data, error } = await supabase
+                .from('products')
+                .select('*')
+                .eq('business_id', selectedBusiness.id)
+                .order('name', { ascending: true });
+
+            if (data && !error) {
+                setProducts(data.map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    price: p.price,
+                    image: p.image_url || 'https://via.placeholder.com/150',
+                    description: p.description,
+                    stock: p.stock,
+                    mainCategory: p.category,
+                    categories: [p.category]
+                })));
+            }
+        } catch (err) {
+            console.error("Fetch Products Error:", err);
+        } finally {
+            setLoadingProducts(false);
+        }
+    };
 
     const fetchReviews = async () => {
         if (!selectedBusiness) return;
@@ -45,9 +102,9 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
         try {
             // Explicitly specify the relationship to avoid ambiguity
             const { data, error } = await supabase
-                .from('reviews')
-                .select('*, profiles!reviewer_id(full_name)')
-                .eq('target_id', selectedBusiness.id)
+                .from('business_reviews')
+                .select('*, profiles!user_id(full_name, avatar_url)')
+                .eq('business_id', selectedBusiness.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -76,7 +133,8 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 name: productName,
                 quantity: 1,
                 businessId: selectedBusiness.id,
-                businessName: selectedBusiness.name
+                businessName: selectedBusiness.name,
+                originalProductId: product.id // Store the real UUID for database
             }];
         });
     };
@@ -90,7 +148,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
 
     const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
-    const filteredProducts = selectedBusiness.products.filter(p => {
+    const filteredProducts = products.filter(p => {
         if (selectedFilter === 'All') return true;
         return p.mainCategory === selectedFilter;
     });
@@ -113,7 +171,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 <div className="absolute bottom-6 left-6 right-6 text-white">
                     <h1 className="text-3xl font-bold mb-2">{selectedBusiness.name}</h1>
                     <div className="flex items-center gap-2 text-sm opacity-90">
-                        <Star size={14} fill="currentColor" className="text-orange-400" />
+                        <Star size={14} fill="currentColor" className={selectedBusiness.rating >= 5.0 ? 'text-[#00D68F]' : selectedBusiness.rating >= 3.8 ? 'text-orange-400' : 'text-red-500'} />
                         <span className="font-bold">{selectedBusiness.rating}</span>
                         <span>({selectedBusiness.reviews} reviews)</span>
                         <span>•</span>
@@ -143,13 +201,18 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 <h2 className="font-bold text-xl mb-4 px-2">{selectedFilter === 'All' ? 'Menu' : selectedFilter}</h2>
 
                 <div className="space-y-4 mb-8">
-                    {selectedBusiness.products && selectedBusiness.products.length > 0 ? (
+                    {loadingProducts ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-3">
+                            <Loader2 size={32} className="animate-spin text-[#00D68F]" />
+                            <p className={`text-sm ${textSec} font-medium`}>Loading amazing products...</p>
+                        </div>
+                    ) : products.length > 0 ? (
                         filteredProducts.map(p => (
                             <ProductCard key={p.id} product={p} addToCart={addToCart} theme={theme} bgCard={bgCard} textSec={textSec} />
                         ))
                     ) : (
                         <div className={`text-center py-10 ${textSec}`}>
-                            <p>No items found in this category.</p>
+                            <p>No items found for this business yet.</p>
                         </div>
                     )}
                 </div>
@@ -183,11 +246,14 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                             <div key={review.id} className={`${bgCard} p-4 rounded-2xl shadow-sm`}>
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-[#00D68F]/10 text-[#00D68F] flex items-center justify-center font-bold text-xs uppercase">
-                                            {(review.profiles?.full_name || 'U').charAt(0)}
+                                        <div
+                                            className={`w-8 h-8 rounded-full ${!review.profiles?.avatar_url ? 'bg-[#00D68F]/10 text-[#00D68F]' : 'bg-gray-200'} flex items-center justify-center font-bold text-xs uppercase bg-cover bg-center`}
+                                            style={review.profiles?.avatar_url ? { backgroundImage: `url(${review.profiles.avatar_url})` } : {}}
+                                        >
+                                            {!review.profiles?.avatar_url && (review.profiles?.full_name || 'U').charAt(0)}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-sm">{review.profiles?.full_name || 'User'}</div>
+                                            <div className="font-bold text-sm block">{review.profiles?.full_name || 'User'}</div>
                                             <div className="flex items-center gap-1 text-[10px] text-orange-400">
                                                 {[...Array(5)].map((_, i) => (
                                                     <Star key={i} size={8} fill={i < review.rating ? "currentColor" : "none"} strokeWidth={i < review.rating ? 0 : 2} className={i >= review.rating ? textSec : ""} />
@@ -197,7 +263,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                                     </div>
                                     <span className={`text-[10px] ${textSec}`}>{new Date(review.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <p className={`text-sm ${textSec} leading-relaxed`}>{review.comment}</p>
+                                <p className={`text-sm ${textSec} leading-relaxed mt-2`}>{review.comment}</p>
                                 <div className="flex gap-4 mt-3">
                                     <button className={`flex items-center gap-1 text-xs ${textSec} hover:text-[#00D68F]`}>
                                         <ThumbsUp size={12} /> Helpful
@@ -224,7 +290,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
             {showReviewModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}></div>
-                    <div className={`${bgCard} w-full max-w-sm rounded-[32px] p-8 relative z-10 animate-scale-in`}>
+                    <div className={`${theme === 'light' ? 'bg-white/80' : 'bg-[#1C1C1E]/80'} backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 relative z-10 animate-scale-in`}>
                         <h2 className="text-2xl font-bold mb-2">Rate {selectedBusiness.name}</h2>
                         <p className={`text-sm ${textSec} mb-6`}>How was your experience today?</p>
 
@@ -244,7 +310,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                             value={userComment}
                             onChange={(e) => setUserComment(e.target.value)}
                             placeholder="Tell us what you loved or how we can improve..."
-                            className={`w-full h-32 p-4 rounded-2xl ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-white/5'} outline-none focus:ring-2 focus:ring-[#00D68F] mb-6 resize-none text-sm font-medium`}
+                            className={`w-full h-32 p-4 rounded-2xl ${theme === 'light' ? 'bg-[#F2F2F7]/50 border border-white/40' : 'bg-white/10 border border-white/5'} backdrop-blur-md outline-none focus:ring-2 focus:ring-[#00D68F] mb-6 resize-none text-sm font-medium`}
                         ></textarea>
 
                         <div className="flex gap-3">
@@ -259,21 +325,20 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                                     setIsSubmitting(true);
                                     const { data: { session } } = await supabase.auth.getSession();
                                     if (!session) {
-                                        alert("Please login to leave a review!");
+                                        showAlert("Login Required", "Please log in to leave a review!", "info");
                                         setIsSubmitting(false);
                                         return;
                                     }
 
-                                    const { error } = await supabase.from('reviews').insert({
-                                        reviewer_id: session.user.id,
-                                        target_id: selectedBusiness.id,
+                                    const { error } = await supabase.from('business_reviews').insert({
+                                        user_id: session.user.id,
+                                        business_id: selectedBusiness.id,
                                         rating: userRating,
-                                        comment: userComment,
-                                        role_target: 'merchant'
+                                        comment: userComment
                                     });
 
                                     if (error) {
-                                        alert("Error submitting review: " + error.message);
+                                        showAlert("Error", error.message, "error");
                                     } else {
                                         setShowReviewModal(false);
                                         setUserComment('');

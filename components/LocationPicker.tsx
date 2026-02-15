@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Map as MapIcon, Locate, X, ArrowRight, Loader2 } from 'lucide-react';
 import { Theme } from '../types';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
     onClose: () => void;
     title?: string;
     initialLocation?: { lat: number; lng: number };
+    user: any; // Add user prop for fallback
 }
 
-export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Location", initialLocation }: Props) => {
+export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Location", initialLocation, user }: Props) => {
     const [address, setAddress] = useState('');
     const [predictions, setPredictions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
     const [marker, setMarker] = useState<any>(null);
     const [sessionToken, setSessionToken] = useState<any>(null);
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(initialLocation || null);
+    const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
 
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const searchTimeout = useRef<any>(null);
@@ -49,7 +51,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
     const initMap = () => {
         const google = (window as any).google;
-        const center = initialLocation || { lat: 13.4432, lng: -16.6322 }; // Banjul default
+        const center = initialLocation || { lat: user?.last_lat || 13.4432, lng: user?.last_lng || -16.5916 }; // Use profile fallback
 
         const newMap = new google.maps.Map(mapContainerRef.current, {
             center,
@@ -63,11 +65,11 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
             map: newMap,
             draggable: true,
             icon: {
-                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                scale: 8,
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 12,
                 fillColor: "#00D68F",
                 fillOpacity: 1,
-                strokeWeight: 2,
+                strokeWeight: 4,
                 strokeColor: "#FFFFFF",
             }
         });
@@ -159,15 +161,52 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
     const useCurrentLocation = () => {
         setLoading(true);
+        setLocationMethod(null);
         if (navigator.geolocation) {
+            // Set a timeout to use profile fallback if GPS is taking too long
+            const fallbackTimeout = setTimeout(() => {
+                if (!selectedCoords && user?.last_lat && user?.last_lng) {
+                    console.log("LocationPicker: GPS slow, applying profile fallback...");
+                    const coords = { lat: user.last_lat, lng: user.last_lng };
+                    map.panTo(coords);
+                    marker.setPosition(coords);
+                    setSelectedCoords(coords);
+                    reverseGeocode(coords);
+                    setLocationMethod('profile');
+                }
+            }, 4000);
+
             navigator.geolocation.getCurrentPosition((pos) => {
+                clearTimeout(fallbackTimeout);
                 const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 map.panTo(coords);
                 marker.setPosition(coords);
                 setSelectedCoords(coords);
                 reverseGeocode(coords);
+                setLocationMethod('gps');
                 setLoading(false);
-            }, () => setLoading(false));
+
+                // Silently persist to Supabase
+                const { supabase } = require('../supabaseClient');
+                supabase.from('profiles').update({
+                    last_lat: coords.lat,
+                    last_lng: coords.lng
+                }).eq('id', user?.id).then(({ error }: any) => {
+                    if (error) console.error("Error persisting location:", error);
+                });
+            }, () => {
+                clearTimeout(fallbackTimeout);
+                setLoading(false);
+                // Final fallback if GPS fails
+                if (!selectedCoords && user?.last_lat && user?.last_lng) {
+                    const coords = { lat: user.last_lat, lng: user.last_lng };
+                    map.panTo(coords);
+                    marker.setPosition(coords);
+                    setSelectedCoords(coords);
+                    reverseGeocode(coords);
+                    setLocationMethod('profile');
+                }
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
         } else {
             setLoading(false);
         }
@@ -216,6 +255,17 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
             <div className="relative flex-1">
                 <div ref={mapContainerRef} className="absolute inset-0 z-0" />
+
+                {loading && (
+                    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[20] animate-bounce-in">
+                        <div className="bg-white dark:bg-[#1C1C1E] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-[#00D68F]/20">
+                            <Loader2 className="animate-spin text-[#00D68F]" size={16} />
+                            <span className="text-sm font-bold">
+                                {locationMethod === 'profile' ? 'Refining position...' : 'Finding you...'}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-2">
                     <div className={`flex items-center gap-3 p-4 rounded-2xl ${bgCard} shadow-xl border border-gray-100 dark:border-gray-800`}>

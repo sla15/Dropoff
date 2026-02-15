@@ -21,108 +21,213 @@ import { BusinessDetailScreen } from './screens/BusinessDetail';
 import { CheckoutScreen } from './screens/Checkout';
 import { ProfileScreen } from './screens/Profile';
 import { OrderTrackingScreen } from './screens/OrderTracking';
+import { PremiumModal } from './components/PremiumModal';
+import { triggerHaptic, sendPushNotification } from './utils/helpers';
 
 // --- API INITIALIZATION ---
-// --- API INITIALIZATION ---
-import OneSignal from 'react-onesignal';
+import { initFCM } from './utils/fcm';
+// --- END API INITIALIZATION ---
 
-const initOneSignal = async (userId?: string) => {
-  try {
-    await OneSignal.init({
-      appId: CONFIG.ONESIGNAL_APP_ID || "YOUR_ONESIGNAL_APP_ID",
-      allowLocalhostAsSecureOrigin: true,
-    });
-    console.log("OneSignal Initialized");
-
-    if (userId) {
-      await OneSignal.login(userId);
-      console.log("OneSignal User Logged In:", userId);
-    }
-  } catch (err) {
-    console.error("OneSignal Init Error:", err);
-  }
-};
-
-export const sendPushNotification = async (title: string, message: string) => {
-  console.log(`[PUSH] ${title}: ${message}`);
-  // In a real app with OneSignal REST API access, we'd call a Cloud Function here.
-  // For the frontend, we can use OneSignal's local notification if available or just log it.
-  try {
-    // react-onesignal doesn't expose a simple 'showNotification' for local use easily,
-    // but we can simulate the UI feedback or use native plugins if on mobile.
-  } catch (err) {
-    console.error("Push Error:", err);
-  }
-};
-
-export const triggerHaptic = () => {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    navigator.vibrate(10);
-  }
-};
-
-export const GreenGlow = () => (
-  <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[300px] h-[300px] bg-[#00D68F] opacity-[0.15] blur-[120px] rounded-full pointer-events-none z-0"></div>
-);
-
-// Define global callback for Google Maps
-(window as any).initMap = () => {
-  console.log("Google Maps API loaded successfully");
-};
-
-
+// Google Maps initialization is handled in index.html to ensure the callback is available before the script loads.
 const App = () => {
-  const [theme, setTheme] = useState<Theme>('light');
+  // --- 1. THEME & CORE STATE ---
+  const getInitialTheme = (): Theme => {
+    const saved = localStorage.getItem('app_theme') as Theme | null;
+    if (saved) return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  };
 
-  // App State
-  const [isLoading, setIsLoading] = useState(true); // Splash Screen State
-  const [screen, setScreen] = useState<Screen | null>(null); // Start as null to avoid flash
+  const [theme, setTheme] = useState<Theme>(getInitialTheme());
+  const [isLoading, setIsLoading] = useState(true);
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [history, setHistory] = useState<Screen[]>([]);
+  const [showAssistant, setShowAssistant] = useState(false);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
+  const [prefilledTier, setPrefilledTier] = useState<string | null>(null);
+  const [prefilledDistance, setPrefilledDistance] = useState<number | null>(null);
+  const [marketSearchQuery, setMarketSearchQuery] = useState('');
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean,
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'info',
+    showCancel?: boolean,
+    onConfirm?: () => void,
+    onCancel?: () => void,
+    confirmText?: string,
+    cancelText?: string
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+    return localStorage.getItem('active_order_id');
+  });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem('app_cart');
     return saved ? JSON.parse(saved) : [];
   });
 
-  useEffect(() => {
-    localStorage.setItem('app_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
-  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
-  const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
-
-  const [isScrolling, setIsScrolling] = useState(false);
-  const scrollTimeout = useRef<any>(null);
-  const [showAssistant, setShowAssistant] = useState(false);
-  const [marketSearchQuery, setMarketSearchQuery] = useState('');
-  const [settings, setSettings] = useState<AppSettings>({
-    min_ride_price: 350,
-    min_delivery_fee: 50,
-    driver_search_radius_km: 5,
-    referral_reward_amount: 50,
-    currency_symbol: 'D',
-    commission_percentage: 10,
-    rating_window_limit: 50,
-    is_rating_enabled: true
-  });
-
-  const [history, setHistory] = useState<Screen[]>([]);
-
   const [user, setUser] = useState<UserData>({
+    id: '',
     name: '',
     phone: '',
     email: '',
     location: 'Banjul, The Gambia',
-    photo: null,
-    rating: 4.8
+    photo: '',
+    role: 'customer',
+    rating: 5.0,
+    referralCode: '',
+    referralBalance: 0
   });
-
   const userRef = useRef<UserData>(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
+  const [settings, setSettings] = useState<AppSettings>({
+    min_ride_price: 150,
+    min_delivery_fee: 50,
+    driver_search_radius_km: 10,
+    referral_reward_amount: 50,
+    currency_symbol: 'D',
+    commission_percentage: 15,
+    rating_window_limit: 100,
+    is_rating_enabled: true,
+    max_driver_cash_amount: 3000,
+    multiplier_scooter: 0.7,
+    multiplier_economy: 1.0,
+    multiplier_premium: 1.5,
+    price_per_km: 40,
+    waiting_fee_per_min: 0.5
+  });
+
+  const [businesses, setBusinesses] = useState<Business[]>(INITIAL_BUSINESSES);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText?: string,
+    cancelText?: string,
+    onCancel?: () => void
+  ) => {
+    setModalConfig({
+      isOpen: true,
+      title,
+      message,
+      type,
+      onConfirm,
+      showCancel,
+      confirmText,
+      cancelText,
+      onCancel
+    });
+  };
+
+  const scrollTimeout = useRef<any>(null);
+  const lastScrollY = useRef(0);
+
+  // --- Real-time Geolocation ---
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    const geoId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        console.log("📍 Location updated:", latitude, longitude);
+        setUserLocation({ lat: latitude, lng: longitude });
+
+        // Update user state for components that rely on it
+        setUser(prev => ({
+          ...prev,
+          last_lat: latitude,
+          last_lng: longitude
+        }));
+
+        // Geocode coordinates to address if possible (simplified version)
+        if (window.google?.maps?.Geocoder) {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+            if (status === 'OK' && results?.[0]) {
+              setUser(prev => ({ ...prev, location: results[0].formatted_address }));
+            }
+          });
+        }
+      },
+      (err) => console.error("Geolocation error:", err),
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+
+    return () => navigator.geolocation.clearWatch(geoId);
+  }, []);
+
+  // Sync with DB if session exists
+  useEffect(() => {
+    if (user.id && userLocation) {
+      const updateDB = async () => {
+        await supabase
+          .from('profiles')
+          .update({
+            last_lat: userLocation.lat,
+            last_lng: userLocation.lng
+          })
+          .eq('id', user.id);
+      };
+      updateDB();
+    }
+  }, [user.id, userLocation]);
+
+  // --- Effects ---
+
+  useEffect(() => {
+    if (activeOrderId) {
+      localStorage.setItem('active_order_id', activeOrderId);
+    } else {
+      localStorage.removeItem('active_order_id');
+    }
+  }, [activeOrderId]);
+
+  // Sync active orders on mount
+  useEffect(() => {
+    if (user.id && !activeOrderId) {
+      const fetchActiveOrder = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('customer_id', user.id)
+            .in('status', ['pending', 'accepted', 'preparing', 'ready', 'delivering'])
+            .limit(1)
+            .maybeSingle();
+
+          if (data && !error) {
+            setActiveOrderId(data.id);
+          }
+        } catch (err) {
+          console.error("Error fetching active order:", err);
+        }
+      };
+      fetchActiveOrder();
+    }
+  }, [user.id]);
+
+  // --- 2. THEME PERSISTENCE & LISTENER ---
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -131,189 +236,198 @@ const App = () => {
     }
   }, [theme]);
 
-  // Initialize Services & Check Session on Mount
   useEffect(() => {
-    initOneSignal();
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('app_theme')) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
-    const fetchSettings = async () => {
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('app_theme', newTheme);
+    triggerHaptic();
+  };
+
+  // --- 3. DATA FETCHING ---
+  useEffect(() => {
+    const recoverSession = async () => {
       try {
-        const { data, error } = await supabase.from('app_settings').select('*').limit(1).single();
-        if (error) throw error;
-        if (data) setSettings(data);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            setUser({
+              id: profile.id,
+              name: profile.full_name || '',
+              phone: profile.phone || '',
+              email: profile.email || '',
+              location: profile.location || 'Banjul, The Gambia',
+              photo: profile.avatar_url || null,
+              role: profile.role || 'customer',
+              rating: Number(profile.average_rating) || 5.0,
+              referralCode: profile.referral_code || '',
+              referralBalance: profile.referral_balance || 0,
+              last_lat: profile.last_lat,
+              last_lng: profile.last_lng
+            });
+
+            // Fetch relevant data for the user
+            fetchFavorites(profile.id);
+            fetchActivities(profile.id);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch settings:", err);
+        console.error("Session recovery error:", err);
       }
     };
 
+    recoverSession();
     fetchSettings();
+    fetchBusinesses();
+    fetchCategories();
+  }, []);
 
-    const fetchBusinesses = async () => {
-      try {
-        console.log("Fetching businesses from Supabase...");
-        const { data, error } = await supabase
-          .from('businesses')
-          .select(`*, products (*)`);
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase.from('app_settings').select('*').limit(1).maybeSingle();
+      if (data && !error) setSettings(data);
+    } catch (err) { console.error("Settings Fetch Error:", err); }
+  };
 
-        if (error) throw error;
-
-        if (data) {
-          const mappedBusinesses: Business[] = data.map((b: any) => ({
-            id: b.id,
-            name: b.name,
-            category: b.category,
-            description: b.description,
-            rating: b.rating || 5.0,
-            reviews: 0,
-            deliveryTime: '30-45 min',
-            image: b.image_url || 'https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80',
-            logo: b.image_url,
-            phone: '',
-            location: b.location_address || '',
-            isOpen: b.is_open,
-            distance: '2.5 km',
-            products: (b.products || []).map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              price: p.price,
-              image: p.image_url || 'https://via.placeholder.com/150',
-              description: p.description,
-              stock: p.stock,
-              mainCategory: p.category,
-              categories: [p.category]
-            }))
-          }));
-          setBusinesses(mappedBusinesses);
-        }
-      } catch (err) {
-        console.error("Failed to fetch businesses:", err);
+  const fetchBusinesses = async () => {
+    try {
+      // NOTE: We no longer fetch products here to improve scalability.
+      // Products are now fetched on-demand in BusinessDetailScreen.
+      const { data, error } = await supabase.from('businesses').select(`*`);
+      if (data && !error) {
+        setBusinesses(data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          category: b.category,
+          description: b.description,
+          rating: b.rating || 5.0,
+          reviews: 0,
+          deliveryTime: '30-45 min',
+          image: b.image_url || 'https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80',
+          logo: b.image_url,
+          phone: '',
+          location: b.location_address || '',
+          isOpen: b.is_open,
+          distance: '2.5 km',
+          products: [] // Initially empty, will be fetched in Detail screen
+        })));
       }
-    };
+    } catch (err) { console.error(err); }
+  };
 
-    const fetchCategories = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('business_categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase.from('business_categories').select('*').eq('is_active', true).order('display_order', { ascending: true });
+      if (data && !error) setCategories(data);
+    } catch (err) { console.error(err); }
+  };
 
-        if (error) throw error;
-        if (data) {
-          setCategories(data.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            icon: c.icon,
-            displayOrder: c.display_order
-          })));
-        }
-      } catch (err) {
-        console.error("Failed to fetch categories:", err);
+  const fetchFavorites = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from('user_favorite_businesses').select('business_id').eq('user_id', userId);
+      if (data && !error) setFavorites(data.map(f => f.business_id));
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchActivities = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_activities')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (data && !error) {
+        setRecentActivities(data.map((a: any) => ({
+          id: a.id,
+          type: a.type,
+          title: a.title,
+          subtitle: a.subtitle,
+          price: Number(a.price) || 0,
+          date: new Date(a.created_at).toLocaleDateString(),
+          created_at: a.created_at,
+          status: a.status as 'completed' | 'cancelled',
+          reference_id: a.reference_id
+        })));
       }
-    };
+    } catch (err) { console.error("Activities Fetch Error:", err); }
+  };
 
-    const fetchFavorites = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('user_favorite_businesses')
-          .select('business_id')
-          .eq('user_id', userId);
+  // --- 4. INITIALIZATION ---
+  useEffect(() => {
+    const initializeApp = async () => {
+      setIsLoading(true);
+      const minTime = new Promise(resolve => setTimeout(resolve, 3500));
 
-        if (error) throw error;
-        if (data) {
-          setFavorites(data.map(f => f.business_id));
-        }
-      } catch (err) {
-        console.error("Failed to fetch favorites:", err);
-      }
-    };
-
-    const fetchActivities = async (userId: string) => {
-      try {
-        // Fetch recent rides
-        const { data: rides, error: ridesError } = await supabase
-          .from('rides')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        // Fetch recent orders
-        const { data: orders, error: ordersError } = await supabase
-          .from('orders')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        const activities: Activity[] = [];
-
-        // Map rides to activities
-        if (rides) {
-          rides.forEach((r: any) => {
-            activities.push({
-              id: r.id,
-              type: 'ride',
-              title: r.destination || 'Ride',
-              subtitle: r.vehicle_type || 'Standard Car',
-              price: r.total_price || 0,
-              date: new Date(r.created_at).toLocaleDateString(),
-              status: r.status || 'completed'
+      const sessionCheck = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+          if (profile) {
+            setUser({
+              id: profile.id,
+              name: profile.full_name || '',
+              phone: profile.phone || '',
+              email: profile.email || '',
+              location: profile.location || 'Banjul, The Gambia',
+              photo: profile.avatar_url || '',
+              role: profile.role || 'customer',
+              rating: Number(profile.average_rating) || 5.0,
+              referralCode: profile.referral_code || '',
+              referralBalance: Number(profile.referral_balance) || 0
             });
-          });
-        }
+            fetchFavorites(session.user.id);
+            fetchActivities(session.user.id);
+            subscribeToChanges(session.user.id);
+            initFCM(session.user.id);
 
-        // Map orders to activities
-        if (orders) {
-          orders.forEach((o: any) => {
-            activities.push({
-              id: o.id,
-              type: 'order',
-              title: o.business_name || 'Order',
-              subtitle: `${o.total_items || 0} Items`,
-              price: o.total_price || 0,
-              date: new Date(o.created_at).toLocaleDateString(),
-              status: o.status || 'completed'
-            });
-          });
+            // Enforce full_name for onboarding
+            if (!profile.full_name) {
+              setScreen('onboarding');
+            } else {
+              setScreen('dashboard');
+            }
+          } else {
+            setScreen('onboarding');
+          }
+        } else {
+          setScreen('onboarding');
+          initFCM();
         }
+      };
 
-        // Sort by date (most recent first) and limit to 10
-        activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setRecentActivity(activities.slice(0, 10));
-      } catch (err) {
-        console.error("Failed to fetch activities:", err);
-        setRecentActivity([]); // Set empty if error
-      }
+      await Promise.all([minTime, sessionCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
+      setIsLoading(false);
     };
 
     const subscribeToChanges = (userId?: string) => {
-      console.log("Initializing Realtime Subscriptions...");
-
-      const channel = supabase.channel('app-db-changes');
-
-      // Global changes
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, (payload) => {
-        console.log('Realtime Settings Change:', payload);
-        fetchSettings();
-      });
-
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'business_categories' }, (payload) => {
-        console.log('Realtime Category Change:', payload);
-        fetchCategories();
-      });
-
+      const channel = supabase.channel('app-changes');
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchSettings());
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'business_categories' }, () => fetchCategories());
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, () => fetchBusinesses());
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchBusinesses());
 
-      // User specific changes
       if (userId) {
-        channel.on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${userId}`
-        }, (payload) => {
-          console.log('Realtime Profile Change:', payload);
+        channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_activities', filter: `user_id=eq.${userId}` }, () => fetchActivities(userId));
+
+        channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, (payload) => {
           const p = payload.new as any;
           setUser(prev => ({
             ...prev,
@@ -321,111 +435,51 @@ const App = () => {
             phone: p.phone || prev.phone,
             email: p.email || prev.email,
             location: p.location || prev.location,
-            photo: p.avatar_url || prev.photo,
-            rating: p.average_rating ? Number(p.average_rating) : prev.rating,
+            avatar: p.avatar_url || prev.avatar,
+            role: p.role || prev.role,
+            rating: p.average_rating !== undefined ? Number(p.average_rating) : prev.rating,
             referralCode: p.referral_code || prev.referralCode,
             referralBalance: p.referral_balance !== undefined ? Number(p.referral_balance) : prev.referralBalance
           }));
         });
-
-        channel.on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'broadcasts'
-        }, (payload) => {
-          const broadcast = payload.new as any;
-          const currentUser = userRef.current;
-
-          console.log('Realtime Broadcast Received:', broadcast, 'Current User:', currentUser);
-
-          // Role-based filtering
-          const target = broadcast.target_audience; // 'customer', 'driver', 'all'
-          const userRole = currentUser.role || 'customer';
-
-          if (target === 'all' || target === userRole) {
-            sendPushNotification(broadcast.title, broadcast.message);
-          }
-        });
       }
-
-      channel.subscribe();
+      channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime connected');
+        }
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          console.log('⚠️ Realtime connection lost. Reconnecting in 5s...');
+          setTimeout(() => {
+            if (userId) subscribeToChanges(userId);
+          }, 5000);
+        }
+      });
       return channel;
     };
 
-    const initializeApp = async () => {
-      const minSplashTime = new Promise(resolve => setTimeout(resolve, 1500));
-      let currentUserId = '';
-
-      const checkSession = async () => {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-
-          if (session && session.user) {
-            currentUserId = session.user.id;
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-
-            if (profile) {
-              setUser({
-                name: profile.full_name || '',
-                phone: profile.phone || '',
-                email: profile.email || '',
-                location: profile.location || 'Banjul, The Gambia',
-                photo: profile.avatar_url || null,
-                rating: Number(profile.average_rating) || 5.0,
-                referralCode: profile.referral_code,
-                referralBalance: Number(profile.referral_balance) || 0
-              });
-              fetchFavorites(session.user.id);
-            }
-            setScreen('dashboard');
-            initOneSignal(currentUserId);
-          } else {
-            setScreen('onboarding');
-            initOneSignal();
-          }
-        } catch (e) {
-          console.error("Session Check Error:", e);
-          setScreen('onboarding');
-        }
-      };
-
-      try {
-        await Promise.all([minSplashTime, checkSession(), fetchBusinesses(), fetchCategories(), fetchSettings()]);
-      } catch (err) {
-        console.error("App Initialization Error:", err);
-        // We still want to stop loading even if some secondary data fails
-      } finally {
-        setIsLoading(false);
-      }
-
-      if (currentUserId) {
-        fetchActivities(currentUserId);
-      }
-
-      const channel = subscribeToChanges(currentUserId);
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    };
-
-    const cleanupPromise = initializeApp();
-    return () => {
-      cleanupPromise.then(cleanup => cleanup && cleanup());
-    };
+    initializeApp();
   }, []);
 
-  const navigate = (scr: Screen, addToHistory: boolean = false) => {
+
+  const [isRideSearching, setIsRideSearching] = useState(false);
+  const navigate = (scr: Screen, addToHistory = false) => {
+    // Block navigation if searching for a ride
+    // Exception: Allow navigation TO 'ride' or if we are already on the target screen (to avoid alert spam)
+    if (isRideSearching && scr !== 'ride' && scr !== screen) {
+      showAlert(
+        "Request in Progress",
+        "Please cancel your search before navigating to another screen.",
+        "info"
+      );
+      return;
+    }
+
     triggerHaptic();
+    setIsNavVisible(true); // Always show nav on navigation
     if (addToHistory) {
       setHistory(prev => [...prev, screen]);
-    } else {
-      if (['dashboard', 'marketplace', 'earn', 'profile', 'ride'].includes(scr)) {
-        setHistory([]);
-      }
+    } else if (['dashboard', 'marketplace', 'earn', 'profile', 'ride'].includes(scr)) {
+      setHistory([]);
     }
     setScreen(scr);
   };
@@ -434,109 +488,60 @@ const App = () => {
     triggerHaptic();
     if (history.length > 0) {
       const newHistory = [...history];
-      const prevScreen = newHistory.pop();
+      const prev = newHistory.pop();
       setHistory(newHistory);
-      if (prevScreen) setScreen(prevScreen);
+      if (prev) setScreen(prev);
     } else {
       setScreen('dashboard');
     }
   };
 
-  const toggleTheme = () => {
-    triggerHaptic();
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  const toggleFavorite = async (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    triggerHaptic();
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert("Please login to save favorites!");
-      return;
-    }
-
-    const isFavorited = favorites.includes(id);
-
-    if (isFavorited) {
-      // Remove from DB
-      const { error } = await supabase
-        .from('user_favorite_businesses')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('business_id', id);
-
-      if (!error) {
-        setFavorites(prev => prev.filter(f => f !== id));
-      } else {
-        console.error("Error unfavoriting:", error);
-      }
-    } else {
-      if (favorites.length >= 4) {
-        alert("You can only have up to 4 favorites!");
-        return;
-      }
-
-      // Add to DB
-      const { error } = await supabase
-        .from('user_favorite_businesses')
-        .insert({
-          user_id: session.user.id,
-          business_id: id
-        });
-
-      if (!error) {
-        setFavorites(prev => [...prev, id]);
-      } else {
-        console.error("Error favoriting:", error);
-      }
-    }
-  };
-
-  const [isNavVisible, setIsNavVisible] = useState(true);
-  const lastScrollY = useRef(0);
-
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const currentScrollY = e.currentTarget.scrollTop;
+    const delta = currentScrollY - lastScrollY.current;
 
-    // Hide nav when scrolling down, show only when scrolling up
-    if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
-      if (isNavVisible) setIsNavVisible(false);
-    } else if (currentScrollY < lastScrollY.current) {
-      if (!isNavVisible) setIsNavVisible(true);
+    // Hysteresis: only update if scrolled more than 10px
+    if (Math.abs(delta) > 10) {
+      if (delta > 0 && currentScrollY > 50) {
+        if (isNavVisible) setIsNavVisible(false);
+      } else if (delta < 0) {
+        if (!isNavVisible) setIsNavVisible(true);
+      }
+      lastScrollY.current = currentScrollY;
     }
-
-    lastScrollY.current = currentScrollY;
 
     setIsScrolling(true);
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-    scrollTimeout.current = setTimeout(() => {
-      setIsScrolling(false);
-      // Removed the auto-show logic here to keep the navbar hidden until user scrolls up
-    }, 400);
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400);
+  };
+
+  const toggleFavorite = async (bizId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    triggerHaptic();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { alert("Please login to save favorites!"); return; }
+
+    if (favorites.includes(bizId)) {
+      const { error } = await supabase.from('user_favorite_businesses').delete().eq('user_id', session.user.id).eq('business_id', bizId);
+      if (!error) setFavorites(prev => prev.filter(f => f !== bizId));
+    } else {
+      if (favorites.length >= 6) { alert("Limit reached!"); return; }
+      const { error } = await supabase.from('user_favorite_businesses').insert({ user_id: session.user.id, business_id: bizId });
+      if (!error) setFavorites(prev => [...prev, bizId]);
+    }
   };
 
   const renderScreen = () => {
     switch (screen) {
-      case 'onboarding':
-        return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} />;
-      case 'dashboard':
-        return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivity={recentActivity} setRecentActivity={setRecentActivity} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setMarketSearchQuery={setMarketSearchQuery} settings={settings} />;
-      case 'marketplace':
-        return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} />;
-      case 'earn':
-        return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} />;
-      case 'business-detail':
-        return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} />;
-      case 'checkout':
-        return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} />;
-      case 'profile':
-        return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivity={recentActivity} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} />;
-      case 'order-tracking':
-        return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivity={setRecentActivity} />;
-      default:
-        return null;
+      case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
+      case 'dashboard': return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivities={recentActivities} setRecentActivities={setRecentActivities} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setPrefilledTier={setPrefilledTier} setPrefilledDistance={setPrefilledDistance} setMarketSearchQuery={setMarketSearchQuery} settings={settings} showAlert={showAlert} activeOrderId={activeOrderId} />;
+      case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} />;
+      case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
+      case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
+      case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} />;
+      case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
+      case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} />;
+      default: return null;
     }
   };
 
@@ -551,11 +556,7 @@ const App = () => {
           </div>
 
           {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && (
-            <FloatingCartButton
-              cart={cart}
-              theme={theme}
-              onClick={() => navigate('checkout', true)}
-            />
+            <FloatingCartButton cart={cart} theme={theme} onClick={() => navigate('checkout', true)} />
           )}
 
           {/* Persistent Ride Layer */}
@@ -564,18 +565,35 @@ const App = () => {
               theme={theme}
               navigate={navigate}
               goBack={goBack}
-              setRecentActivity={setRecentActivity}
+              setRecentActivities={setRecentActivities}
               user={user}
               prefilledDestination={prefilledDestination}
-              clearPrefilled={() => setPrefilledDestination(null)}
+              prefilledTier={prefilledTier}
+              prefilledDistance={prefilledDistance}
+              clearPrefilled={() => { setPrefilledDestination(null); setPrefilledTier(null); setPrefilledDistance(null); }}
               active={screen === 'ride'}
               handleScroll={handleScroll}
               settings={settings}
+              showAlert={showAlert}
+              onSearchingChange={setIsRideSearching}
             />
           </div>
         </div>
       </div>
       {showAssistant && <SmartAssistant onClose={() => setShowAssistant(false)} theme={theme} />}
+      <PremiumModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        theme={theme}
+        showCancel={modalConfig.showCancel}
+        onConfirm={modalConfig.onConfirm}
+        onCancel={modalConfig.onCancel}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+      />
     </div>
   );
 };

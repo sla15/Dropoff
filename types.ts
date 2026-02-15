@@ -1,7 +1,7 @@
 
 export type Theme = 'light' | 'dark';
 export type Screen = 'onboarding' | 'dashboard' | 'ride' | 'marketplace' | 'earn' | 'profile' | 'checkout' | 'business-detail' | 'store' | 'order-tracking';
-export type RideStatus = 'idle' | 'payment-select' | 'searching' | 'accepted' | 'arrived' | 'in-progress' | 'completed' | 'review';
+export type RideStatus = 'idle' | 'payment-select' | 'searching' | 'accepted' | 'arrived' | 'in-progress' | 'completed' | 'review' | 'cancelled' | 'cancelled_by_driver';
 
 export interface Category {
   id: string;
@@ -44,6 +44,7 @@ export interface CartItem extends Product {
   businessId: string;
   businessName: string;
   quantity: number;
+  originalProductId: string; // Preserves the actual UUID for database inserts
 }
 
 export interface Activity {
@@ -54,8 +55,12 @@ export interface Activity {
   subtitle: string;
   price: number;
   date: string;
+  created_at?: string;
   status: 'completed' | 'cancelled';
   rating?: number;
+  requested_vehicle_type?: string;
+  distance_km?: number;
+  reference_id?: string;
 }
 
 export interface SavedLocation {
@@ -68,6 +73,7 @@ export interface SavedLocation {
 }
 
 export interface UserData {
+  id: string;
   name: string;
   phone: string;
   email: string;
@@ -77,6 +83,8 @@ export interface UserData {
   role?: 'customer' | 'driver' | 'merchant' | 'both';
   referralCode?: string;
   referralBalance?: number;
+  last_lat?: number;
+  last_lng?: number;
 }
 
 export interface Reward {
@@ -91,6 +99,7 @@ export interface Reward {
 }
 
 export interface AppSettings {
+  id?: string;
   min_ride_price: number;
   min_delivery_fee: number;
   driver_search_radius_km: number;
@@ -99,4 +108,10 @@ export interface AppSettings {
   commission_percentage: number;
   rating_window_limit: number;
   is_rating_enabled: boolean;
+  max_driver_cash_amount: number;
+  multiplier_scooter: number;
+  multiplier_economy: number;
+  multiplier_premium: number;
+  price_per_km: number;
+  waiting_fee_per_min: number;
 }

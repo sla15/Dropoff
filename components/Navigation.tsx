@@ -19,41 +19,84 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
             <div
                 className={`
           pointer-events-auto
-          ${theme === 'light' ? 'bg-white/80 text-black border-white' : 'bg-[#1C1C1E]/80 text-white border-white/5'} 
-          backdrop-blur-2xl rounded-[32px] px-2 shadow-2xl flex items-center justify-between relative border ring-1 ring-black/5
-          w-[92%] md:w-[400px] py-3
+          ${theme === 'light' ? 'bg-white/50 text-black border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.1)]' : 'bg-[#1C1C1E]/40 text-white border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.3)]'} 
+          backdrop-blur-2xl rounded-full px-6 flex items-center justify-center gap-2 relative
+          w-fit mx-auto py-2 overflow-visible border-[0.5px] min-w-[280px]
         `}
             >
+                {/* Liquid Top Highlighter */}
+                <div className={`absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70`}></div>
+                <div className={`absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#00D68F]/20 to-transparent opacity-50 blur-[1px]`}></div>
 
-                <button onClick={() => navigate('ride')} className="flex flex-1 flex-col items-center gap-1.5 active:scale-98 transition-transform">
-                    <Car size={20} className={active === 'ride' ? 'text-[#00D68F]' : 'opacity-40'} strokeWidth={active === 'ride' ? 2.5 : 2} />
-                    <span className={`text-[10px] font-bold ${active === 'ride' ? 'text-[#00D68F]' : 'opacity-40'}`}>Ride</span>
-                </button>
+                <NavItem
+                    active={active === 'ride'}
+                    onClick={() => navigate('ride')}
+                    icon={Car}
+                    label="Ride"
+                    theme={theme}
+                />
 
-                <button onClick={() => navigate('marketplace')} className="flex flex-1 flex-col items-center gap-1.5 active:scale-98 transition-transform">
-                    <ShoppingBag size={20} className={active === 'marketplace' ? 'text-[#00D68F]' : 'opacity-40'} strokeWidth={active === 'marketplace' ? 2.5 : 2} />
-                    <span className={`text-[10px] font-bold ${active === 'marketplace' ? 'text-[#00D68F]' : 'opacity-40'}`}>Market</span>
-                </button>
+                <NavItem
+                    active={active === 'marketplace'}
+                    onClick={() => navigate('marketplace')}
+                    icon={ShoppingBag}
+                    label="Market"
+                    theme={theme}
+                />
 
-                <div className="relative w-12 flex justify-center">
-                    <button
-                        onClick={() => navigate('dashboard')}
-                        className={`absolute w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-[4px] transition-all duration-500 active:scale-98 ${theme === 'light' ? 'bg-[#00D68F] text-black border-[#F2F2F7]' : 'bg-[#00D68F] text-black border-black'} -top-8 scale-100`}
-                    >
-                        <Home size={24} fill="currentColor" strokeWidth={2.5} />
-                    </button>
-                </div>
+                <NavItem
+                    active={active === 'dashboard'}
+                    onClick={() => navigate('dashboard')}
+                    icon={Home}
+                    label="Home"
+                    theme={theme}
+                    isHome
+                />
 
-                <button onClick={() => navigate('profile')} className="flex flex-1 flex-col items-center gap-1.5 active:scale-98 transition-transform">
-                    <User size={20} className={active === 'profile' ? 'text-[#00D68F]' : 'opacity-40'} strokeWidth={active === 'profile' ? 2.5 : 2} />
-                    <span className={`text-[10px] font-bold ${active === 'profile' ? 'text-[#00D68F]' : 'opacity-40'}`}>Profile</span>
-                </button>
+                <NavItem
+                    active={active === 'profile'}
+                    onClick={() => navigate('profile')}
+                    icon={User}
+                    label="Profile"
+                    theme={theme}
+                />
 
-                <button onClick={() => navigate('earn')} className="flex flex-1 flex-col items-center gap-1.5 active:scale-98 transition-transform">
-                    <Gift size={20} className={active === 'earn' ? 'text-[#00D68F]' : 'opacity-40'} strokeWidth={active === 'earn' ? 2.5 : 2} />
-                    <span className={`text-[10px] font-bold ${active === 'earn' ? 'text-[#00D68F]' : 'opacity-40'}`}>Gifts</span>
-                </button>
+                <NavItem
+                    active={active === 'earn'}
+                    onClick={() => navigate('earn')}
+                    icon={Gift}
+                    label="Gifts"
+                    theme={theme}
+                />
             </div>
+        </div>
+    );
+};
+
+const NavItem = ({ active, onClick, icon: Icon, label, theme, isHome }: { active: boolean, onClick: () => void, icon: any, label: string, theme: Theme, isHome?: boolean }) => {
+    const iconSize = isHome ? 24 : 26;
+
+    return (
+        <div className="relative flex flex-col items-center">
+            <button
+                onClick={onClick}
+                className={`
+                    flex flex-col items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                    ${active
+                        ? 'w-14 h-14 rounded-full bg-[#00D68F] text-black shadow-xl -translate-y-1.5 border-[4px]'
+                        : 'w-12 h-12 rounded-2xl text-current opacity-40 hover:opacity-100 active:scale-95'
+                    }
+                    ${active && theme === 'light' ? 'border-white' : active ? 'border-[#1C1C1E]' : 'border-transparent'}
+                `}
+            >
+                <Icon size={iconSize} strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+            </button>
+            <span className={`
+                absolute -bottom-1 text-[10px] font-black transition-all duration-500
+                ${active ? 'opacity-100 translate-y-0 scale-100 text-[#00D68F]' : 'opacity-0 translate-y-2 scale-75'}
+            `}>
+                {label}
+            </span>
         </div>
     );
 };
@@ -73,7 +116,7 @@ export const Sidebar = ({ active, navigate, theme }: NavProps) => {
                 <div className="w-10 h-10 bg-[#00D68F] rounded-xl flex items-center justify-center text-black">
                     <div className="w-6 h-6 border-2 border-black rounded-full"></div>
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight">SuperApp</h1>
+                <h1 className="text-2xl font-bold tracking-tight">DROPOFF</h1>
             </div>
 
             <nav className="flex-1 space-y-2">

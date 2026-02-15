@@ -1,27 +1,50 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User } from 'lucide-react';
+import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
-import { triggerHaptic, sendPushNotification } from '../index';
+import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { GreenGlow } from '../components/GreenGlow';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
-
-
+import { darkMapStyle } from '../utils/mapStyles'; // Ensure this exists or is handled
+import { RideMap } from '../components/Ride/RideMap';
+import { RideBookingForm } from '../components/Ride/RideBookingForm';
+import { RideStatusPanel } from '../components/Ride/RideStatusPanel';
+import { RideCancellationSummary } from '../components/Ride/RideCancellationSummary';
+import { RidePaymentSummary } from '../components/Ride/RidePaymentSummary';
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
     goBack: () => void;
-    setRecentActivity: React.Dispatch<React.SetStateAction<Activity[]>>;
+    setRecentActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
     user: UserData;
     prefilledDestination?: string | null;
+    prefilledTier?: string | null;
+    prefilledDistance?: number | null;
     clearPrefilled?: () => void;
     active?: boolean;
     handleScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
+    onSearchingChange?: (searching: boolean) => void;
 }
 
-export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, prefilledDestination, clearPrefilled, active, handleScroll, settings }: Props) => {
+export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, showAlert, onSearchingChange }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
+
+    useEffect(() => {
+        if (onSearchingChange) {
+            onSearchingChange(status === 'searching');
+        }
+    }, [status]);
     const [rideType, setRideType] = useState<'ride' | 'delivery'>('ride');
     const [destinations, setDestinations] = useState<string[]>(['']);
     const [selectedTier, setSelectedTier] = useState('eco');
@@ -30,29 +53,48 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
     const [rating, setRating] = useState(5);
     const [reviewComment, setReviewComment] = useState('');
     const [bookingStep, setBookingStep] = useState<'planning' | 'selecting'>('planning');
-    const [mapPins, setMapPins] = useState<{ x: number, y: number, label?: string }[]>([]);
+    const mapPinsRef = useRef<{ x: number, y: number, label?: string }[]>([]);
+    const mapInteractionRef = useRef(false);
+    const initialCenterDoneRef = useRef(false);
     const [loading, setLoading] = useState(false);
+    const [showPaymentSummary, setShowPaymentSummary] = useState(false);
+    const [showCancellationSummary, setShowCancellationSummary] = useState(false);
+    const [isMinimalRating, setIsMinimalRating] = useState(false);
+    const [isCalculating, setIsCalculating] = useState(false);
+    const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
+    const [assignedDriver, setAssignedDriver] = useState<any>(null);
+    const [isLocating, setIsLocating] = useState(false);
+    const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
+    const [currentRideId, setCurrentRideId] = useState<string | null>(null);
+
+    // Tiers Definition
+    const tiers = [
+        { id: 'eco', label: 'Economy', mult: Number(settings.multiplier_economy) || 1, time: '3 min', icon: Car, img: '/assets/white_yaris_side.png', desc: '4 seats' },
+        { id: 'prem', label: 'AC', mult: Number(settings.multiplier_premium) || 1.8, time: '5 min', icon: Car, img: '/assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
+        { id: 'moto', label: 'Bike', mult: Number(settings.multiplier_scooter) || 0.6, time: '2 min', icon: Bike, img: '/assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
+    ];
 
     // Animation States
-    const [driverPos, setDriverPos] = useState({ x: 80, y: 10 }); // Start top-right
+    const [driverPos, setDriverPos] = useState({ x: 80, y: 10 });
     const animationRef = useRef<number | null>(null);
 
-    // --- GOOGLE MAPS REFS & STATE ---
+    // --- GOOGLE MAPS REFS ---
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<any>(null);
-    const [markers, setMarkers] = useState<any[]>([]);
-    const [driverMarkers, setDriverMarkers] = useState<Map<string, any>>(new Map());
-    const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
     const [directionsRenderer, setDirectionsRenderer] = useState<any>(null);
-    const autocompleteService = useRef<any>(null);
+    const [directionsService, setDirectionsService] = useState<any>(null);
+    const [autocompleteService, setAutocompleteService] = useState<any>(null);
+    const [geocoder, setGeocoder] = useState<any>(null);
     const sessionToken = useRef<any>(null);
+    const markersRef = useRef<any[]>([]);
+    const driverMarkersRef = useRef<Map<string, any>>(new Map());
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [realDistanceKm, setRealDistanceKm] = useState<number>(0);
-    const [assignedDriver, setAssignedDriver] = useState<any>(null);
-    const [searchRadius, setSearchRadius] = useState(5); // Default 5km
-    const [searchInterval, setSearchInterval] = useState<any>(null);
+    const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
+    const [searchRadius, setSearchRadius] = useState(5);
+    const searchIntervalRef = useRef<any>(null);
+    const notifiedDriversRef = useRef<Set<string>>(new Set());
 
     // Drag Sheet State
     const [sheetOffset, setSheetOffset] = useState(0);
@@ -61,26 +103,162 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
     const sheetStartY = useRef(0);
     const sheetCurrentY = useRef(0);
 
+    const userMarkerRef = useRef<any>(null);
+
+    const updateMarker = (pos: { lat: number, lng: number }, label?: string, targetMapInstance?: any) => {
+        const activeMap = targetMapInstance || map;
+        if (!activeMap) return;
+        const google = (window as any).google;
+        if (!google) return;
+
+        const markerIcon = {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#00D68F',
+            fillOpacity: 1,
+            strokeWeight: 4,
+            strokeColor: 'white'
+        };
+
+        if (userMarkerRef.current) {
+            userMarkerRef.current.setPosition(pos);
+            userMarkerRef.current.setMap(activeMap);
+            userMarkerRef.current.setIcon(markerIcon);
+        } else {
+            userMarkerRef.current = new google.maps.Marker({
+                position: pos,
+                map: activeMap,
+                title: label || user.name || 'You',
+                icon: markerIcon,
+                zIndex: 100,
+                optimized: false
+            });
+        }
+    };
+
+    const handleLocateMe = (isInitial = false, manualMap?: any) => {
+        const targetMap = manualMap || map;
+        setIsLocating(true);
+        setLocationMethod(null);
+        console.log("RideScreen: handleLocateMe triggered", { isInitial, hasMap: !!targetMap });
+
+        if (!navigator.geolocation) {
+            if (user.last_lat && user.last_lng) {
+                const pos = { lat: user.last_lat, lng: user.last_lng };
+                setUserLocation(pos);
+                setLocationMethod('profile');
+                if (targetMap) {
+                    targetMap.panTo(pos);
+                    updateMarker(pos, undefined, targetMap);
+                }
+            }
+            setIsLocating(false);
+            if (!isInitial) showAlert("Geolocation Error", "Your browser does not support geolocation.", "error");
+            return;
+        }
+
+        let fallbackApplied = false;
+        const fallbackTimeout = setTimeout(() => {
+            if (!userLocation && user.last_lat && user.last_lng) {
+                console.log("RideScreen: GPS slow, applying profile database fallback as interim center...");
+                const pos = { lat: user.last_lat, lng: user.last_lng };
+                setUserLocation(pos);
+                setLocationMethod('profile');
+                if (targetMap) {
+                    targetMap.panTo(pos);
+                    updateMarker(pos, undefined, targetMap);
+                }
+                fallbackApplied = true;
+            }
+        }, 4000); // Increased fallback to 4s to give GPS more time
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                clearTimeout(fallbackTimeout);
+                const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+                console.log("RideScreen: Real GPS success:", pos);
+                setUserLocation(pos);
+                setLocationMethod('gps');
+                setIsLocating(false);
+
+                supabase.from('profiles').update({
+                    last_lat: pos.lat,
+                    last_lng: pos.lng
+                }).eq('id', user.id).then(({ error }) => {
+                    if (error) console.error("Error persisting location:", error);
+                });
+
+                if (targetMap) {
+                    targetMap.panTo(pos);
+                    if (isInitial) targetMap.setZoom(14);
+                    updateMarker(pos, undefined, targetMap);
+                }
+                if (!isInitial) triggerHaptic();
+            },
+            (error) => {
+                clearTimeout(fallbackTimeout);
+                setIsLocating(false);
+                console.log("Geolocation error:", error);
+
+                let errorTitle = "Location Error";
+                let errorMsg = "Could not get your current location.";
+
+                switch (error.code) {
+                    case 1: // PERMISSION_DENIED
+                        errorTitle = "Permission Denied";
+                        errorMsg = "Please allow location access in your browser or device settings.";
+                        break;
+                    case 2: // POSITION_UNAVAILABLE
+                        errorTitle = "Unavailable";
+                        errorMsg = "Location information is unavailable.";
+                        break;
+                    case 3: // TIMEOUT
+                        errorTitle = "Timeout";
+                        errorMsg = "Taking too long to get location. Try again or set manually.";
+                        break;
+                }
+
+                if (!userLocation && user.last_lat && user.last_lng) {
+                    const pos = { lat: user.last_lat, lng: user.last_lng };
+                    setUserLocation(pos);
+                    setLocationMethod('profile');
+                    if (targetMap) {
+                        targetMap.panTo(pos);
+                        updateMarker(pos, undefined, targetMap);
+                    }
+                }
+                if (!isInitial) showAlert(errorTitle, errorMsg, "error");
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    };
+
     // Initialize Map
     useEffect(() => {
-        if (!mapContainerRef.current) return;
-
         const initMap = () => {
-            if (!(window as any).google) {
-                console.error("Google Maps script not loaded");
-                return;
-            }
+            if (!mapContainerRef.current || !(window as any).google) return;
+            const google = (window as any).google;
+            const defaultCenter = { lat: 13.4432, lng: -16.5916 };
+            const targetCenter = userLocation || (user.last_lat && user.last_lng ? { lat: user.last_lat, lng: user.last_lng } : defaultCenter);
 
-            const defaultCenter = { lat: 13.4432, lng: -16.5916 }; // Banjul
-            const newMap = new (window as any).google.maps.Map(mapContainerRef.current, {
-                center: defaultCenter,
-                zoom: 14,
+            const newMap = new google.maps.Map(mapContainerRef.current, {
+                center: targetCenter,
+                zoom: 13,
                 disableDefaultUI: true,
+                clickableIcons: false,
+                gestureHandling: 'greedy',
                 styles: theme === 'dark' ? darkMapStyle : []
             });
 
+            newMap.addListener('dragstart', () => {
+                mapInteractionRef.current = true;
+            });
+
             setMap(newMap);
-            setDirectionsRenderer(new (window as any).google.maps.DirectionsRenderer({
+            initialCenterDoneRef.current = true;
+            updateMarker(targetCenter, user.name || 'You', newMap);
+
+            const directionsRenderer = new google.maps.DirectionsRenderer({
                 map: newMap,
                 suppressMarkers: true,
                 polylineOptions: {
@@ -88,58 +266,119 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
                     strokeWeight: 5,
                     strokeOpacity: 0.8
                 }
-            }));
+            });
 
-            autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-            // Start with no session token; generate on focus
-            sessionToken.current = null;
-
-            // 1. Center on User Location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const pos = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        newMap.setCenter(pos);
-                        setUserLocation(pos);
-                        // Add marker for user
-                        new (window as any).google.maps.Marker({
-                            position: pos,
-                            map: newMap,
-                            icon: {
-                                path: "M12,2A5,5 0 0,1 17,7A5,5 0 0,1 12,12A5,5 0 0,1 7,7A5,5 0 0,1 12,2M12,14C17.5,14 22,16.24 22,19V22H2V19C2,16.24 6.5,14 12,14Z",
-                                scale: 1.2,
-                                fillOpacity: 1,
-                                fillColor: '#00D68F',
-                                strokeColor: 'white',
-                                strokeWeight: 2,
-                                anchor: new (window as any).google.maps.Point(12, 12)
-                            }
-                        });
-                    },
-                    (error) => console.log("Geolocation error:", error)
-                );
-            }
+            setDirectionsRenderer(directionsRenderer);
+            setDirectionsService(new google.maps.DirectionsService());
+            setAutocompleteService(new google.maps.places.AutocompleteService());
+            setGeocoder(new google.maps.Geocoder());
         };
 
-        if ((window as any).google) {
+        if ((window as any).google && mapContainerRef.current) {
             initMap();
         } else {
             const checkInterval = setInterval(() => {
-                if ((window as any).google) {
+                if ((window as any).google && mapContainerRef.current) {
                     initMap();
                     clearInterval(checkInterval);
                 }
             }, 100);
+            return () => clearInterval(checkInterval);
         }
-    }, []);
+    }, [active]);
 
-    // Handle Prefilled Destination from Dashboard
+    // Re-center Map when screen becomes active
+    useEffect(() => {
+        if (active && map && !userLocation) {
+            console.log("RideScreen: Screen became active, triggering auto-locate");
+            handleLocateMe(true);
+        }
+    }, [active, !!map]);
+
+    // Initial Location Capture once Map is ready
+    // Removed duplicate useEffect, centering is handled in initMap
+
+    // Theme-aware Map Styles linked in RideMap, but keeping effect here if map instance is managed here
+
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (status === 'searching') {
+                handleCancelRide();
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [status]);
+
+    // Restore Active Ride on Mount
+    useEffect(() => {
+        const restoreActiveRide = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            // 0. CLEANUP: If there are any previous searching rides, clear them out
+            // The user wants searching to "stop as soon as the app is reloaded"
+            const { data: staleSearches } = await supabase
+                .from('rides')
+                .select('*')
+                .eq('customer_id', user.id)
+                .eq('status', 'searching')
+                .maybeSingle();
+            if (staleSearches) {
+                console.log("Cleaning up stale searches on launch:", staleSearches.length);
+                await supabase
+                    .from('rides')
+                    .update({ status: 'cancelled' })
+                    .eq('id', staleSearches.id);
+            }
+
+            // 1. Restore only actual active bookings
+            const { data: activeRide, error } = await supabase
+                .from('rides')
+                .select('*')
+                .eq('customer_id', session.user.id)
+                .in('status', ['accepted', 'arrived', 'in-progress']) // EXCLUDED 'searching'
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (activeRide && !error) {
+                console.log("Found active ride, restoring state:", activeRide);
+
+                // Restore destinations for UI
+                setDestinations([activeRide.dropoff_address]);
+                setRealDistanceKm(activeRide.distance_km || 0);
+
+                // Resume tracking
+                handleBookRide(activeRide.id);
+
+                // Force navigation to Ride screen
+                if (navigate) {
+                    navigate('ride');
+                }
+            }
+        };
+
+        if (map) {
+            restoreActiveRide();
+        }
+    }, [map]);
+
+    // Handle Prefilled Destination & Tier from Dashboard
     useEffect(() => {
         if (prefilledDestination && map && directionsRenderer) {
             console.log("Applying prefilled destination:", prefilledDestination);
+            setBookingStep('selecting');
+
+            if (prefilledTier) {
+                console.log("Applying prefilled tier:", prefilledTier);
+                setSelectedTier(prefilledTier);
+            }
+            if (prefilledDistance) {
+                console.log("Applying prefilled distance:", prefilledDistance, "km (using cached value)");
+                setRealDistanceKm(prefilledDistance);
+            }
+
             updateDestination(0, prefilledDestination);
 
             // Geocode and show route immediately
@@ -149,27 +388,49 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
                     const loc = results[0].geometry.location;
                     map.panTo(loc);
 
-                    new (window as any).google.maps.Marker({
+                    const marker = new (window as any).google.maps.Marker({
                         position: loc,
                         map: map,
                         label: '1'
                     });
 
-                    calculateRouteAndPrice();
-                    setBookingStep('selecting');
+                    // Store marker in ref to manage it later
+                    markersRef.current = [marker];
+
+                    // If we have prefilled distance, just draw the route visually
+                    // Don't recalculate to save API calls and use cached distance
+                    console.log("Checking prefilledDistance for logic:", prefilledDistance);
+                    if (prefilledDistance) {
+                        console.log("Drawing route with cached distance, skipping Distance Matrix API call");
+                        const directionsService = new (window as any).google.maps.DirectionsService();
+                        directionsService.route({
+                            origin: userLocation || { lat: 13.4432, lng: -16.5916 },
+                            destination: loc,
+                            travelMode: (window as any).google.maps.TravelMode.DRIVING
+                        }, (result: any, routeStatus: string) => {
+                            if (routeStatus === 'OK') {
+                                directionsRenderer.setDirections(result);
+                            }
+                        });
+                    } else {
+                        // No cached distance, calculate it
+                        calculateRouteAndPrice();
+                    }
+
                     if (clearPrefilled) clearPrefilled();
                 }
             });
         }
-    }, [prefilledDestination, map, directionsRenderer]);
+    }, [prefilledDestination, prefilledTier, map, directionsRenderer]);
 
     // Re-center Map when screen becomes active
     useEffect(() => {
-        if (active && map && userLocation) {
-            console.log("Ride screen active, re-centering map...");
+        if (active && map && userLocation && !mapInteractionRef.current) {
+            console.log("Ride screen active, initial re-centering map...");
             map.panTo(userLocation);
+            // We only auto-pan once or until the user interacts
         }
-    }, [active, map, userLocation]);
+    }, [active, map, !!userLocation]); // Re-center when location first arrives
 
     // --- REAL-TIME DRIVER TRACKING ---
     useEffect(() => {
@@ -180,11 +441,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
             let iconName = 'car_economic_3d_backup.png';
             let markerClass = 'driver-marker';
 
-            if (vType === 'prem') {
+            if (vType === 'premium') {
                 iconName = 'car_premium_3d_backup.png';
                 markerClass = 'driver-marker driver-marker-prem';
             }
-            if (vType === 'moto') {
+            if (vType === 'scooter') {
                 iconName = 'car_scooter_3d_backup.png';
                 markerClass = 'driver-marker driver-marker-moto';
             }
@@ -204,25 +465,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
                 .eq('is_online', true);
 
             if (data) {
-                const newDriverMarkers = new Map();
+                const markersMap = driverMarkersRef.current;
                 data.forEach(d => {
-                    const icon = getVehicleIcon(d.vehicle_type || 'eco');
-                    const marker = new (window as any).google.maps.Marker({
-                        position: { lat: d.current_lat, lng: d.current_lng },
-                        map: map,
-                        icon: {
-                            url: icon.url,
-                            scaledSize: icon.scaledSize,
-                            anchor: icon.anchor
-                        },
-                        title: `Driver ${d.id}`,
-                        // Note: Standard Google Maps Marker doesn't easily support className for animation
-                        // BUT we can use the 'optimized: false' flag to ensure they are rendered as DOM elements
-                        optimized: false
-                    });
-                    newDriverMarkers.set(d.id, marker);
+                    const position = { lat: d.current_lat, lng: d.current_lng };
+                    const icon = getVehicleIcon(d.vehicle_category || 'economic');
+
+                    let marker = markersMap.get(d.id);
+                    if (marker) {
+                        marker.setPosition(position);
+                        marker.setMap(map); // Ensure it's on the CURRENT map instance
+                    } else {
+                        marker = new (window as any).google.maps.Marker({
+                            position,
+                            map: map,
+                            icon: {
+                                url: icon.url,
+                                scaledSize: icon.scaledSize,
+                                anchor: icon.anchor
+                            },
+                            title: `Driver ${d.id}`,
+                            optimized: false
+                        });
+                        markersMap.set(d.id, marker);
+                    }
                 });
-                setDriverMarkers(newDriverMarkers);
             }
         };
 
@@ -233,78 +499,91 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'drivers' },
-                (payload) => {
+                async (payload) => {
                     console.log('Driver change detected:', payload);
                     const updatedDriver = payload.new as any;
                     const oldDriver = payload.old as any;
+                    const markersMap = driverMarkersRef.current;
 
-                    setDriverMarkers(prev => {
-                        const next = new Map(prev);
-
-                        // Handle deletion or going offline
-                        if (payload.eventType === 'DELETE' || (updatedDriver && !updatedDriver.is_online)) {
-                            const marker = next.get(updatedDriver?.id || oldDriver?.id) as any;
-                            if (marker) {
-                                marker.setMap(null);
-                                next.delete(updatedDriver?.id || oldDriver?.id);
-                            }
+                    // Handle deletion or going offline
+                    if (payload.eventType === 'DELETE' || (updatedDriver && !updatedDriver.is_online)) {
+                        const marker = markersMap.get(updatedDriver?.id || oldDriver?.id);
+                        if (marker) {
+                            marker.setMap(null);
+                            markersMap.delete(updatedDriver?.id || oldDriver?.id);
                         }
-                        // Handle insertion or update
-                        else if (updatedDriver && updatedDriver.is_online) {
-                            let marker = next.get(updatedDriver.id) as any;
-                            const position = { lat: updatedDriver.current_lat, lng: updatedDriver.current_lng };
+                    }
+                    // Handle insertion or update
+                    else if (updatedDriver && updatedDriver.is_online) {
+                        let marker = markersMap.get(updatedDriver.id);
+                        const position = { lat: updatedDriver.current_lat, lng: updatedDriver.current_lng };
 
-                            if (marker) {
-                                marker.setPosition(position);
-                            } else {
-                                const icon = getVehicleIcon(updatedDriver.vehicle_type || 'eco');
-                                marker = new (window as any).google.maps.Marker({
-                                    position: position,
-                                    map: map,
-                                    icon: {
-                                        url: icon.url,
-                                        scaledSize: icon.scaledSize,
-                                        anchor: icon.anchor
-                                    },
-                                    title: `Driver ${updatedDriver.id}`,
-                                    optimized: false
+                        if (marker) {
+                            marker.setPosition(position);
+                        } else {
+                            const icon = getVehicleIcon(updatedDriver.vehicle_category || 'economic');
+                            marker = new (window as any).google.maps.Marker({
+                                position: position,
+                                map: map,
+                                icon: {
+                                    url: icon.url,
+                                    scaledSize: icon.scaledSize,
+                                    anchor: icon.anchor
+                                },
+                                title: `Driver ${updatedDriver.id}`,
+                                optimized: false
+                            });
+                            markersMap.set(updatedDriver.id, marker);
+                        }
+
+                        // Update local assignedDriver if this is our match
+                        if (updatedDriver.id === assignedDriverId) {
+                            setAssignedDriver(updatedDriver);
+
+                            // Use Distance Matrix for precise ETA
+                            if (userLocation) {
+                                const service = new (window as any).google.maps.DistanceMatrixService();
+                                service.getDistanceMatrix({
+                                    origins: [position],
+                                    destinations: [userLocation],
+                                    travelMode: (window as any).google.maps.TravelMode.DRIVING,
+                                }, (response: any, status: string) => {
+                                    if (status === 'OK' && response.rows[0].elements[0].duration) {
+                                        setEtaSeconds(response.rows[0].elements[0].duration.value);
+                                    }
                                 });
-                                next.set(updatedDriver.id, marker);
-                            }
 
-                            // Update local assignedDriver if this is our match
-                            if (updatedDriver.id === assignedDriverId) {
-                                setAssignedDriver(updatedDriver);
+                                const dist = calculateProximity(
+                                    updatedDriver.current_lat,
+                                    updatedDriver.current_lng,
+                                    userLocation.lat,
+                                    userLocation.lng
+                                );
 
-                                // Calculate real ETA based on proximity
-                                if (userLocation) {
-                                    const dist = calculateProximity(
-                                        updatedDriver.current_lat,
-                                        updatedDriver.current_lng,
-                                        userLocation.lat,
-                                        userLocation.lng
-                                    );
+                                if (dist < 0.1 && status === 'accepted' && currentRideId) {
+                                    const { data: rideData, error: rideError } = await supabase
+                                        .from('rides')
+                                        .select('status, driver_id, profiles!rides_driver_id_fkey(full_name, phone, avatar_url, average_rating), drivers!rides_driver_id_fkey(vehicle_model, vehicle_plate, current_lat, current_lng)')
+                                        .eq('id', currentRideId)
+                                        .maybeSingle();
 
-                                    // Average speed 30km/h = 0.5km/min
-                                    const newEta = Math.round((dist / 0.5) * 60);
-                                    setEtaSeconds(newEta);
-
-                                    // Auto-arrive if very close (< 0.1km = 100m)
-                                    if (dist < 0.1 && status === 'accepted') {
-                                        setStatus('arrived');
-                                        sendPush("Driver Arrived", `${updatedDriver.vehicle_model || 'Your driver'} has arrived and is waiting!`);
+                                    if (rideData && !rideError) {
+                                        console.log("RideScreen: Proximity refresh success", rideData);
                                     }
                                 }
                             }
                         }
-                        return next;
-                    });
+                    }
                 }
             )
             .subscribe();
 
         return () => {
+            console.log("RideScreen: Cleaning up driver markers and channel...");
             supabase.removeChannel(channel);
+            // Optional: Hide markers instead of full deletion if you expect a quick re-mount,
+            // but for a clean start on map re-init, nulling map is safer.
+            driverMarkersRef.current.forEach(m => m.setMap(null));
         };
     }, [map, assignedDriverId, userLocation, status]);
 
@@ -327,20 +606,14 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
     useEffect(() => {
         const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
 
-        driverMarkers.forEach((marker: any, id) => {
+        driverMarkersRef.current.forEach((marker: any, id) => {
             if (isRequestActive) {
-                // Only show the assigned driver
-                if (id === assignedDriverId) {
-                    marker.setVisible(true);
-                } else {
-                    marker.setVisible(false);
-                }
+                marker.setVisible(id === assignedDriverId);
             } else {
-                // Show all online drivers when searching or idle
                 marker.setVisible(true);
             }
         });
-    }, [status, driverMarkers, assignedDriverId]);
+    }, [status, assignedDriverId]);
 
     // Simulated driver movement for dummy data demonstration
     useEffect(() => {
@@ -384,41 +657,94 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         };
     }, [status, assignedDriverId, userLocation]);
 
-    const calculateRouteAndPrice = async () => {
-        if (!map || directionsRenderer === null || destinations.every(d => !d)) return;
+    const calculateRouteAndPrice = async (): Promise<boolean> => {
+        if (!map || directionsRenderer === null || destinations.every(d => !d)) return false;
 
-        const directionsService = new (window as any).google.maps.DirectionsService();
+        if (prefilledDistance) {
+            console.log("Using prefilled distance:", prefilledDistance, "km");
+            setRealDistanceKm(prefilledDistance);
+            return true;
+        }
+
+        const google = (window as any).google;
+        const directionsService = new google.maps.DirectionsService();
+        const distanceMatrixService = new google.maps.DistanceMatrixService();
 
         const validDestinations = destinations.filter(d => d.trim() !== '');
-        if (validDestinations.length === 0) return;
+        if (validDestinations.length === 0) return false;
 
-        console.log("Requesting Directions for:", validDestinations);
+        setIsCalculating(true);
+        console.log("Requesting Accurate Distance for:", validDestinations);
 
-        const request: any = {
-            origin: userLocation || { lat: 13.4432, lng: -16.5916 },
-            destination: validDestinations[validDestinations.length - 1],
-            waypoints: validDestinations.length > 1
-                ? validDestinations.slice(0, -1).map(d => ({ location: d, stopover: true }))
-                : [],
-            travelMode: (window as any).google.maps.TravelMode.DRIVING
-        };
+        // --- DISTANCE CACHING (7 DAYS) ---
+        const startAddr = userLocation || { lat: 13.4432, lng: -16.5916 };
+        const endAddr = validDestinations[validDestinations.length - 1];
 
-        directionsService.route(request, (result: any, status: string) => {
-            if (status === 'OK') {
-                directionsRenderer.setDirections(result);
+        try {
+            // 1. Check Supabase distance_cache first
+            // Note: Since we don't have destination coordinates yet, 
+            // a full coordinate cache hit is only possible if we geocode first.
+            // For now, we rely on the Direction service and save to cache.
+            // We'll skip the pre-check to avoid incorrect hits until geocoding is integrated.
+        } catch (e) {
+            console.error("Supabase Cache Read Error:", e);
+        }
 
-                // Calculate total distance
-                let totalDist = 0;
-                const legs = result.routes[0].legs;
-                for (let j = 0; j < legs.length; j++) {
-                    totalDist += legs[j].distance.value;
+        return new Promise(async (resolve) => {
+            // Premium 1s Wait Experience (starts anyway)
+            const minWait = new Promise(resolve => setTimeout(resolve, 1000));
+
+            const defaultCenter = { lat: user.last_lat || 13.4432, lng: user.last_lng || -16.5916 };
+            const request: any = {
+                origin: userLocation || defaultCenter,
+                destination: validDestinations[validDestinations.length - 1],
+                waypoints: validDestinations.length > 1
+                    ? validDestinations.slice(0, -1).map(d => ({ location: d, stopover: true }))
+                    : [],
+                travelMode: google.maps.TravelMode.DRIVING
+            };
+
+            // 1. Get Visual Route & Calculate total distance from legs
+            directionsService.route(request, async (result: any, status: string) => {
+                if (status === 'OK') {
+                    directionsRenderer.setDirections(result);
+
+                    // Sum up all legs for sequential multi-stop distance
+                    let totalMeters = 0;
+                    let totalSeconds = 0;
+                    const route = result.routes[0];
+                    if (route && route.legs) {
+                        route.legs.forEach((leg: any) => {
+                            totalMeters += leg.distance.value;
+                            totalSeconds += leg.duration.value;
+                        });
+                    }
+                    const km = totalMeters / 1000;
+                    const mins = totalSeconds / 60;
+                    setRealDistanceKm(km);
+                    console.log("Verified multi-stop distance:", km, "km");
+
+                    // Save to Supabase Cache
+                    try {
+                        const leg = route.legs[0];
+                        await supabase.from('distance_cache').upsert({
+                            origin_lat: parseFloat(leg.start_location.lat().toFixed(4)),
+                            origin_lng: parseFloat(leg.start_location.lng().toFixed(4)),
+                            dest_lat: parseFloat(leg.end_location.lat().toFixed(4)),
+                            dest_lng: parseFloat(leg.end_location.lng().toFixed(4)),
+                            distance_km: km,
+                            duration_mins: mins
+                        }, { onConflict: 'origin_lat, origin_lng, dest_lat, dest_lng' });
+                    } catch (e) { }
+
+                    setIsCalculating(false);
+                    resolve(true);
+                } else {
+                    console.error("Route calculation failed:", status);
+                    setIsCalculating(false);
+                    resolve(false);
                 }
-                const km = totalDist / 1000;
-                setRealDistanceKm(km);
-                console.log("Route calculated! Distance:", km, "km");
-            } else {
-                console.error("Directions request failed due to " + status);
-            }
+            });
         });
     };
 
@@ -432,7 +758,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         const newDestinations = [...destinations];
         newDestinations[index] = value;
         setDestinations(newDestinations);
+
+        // If cleared, also clear the marker and route
+        if (!value.trim()) {
+            if (markersRef.current[index]) {
+                markersRef.current[index].setMap(null);
+                markersRef.current[index] = null;
+            }
+            if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+            setRealDistanceKm(0);
+        }
     };
+
 
     const addDestination = () => {
         setDestinations([...destinations, '']);
@@ -443,20 +780,101 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
             const newDestinations = destinations.filter((_, i) => i !== index);
             setDestinations(newDestinations);
 
-            // Remove corresponding pin if it exists
-            if (index < mapPins.length) {
-                const newPins = mapPins.filter((_, i) => i !== index);
-                setMapPins(newPins);
+            // Manage markers ref
+            if (markersRef.current[index]) {
+                markersRef.current[index].setMap(null);
             }
+            markersRef.current = markersRef.current.filter((_, i) => i !== index);
+
+            // Sync labels
+            markersRef.current.forEach((m, i) => {
+                if (m && typeof m.setLabel === 'function') {
+                    m.setLabel((i + 1).toString());
+                }
+            });
         } else {
             updateDestination(0, '');
-            setMapPins([]);
+            markersRef.current.forEach(m => m?.setMap(null));
+            markersRef.current = [];
         }
     };
+
+    // Map Click Listener
+    useEffect(() => {
+        if (!map || bookingStep !== 'planning') return;
+
+        const listener = map.addListener('click', (e: any) => {
+            if (status === 'searching') return;
+            const latLng = e.latLng;
+            if (!latLng) return;
+
+            // Geocode the location
+            const geocoder = new (window as any).google.maps.Geocoder();
+            geocoder.geocode({ location: latLng }, (results: any, status: string) => {
+                if (status === 'OK' && results[0]) {
+                    const address = results[0].formatted_address;
+                    // Update the last empty destination or the last one
+                    const idx = destinations.findIndex(d => !d);
+                    const targetIdx = idx === -1 ? destinations.length - 1 : idx;
+
+                    updateDestination(targetIdx, address);
+
+                    // Visual pin
+                    const marker = new (window as any).google.maps.Marker({
+                        position: latLng,
+                        map: map,
+                        label: (targetIdx + 1).toString(),
+                        animation: (window as any).google.maps.Animation.DROP,
+                        cursor: 'pointer'
+                    });
+
+                    // Remove on click
+                    marker.addListener('click', () => {
+                        marker.setMap(null);
+                        const label = marker.getLabel();
+                        const currentIdx = typeof label === 'string' ? parseInt(label) - 1 : targetIdx;
+                        updateDestination(currentIdx, '');
+                        if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+                        triggerHaptic();
+                    });
+
+                    if (markersRef.current[targetIdx]) {
+                        markersRef.current[targetIdx].setMap(null);
+                    }
+                    markersRef.current[targetIdx] = marker;
+                    triggerHaptic();
+                }
+            });
+        });
+
+        return () => {
+            (window as any).google.maps.event.removeListener(listener);
+        };
+    }, [map, bookingStep, destinations, directionsRenderer]);
 
     const handleSearch = (val: string, index: number) => {
         updateDestination(index, val);
         setActiveInputIndex(index);
+
+        // --- PLUS CODE SUPPORT ---
+        // Basic check for Plus Code format (e.g. C8HG+266 or 8FVC+C8)
+        const plusCodeRegex = /^[A-Z0-9]{4,8}\+[A-Z0-9]{2,3}/i;
+        if (plusCodeRegex.test(val.trim())) {
+            const geocoder = new (window as any).google.maps.Geocoder();
+            geocoder.geocode({ address: val.trim() }, (results: any, status: string) => {
+                if (status === 'OK' && results[0]) {
+                    setPredictions([{
+                        place_id: results[0].place_id,
+                        description: results[0].formatted_address,
+                        structured_formatting: {
+                            main_text: val.trim(),
+                            secondary_text: "Plus Code Location"
+                        }
+                    }]);
+                }
+            });
+            // Don't return here, let autocomplete run too just in case
+        }
 
         if (!val || val.length < 2) {
             setPredictions([]);
@@ -486,87 +904,133 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
     const selectPrediction = (prediction: any) => {
         if (activeInputIndex === null) return;
 
-        updateDestination(activeInputIndex, prediction.description);
+        const targetIdx = activeInputIndex;
+        updateDestination(targetIdx, prediction.description);
         setPredictions([]);
         setActiveInputIndex(null);
 
-        // Clear session token to save cost
         sessionToken.current = null;
 
-        // Geocode and update map
         const geocoder = new (window as any).google.maps.Geocoder();
-        geocoder.geocode({ address: prediction.description }, (results: any, status: string) => {
+        // Use placeId for 100% accuracy as requested
+        geocoder.geocode({ placeId: prediction.place_id }, (results: any, status: string) => {
             if (status === 'OK' && results[0] && map) {
                 const loc = results[0].geometry.location;
                 map.panTo(loc);
 
-                // Add marker
+                if (markersRef.current[targetIdx]) {
+                    markersRef.current[targetIdx].setMap(null);
+                }
+
                 const marker = new (window as any).google.maps.Marker({
                     position: loc,
                     map: map,
-                    label: (activeInputIndex + 1).toString()
+                    label: (targetIdx + 1).toString(),
+                    cursor: 'pointer'
                 });
-                setMarkers([...markers, marker]);
 
-                // Removed immediate routing call to allow manual control via 'Next' button
-                // calculateRouteAndPrice();
+                marker.addListener('click', () => {
+                    marker.setMap(null);
+                    const label = marker.getLabel();
+                    const currentIdx = typeof label === 'string' ? parseInt(label) - 1 : targetIdx;
+                    updateDestination(currentIdx, '');
+                    if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+                    triggerHaptic();
+                });
+
+                markersRef.current[targetIdx] = marker;
+            } else {
+                showAlert("Location Error", "We couldn't accurately find this place. Please try another search.", "error");
             }
         });
     };
 
-    const handleNextStep = () => {
+    const handleNextStep = async () => {
         if (destinations[0]) {
-            calculateRouteAndPrice();
-            setBookingStep('selecting');
-            triggerHaptic();
+            const success = await calculateRouteAndPrice();
+            if (success) {
+                setBookingStep('selecting');
+                triggerHaptic();
+            } else {
+                showAlert("Route Error", "Could not calculate route. Please check your addresses.", "error");
+            }
         }
     };
 
     const handleBookRide = async (existingRideId?: string, expandedMaxRadius?: number, startSearchRadius?: number) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-            alert("Please login to book a ride!");
+            showAlert("Login Required", "Please login to book a ride!", "error");
             return;
         }
-
-        setStatus('searching');
-        const startRadius = startSearchRadius || 2; // Start with 2km increment
-        const maxRadius = expandedMaxRadius || (Number(settings.driver_search_radius_km) || 10);
-        setSearchRadius(startRadius);
-        triggerHaptic();
 
         let ride = null;
         if (existingRideId) {
             // Use existing ride record
             const { data } = await supabase.from('rides').select('*').eq('id', existingRideId).single();
             ride = data;
+
+            // Only set status to searching if it's actually searching
+            if (ride && ride.status === 'searching') {
+                setStatus('searching');
+            } else if (ride) {
+                setStatus(ride.status as RideStatus);
+            }
         } else {
+            setStatus('searching');
+        }
+
+        const startRadius = startSearchRadius || 2; // Start with 2km increment
+        const maxRadius = expandedMaxRadius || (Number(settings.driver_search_radius_km) || 10);
+        setSearchRadius(startRadius);
+        triggerHaptic();
+
+        if (!existingRideId) {
             // 1. Create the Ride Request in 'searching' status
+            const categoryMap: Record<string, string> = {
+                'eco': 'economic',
+                'prem': 'premium',
+                'moto': 'scooter'
+            };
+
+            const pickup_lat = userLocation?.lat || user.last_lat;
+            const pickup_lng = userLocation?.lng || user.last_lng;
+
+            if (!pickup_lat || !pickup_lng) {
+                showAlert("Location Missing", "We couldn't determine your pickup location. Please wait a moment or try again.", "error");
+                setStatus('idle');
+                return;
+            }
+
             const { data, error: insertError } = await supabase.from('rides').insert({
                 customer_id: session.user.id,
                 pickup_address: 'Current Location',
-                pickup_lat: userLocation?.lat,
-                pickup_lng: userLocation?.lng,
+                pickup_lat,
+                pickup_lng,
                 dropoff_address: destinations[destinations.length - 1],
                 price: calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice,
                 status: 'searching',
-                ride_type: rideType
+                ride_type: rideType,
+                requested_vehicle_type: categoryMap[selectedTier] || 'economic',
+                distance_km: realDistanceKm
             }).select().single();
 
             if (insertError) {
                 console.error("Ride Insert Error:", insertError);
                 if (insertError.message.includes('safety_lock_no_self_riding')) {
-                    alert("Safety Lock: You cannot book your own ride!");
+                    showAlert("Safety Lock", "You cannot book your own ride!", "error");
                 } else {
-                    alert("Failed to create ride request. Please try again.");
+                    showAlert("Booking Failed", "Failed to create ride request. Please try again.", "error");
                 }
                 setStatus('idle');
                 return;
             }
             ride = data;
+            if (ride) setCurrentRideId(ride.id);
         }
 
         if (!ride) return;
+        setCurrentRideId(ride.id);
 
         // 2. Setup Realtime Subscription for this specific ride (only if not already subscribed)
         // Note: In a production app, we'd manage this subscription more carefully to avoid duplicates.
@@ -581,84 +1045,182 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
 
                     if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
                         // Driver accepted!
-                        rideSubscription.unsubscribe();
-                        if (searchInterval) clearInterval(searchInterval);
+                        // Do NOT unsubscribe here, we need to hear about arrived, in-progress, etc.
+                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
 
-                        // Fetch driver details
-                        const { data: driver } = await supabase
+                        // Fetch driver details with profile info
+                        const { data: driverData, error: driverError } = await supabase
                             .from('drivers')
-                            .select('*')
+                            .select(`
+                                *,
+                                profile:profiles(
+                                    full_name,
+                                    phone,
+                                    average_rating
+                                )
+                            `)
                             .eq('id', updatedRide.driver_id)
                             .single();
 
-                        setAssignedDriverId(updatedRide.driver_id);
-                        setAssignedDriver(driver);
-                        setStatus('accepted');
-                        sendPush("Ride Accepted", `Your ride with ${driver?.vehicle_model || 'a driver'} has been accepted!`);
+                        if (driverData && !driverError) {
+                            const formattedDriver = {
+                                ...driverData,
+                                name: (driverData.profile as any)?.full_name || 'Driver',
+                                phone: (driverData.profile as any)?.phone || '',
+                                rating: (driverData.profile as any)?.average_rating || 5.0
+                            };
+                            setAssignedDriverId(updatedRide.driver_id);
+                            setAssignedDriver(formattedDriver);
+                            setStatus('accepted');
+                            sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                            triggerHaptic();
+                        }
+                    } else if (updatedRide.status === 'arrived') {
+                        setStatus('arrived');
                         triggerHaptic();
+                    } else if (updatedRide.status === 'in-progress') {
+                        setStatus('in-progress');
+                        triggerHaptic();
+                    } else if (updatedRide.status === 'completed') {
+                        rideSubscription.unsubscribe();
+                        completeTrip();
                     } else if (updatedRide.status === 'cancelled') {
                         rideSubscription.unsubscribe();
-                        if (searchInterval) clearInterval(searchInterval);
-                        setStatus('idle');
-                        alert("Your ride request was cancelled.");
+                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+
+                        // If it was already accepted, show cancellation summary modal
+                        if (status === 'accepted' || status === 'arrived' || status === 'in-progress') {
+                            setStatus('cancelled_by_driver'); // Internal status to clear UI
+                            setShowCancellationSummary(true);
+                            setIsMinimalRating(true); // Simplified rating for cancellations
+                        } else {
+                            // Full Cleanup for pre-acceptance cancellation
+                            if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+                            markersRef.current.forEach(m => m?.setMap(null));
+                            markersRef.current = [];
+                            setDestinations(['']);
+                            setBookingStep('planning');
+                            setAssignedDriverId(null);
+                            setAssignedDriver(null);
+                            setStatus('idle');
+                            showAlert("Cancelled", "Your ride request was cancelled.", "info");
+                        }
                     }
                 }
             )
             .subscribe();
 
-        // 3. Start Search Loop (Simulating broadcasting to nearby drivers)
+        // 3. Start Search Loop with Dynamic Radius and Actual Notifications
         let currentRadius = startRadius;
+        const HARD_STOP_LIMIT = 120; // Auto-stop at 120km
         const interval = setInterval(async () => {
-            console.log(`Searching for drivers in ${currentRadius}km radius... (Up to ${maxRadius}km)`);
+            // Radial search for drivers
+            if (!userLocation) {
+                console.log("⚠️ Cannot search: userLocation is null.");
+                return;
+            }
 
-            // Check if any drivers are even nearby to justify the search state
-            const { data: nearby } = await supabase.rpc('get_nearby_drivers', {
-                user_lat: userLocation?.lat,
-                user_lng: userLocation?.lng,
+            const categoryMap: Record<string, string> = {
+                'eco': 'economic',
+                'prem': 'premium',
+                'moto': 'scooter'
+            };
+
+            console.log(`📡 Searching for drivers in ${currentRadius}km radius... (Up to ${maxRadius}km)`);
+            const { data: nearbyDrivers, error: rpcError } = await supabase.rpc('get_nearby_drivers', {
+                user_lat: userLocation.lat,
+                user_lng: userLocation.lng,
                 radius_km: currentRadius,
-                required_category: selectedTier === 'prem' ? 'AC' : (selectedTier === 'moto' ? 'tuktuk' : 'economic')
+                required_category: categoryMap[selectedTier] || 'economic'
             });
 
-            if (nearby && nearby.length > 0) {
-                console.log(`${nearby.length} nearby drivers notified.`);
-                // In a real app, we might trigger push notifications to these driver IDs here
+            if (nearbyDrivers && nearbyDrivers.length > 0) {
+                console.log(`Found ${nearbyDrivers.length} nearby drivers.`);
+
+                // Actually notify drivers who haven't been notified yet
+                for (const driver of nearbyDrivers) {
+                    const driverId = driver.driver_id;
+                    if (!notifiedDriversRef.current.has(driverId)) {
+                        notifiedDriversRef.current.add(driverId);
+
+                        // Get driver's FCM token
+                        const { data: profileData } = await supabase
+                            .from('profiles')
+                            .select('fcm_token')
+                            .eq('id', driverId)
+                            .single();
+
+                        if (profileData?.fcm_token) {
+                            // Call Edge Function to send notification
+                            try {
+                                await supabase.functions.invoke('send-fcm-notification', {
+                                    body: {
+                                        tokens: [profileData.fcm_token],
+                                        title: 'New Ride Request! 🚗',
+                                        message: 'A new request is waiting near you.',
+                                        target: 'driver',
+                                        data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
+                                    }
+                                });
+                                console.log(`✅ Notified driver ${driverId}`);
+                            } catch (err) {
+                                console.warn(`Failed to notify driver ${driverId}:`, err);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Hard stop at 120km
+            if (currentRadius >= HARD_STOP_LIMIT) {
+                clearInterval(interval);
+                console.log(`🛑 Auto-stopped at ${HARD_STOP_LIMIT}km limit.`);
+                showAlert(
+                    "Search Ended",
+                    "No drivers found within 120km. Please try again later.",
+                    "info",
+                    () => handleCancelRide()
+                );
+                return;
             }
 
             if (currentRadius >= maxRadius) {
                 clearInterval(interval);
 
                 // Ask user if they want to continue
-                const shouldContinue = window.confirm(`No drivers found within ${maxRadius}km. Would you like to expand the search radius by another 10km?`);
-
-                if (shouldContinue) {
-                    // Start a new loop with a higher limit
-                    const newMax = maxRadius + 10;
-                    console.log(`User chose to continue. Expanding search to ${newMax}km.`);
-
-                    // We need to trigger the loop again.
-                    // To keep it simple, we can just call handleBookRide again with an optional 'existingRideId' and 'expandedRadius'
-                    // but it might be cleaner to just restart the search loop here if we refactor slightly.
-                    // For now, let's just use a recursive-like call or a new interval.
-
-                    // Better approach: Update the loop logic to handle this internally if we change how the interval is managed.
-                    // But since we are already in the interval, we can just NOT clear it and just update maxRadius.
-                    // However, maxRadius is a local const. I should change it to a let or refactor.
-
-                    // Let's refactor the search loop to be more robust.
-                    rideSubscription.unsubscribe(); // Cleanup before restart
-                    handleBookRide(ride.id, maxRadius + 10, currentRadius + 2);
-                } else {
-                    rideSubscription.unsubscribe();
-                    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', ride.id);
-                    setStatus('idle');
-                }
+                showAlert(
+                    "No Drivers Found",
+                    `No drivers found within ${maxRadius}km. Would you like to expand the search by another 20km?`,
+                    "info",
+                    () => {
+                        // User chose to expand
+                        const newMax = maxRadius + 20;
+                        console.log(`User chose to expand. New max: ${newMax}km.`);
+                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+                        handleBookRide(ride.id, newMax, currentRadius + 2);
+                    },
+                    true, // showCancel
+                    "Expand Search",
+                    "Cancel",
+                    () => {
+                        // User chose to cancel
+                        console.log("User cancelled expansion.");
+                        handleCancelRide();
+                    }
+                );
             } else {
+                // Double check status before incrementing
+                const { data: latestRide } = await supabase.from('rides').select('status').eq('id', ride.id).single();
+                if (latestRide && latestRide.status !== 'searching') {
+                    clearInterval(interval);
+                    return;
+                }
                 currentRadius += 2;
                 setSearchRadius(currentRadius);
             }
         }, 4000);
 
-        setSearchInterval(interval);
+        searchIntervalRef.current = interval;
     };
 
     const handleMapClick = (e: any) => {
@@ -671,71 +1233,6 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         // Clear interval on cleanup
         return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
     }, []);
-
-    useEffect(() => {
-        if (status === 'accepted') {
-            // Phase 1: Driver moving to User
-            // COMMENTED OUT: Use real database values instead of simulation
-            /*
-            const start = { x: 80, y: 10 };
-            const end = { x: 45, y: 50 }; // Center-ish for mock animation
-            const duration = 10000; // 10 seconds for demo
-            let startTime = Date.now();
-
-            const animate = () => {
-                const now = Date.now();
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-
-                // Linear Interpolation
-                const currentX = start.x + (end.x - start.x) * progress;
-                const currentY = start.y + (end.y - start.y) * progress;
-
-                setDriverPos({ x: currentX, y: currentY });
-
-                // Update ETA text simulation
-                setEtaSeconds(Math.ceil((1 - progress) * 300)); // Map progress to 5 mins
-
-                if (progress < 1) {
-                    animationRef.current = requestAnimationFrame(animate);
-                } else {
-                    setStatus('arrived');
-                }
-            };
-            animationRef.current = requestAnimationFrame(animate);
-            */
-
-        } else if (status === 'in-progress') {
-            // Phase 2: Driver moving to Destination (or first pin)
-            // COMMENTED OUT: Use real database values
-            /*
-            if (mapPins.length === 0) return;
-
-            const start = { x: 45, y: 50 };
-            const end = mapPins[0]; // First destination
-            const duration = 15000;
-            let startTime = Date.now();
-
-            const animate = () => {
-                const now = Date.now();
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-
-                const currentX = start.x + (end.x - start.x) * progress;
-                const currentY = start.y + (end.y - start.y) * progress;
-
-                setDriverPos({ x: currentX, y: currentY });
-
-                if (progress < 1) {
-                    animationRef.current = requestAnimationFrame(animate);
-                } else {
-                    // Arrived at destination
-                }
-            };
-            animationRef.current = requestAnimationFrame(animate);
-            */
-        }
-    }, [status, mapPins]);
 
     useEffect(() => {
         if (status === 'searching') {
@@ -752,29 +1249,36 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         return `${mins} min`;
     };
 
-    const distanceToUse = realDistanceKm || (5.2 * destinations.length);
-    const baseRate = 40;
+    const distanceToUse = realDistanceKm;
+    const baseRate = Number(settings.price_per_km) || 40;
     const minFare = rideType === 'delivery' ? (Number(settings.min_delivery_fee) || 100) : (Number(settings.min_ride_price) || 300);
+
+    // DEBUG LOGS FOR PRICING
+    useEffect(() => {
+        console.log("RideScreen Pricing Context:", {
+            settings_id: settings.id,
+            price_per_km: settings.price_per_km,
+            min_ride_price: settings.min_ride_price,
+            rideType,
+            baseRate,
+            minFare,
+            userReferralBalance: user.referralBalance
+        });
+    }, [settings, rideType]);
 
     const calculatePrice = (multiplier: number) => {
         const basePrice = distanceToUse * baseRate * multiplier;
-        const originalPrice = Math.max(minFare, Math.ceil(basePrice));
+        const originalPrice = Math.ceil(minFare + basePrice);
         const balance = user.referralBalance || 0;
         const finalPrice = Math.max(0, originalPrice - balance);
         const amountUsed = originalPrice - finalPrice;
         return { originalPrice, finalPrice, amountUsed };
     };
 
-    const tiers = [
-        { id: 'eco', label: 'Economy', mult: 1, time: '3 min', icon: Car, img: '/assets/white_yaris_side.png', desc: '4 seats' },
-        { id: 'prem', label: 'AC', mult: 1.8, time: '5 min', icon: Car, img: '/assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
-        { id: 'moto', label: 'Bike', mult: 0.6, time: '2 min', icon: Bike, img: '/assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
-    ];
-
     const confirmRide = () => {
         if (!destinations[destinations.length - 1]) return;
-        if (destinations[destinations.length - 1].toLowerCase().trim() === user.location?.toLowerCase().trim()) {
-            alert("Destination cannot be your current location!");
+        if (user.location && destinations[destinations.length - 1].toLowerCase().trim() === user.location.toLowerCase().trim()) {
+            showAlert("Invalid Location", "Destination cannot be your current location!", "error");
             return;
         }
         handleBookRide();
@@ -784,8 +1288,62 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
         setStatus('in-progress');
     };
 
+    const handleCancelRide = async () => {
+        const wasActive = status === 'searching' || status === 'accepted' || status === 'arrived' || status === 'in-progress';
+
+        if (status === 'searching') {
+            // Explicitly notify parent to unlock navigation immediately
+            if (onSearchingChange) onSearchingChange(false);
+            triggerHaptic();
+        }
+
+        // 1. Mark in DB if possible
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session && wasActive) {
+                await supabase
+                    .from('rides')
+                    .update({ status: 'cancelled' })
+                    .eq('customer_id', session.user.id)
+                    .in('status', ['searching', 'accepted', 'arrived', 'in-progress']);
+            }
+        } catch (e) {
+            console.error("Cancel update error:", e);
+        }
+
+        // 2. Clear Interval
+        if (searchIntervalRef.current) {
+            clearInterval(searchIntervalRef.current);
+            searchIntervalRef.current = null;
+        }
+
+        // 3. Full Map & State Cleanup
+        if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+        markersRef.current.forEach(m => m?.setMap(null));
+        markersRef.current = [];
+        setDestinations(['']);
+        setBookingStep('planning');
+        setAssignedDriverId(null);
+        setAssignedDriver(null);
+        setRealDistanceKm(0);
+        setEtaSeconds(300);
+
+        // 4. Conditional UI transition
+        if (wasActive && status !== 'searching') {
+            // Only show summary if it was an actual booking (accepted/etc)
+            // If it was just 'searching', just go back to idle
+            setStatus('cancelled');
+            setShowCancellationSummary(true);
+            setIsMinimalRating(true);
+        } else {
+            setStatus('idle');
+            navigate('dashboard');
+        }
+    };
+
     const completeTrip = () => {
-        setStatus('review');
+        setStatus('completed');
+        setShowPaymentSummary(true);
     };
 
     const submitReview = async () => {
@@ -806,7 +1364,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
                     reviewer_id: session.user.id,
                     target_id: assignedDriverId,
                     rating: rating,
-                    comment: reviewComment || "No comment provided",
+                    comment: "Rated via app",
                     role_target: 'driver'
                 });
 
@@ -821,21 +1379,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
             }
 
             // 4. Success - Reset and exit
-            setReviewComment('');
             setRating(5);
+            setReviewComment('');
             setStatus('idle');
             setAssignedDriverId(null);
             setAssignedDriver(null);
+            setShowPaymentSummary(false);
+            setShowCancellationSummary(false);
+            setIsMinimalRating(false);
+
+            // Full Cleanup
+            if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+            markersRef.current.forEach(m => m?.setMap(null));
+            markersRef.current = [];
+            setDestinations(['']);
+            setBookingStep('planning');
+
             navigate('dashboard');
         } catch (err: any) {
             console.error("Submit Review Error:", err);
-            alert(`Error submitting feedback: ${err.message}`);
+            showAlert("Error", `Feedback failed: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }
     };
-
-
 
     // --- SHEET DRAG HANDLERS ---
     const handleSheetTouchStart = (e: React.TouchEvent) => {
@@ -884,64 +1451,47 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
 
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} relative`}>
-            {/* Real Interactive Map Area */}
-            <div ref={mapContainerRef} className="absolute inset-0 z-0 overflow-hidden" />
-
-
-
-            {(status === 'accepted' || status === 'arrived' || status === 'in-progress') && (
-                <div
-                    className="absolute z-20 transition-all duration-75 ease-linear pointer-events-none"
-                    style={{ left: `${driverPos.x}%`, top: `${driverPos.y}%` }}
-                >
-                    <div className="relative -translate-x-1/2 -translate-y-1/2">
-                        {status === 'accepted' && (
-                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap shadow-lg animate-bounce">
-                                {formatTime(etaSeconds)}
-                            </div>
-                        )}
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg border-2 border-[#00D68F] transform -rotate-90">
-                            <Car size={18} className="text-black" fill="currentColor" />
-                        </div>
+            {isLocating && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[20] animate-bounce-in">
+                    <div className="bg-white dark:bg-[#1C1C1E] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-[#00D68F]/20">
+                        <Loader2 className="animate-spin text-[#00D68F]" size={16} />
+                        <span className="text-sm font-bold">
+                            {locationMethod === 'profile' ? 'Refining position...' : 'Finding you...'}
+                        </span>
                     </div>
                 </div>
             )}
 
-            {mapPins.map((pin, i) => (
-                <div key={`pin-${i}`} className="absolute z-10 animate-scale-in" style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
-                    <div className="relative -translate-x-1/2 -translate-y-full">
-                        <MapPinFilled size={36} className="text-red-600 drop-shadow-lg filter" />
-                        <div className="w-2 h-2 bg-black/20 rounded-full absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 blur-[1px]"></div>
-                        {pin.label && (
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white dark:bg-black px-2 py-1 rounded shadow-md text-[10px] font-bold border border-gray-100 dark:border-gray-800">
-                                {pin.label}
-                            </div>
-                        )}
-                    </div>
-                    <div className="absolute -translate-x-1/2 -translate-y-full top-[-28px] left-0 w-full text-center text-[10px] font-bold text-white pointer-events-none">
-                        {i + 1}
-                    </div>
-                </div>
-            ))}
+            {/* Map Component */}
+            <RideMap
+                mapContainerRef={mapContainerRef}
+                map={map}
+                theme={theme}
+                userLocation={userLocation}
+                mapPins={mapPinsRef.current}
+                status={status}
+            />
 
             {/* Back Button & Locate Me */}
             <div className="z-10 px-6 pt-safe flex items-center justify-between pointer-events-none">
-                <button onClick={goBack} className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center pointer-events-auto active:scale-90 transition-transform`}>
+                <button
+                    onClick={status === 'searching' ? () => handleCancelRide() : goBack}
+                    className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center pointer-events-auto active:scale-90 transition-transform`}
+                >
                     <ArrowLeft size={20} />
                 </button>
-                {status === 'idle' && (
-                    <button
-                        onClick={() => { triggerHaptic(); alert("Centering on location..."); }}
-                        className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center pointer-events-auto active:scale-90 transition-transform`}
-                    >
-                        <Locate size={20} />
-                    </button>
-                )}
+
+                <button
+                    onClick={() => handleLocateMe()}
+                    className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center pointer-events-auto active:scale-90 transition-transform`}
+                >
+                    <Locate size={20} className="text-[#00D68F]" />
+                </button>
             </div>
 
             {/* Bottom Card / Draggable Sheet */}
             <div
-                className={`absolute bottom-0 left-0 right-0 z-20 ${bgCard} rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[85vh] transition-transform duration-300 ease-out`}
+                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/60' : 'bg-[#1C1C1E]/60'} backdrop-blur-xl rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[85vh] transition-transform duration-300 ease-out`}
                 style={{
                     transform: sheetTransform,
                     transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)'
@@ -959,410 +1509,89 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivity, user, p
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-6 pt-2 pb-safe" onScroll={handleScroll}>
                     {status === 'idle' && (
-                        <div className="space-y-6">
-                            {bookingStep === 'planning' ? (
-                                <div className="space-y-6 animate-scale-in">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="text-xl font-bold">Plan your {rideType}</h2>
-                                        <div className={`p-1 rounded-xl ${inputBg} flex gap-1`}>
-                                            <button
-                                                onClick={() => { triggerHaptic(); setRideType('ride'); }}
-                                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${rideType === 'ride' ? 'bg-[#00D68F] text-black shadow-md' : 'text-gray-500'}`}
-                                            >
-                                                Ride
-                                            </button>
-                                            <button
-                                                onClick={() => { triggerHaptic(); setRideType('delivery'); setSelectedTier('moto'); }}
-                                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${rideType === 'delivery' ? 'bg-[#00D68F] text-black shadow-md' : 'text-gray-500'}`}
-                                            >
-                                                Delivery
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="relative pl-4 space-y-4">
-                                        <div className="absolute left-[23px] top-4 bottom-8 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-
-                                        <div className="relative flex items-center gap-3">
-                                            <div className="w-4 h-4 rounded-full border-[3px] border-blue-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
-                                            <div className={`flex-1 p-3.5 rounded-xl ${inputBg} font-medium text-sm ${textSec} flex items-center justify-between`}>
-                                                <span>Current Location</span>
-                                                <Locate size={14} className="opacity-50" />
-                                            </div>
-                                        </div>
-
-                                        {destinations.map((dest, idx) => (
-                                            <div key={idx} className="relative flex flex-col gap-1">
-                                                <div className="relative flex items-center gap-3 animate-scale-in">
-                                                    <div className="w-4 h-4 rounded-full border-[3px] border-red-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
-                                                    <div className={`flex-1 flex items-center gap-2 p-3.5 rounded-xl ${inputBg} focus-within:ring-2 ring-[#00D68F] transition-all`}>
-                                                        <input
-                                                            placeholder={idx === 0 ? "Where to?" : "Add a stop"}
-                                                            className="bg-transparent outline-none flex-1 font-bold text-sm"
-                                                            value={dest}
-                                                            onChange={(e) => handleSearch(e.target.value, idx)}
-                                                            onFocus={() => {
-                                                                setActiveInputIndex(idx);
-                                                                if (!sessionToken.current) {
-                                                                    const google = (window as any).google;
-                                                                    if (google) {
-                                                                        sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                        {destinations.length > 1 && (
-                                                            <button onClick={() => removeDestination(idx)} className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                                                                <X size={14} className="opacity-50" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {activeInputIndex === idx && predictions.length > 0 && (
-                                                    <div className={`absolute top-full left-7 right-0 z-50 ${bgCard} mt-2 rounded-2xl shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden`}>
-                                                        {predictions.map((p: any) => (
-                                                            <button
-                                                                key={p.place_id}
-                                                                onClick={() => selectPrediction(p)}
-                                                                className={`w-full p-4 text-left hover:bg-[#00D68F]/10 border-b border-black/5 dark:border-white/5 last:border-0 flex items-start gap-3`}
-                                                            >
-                                                                <MapPinFilled size={18} className="text-[#00D68F] flex-shrink-0 mt-0.5" />
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-bold text-sm">{p.structured_formatting?.main_text || p.description}</span>
-                                                                    <span className="text-[10px] opacity-50 truncate">{p.structured_formatting?.secondary_text || ''}</span>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-
-                                        <div className="relative flex items-center gap-3 pl-0.5">
-                                            <div className="w-3.5 flex justify-center"><Plus size={14} className="text-[#00D68F]" /></div>
-                                            <button onClick={addDestination} className="text-sm font-bold text-[#00D68F] active:opacity-60">Add Stop</button>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={handleNextStep}
-                                        disabled={!destinations[0]}
-                                        className="w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 active:scale-[0.98] transition-transform"
-                                    >
-                                        Next
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-6 animate-scale-in">
-                                    <div className="flex items-center justify-between px-1">
-                                        <button
-                                            onClick={() => setBookingStep('planning')}
-                                            className="text-[#00D68F] font-bold text-sm flex items-center gap-1 active:opacity-60"
-                                        >
-                                            <ArrowLeft size={16} /> Back
-                                        </button>
-                                        <h2 className="text-xl font-bold">Choose your ride</h2>
-                                        <div className="w-10"></div>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3 px-1">
-                                            <h3 className="font-bold text-sm">Available Tiers</h3>
-                                            <div className={`flex items-center gap-1 text-[10px] ${textSec}`}>
-                                                <Info size={12} /> Min. fare D{minFare}
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 px-1 snap-x">
-                                            {tiers.map(t => {
-                                                const isSelected = selectedTier === t.id;
-                                                const price = calculatePrice(t.mult);
-                                                return (
-                                                    <div
-                                                        key={t.id}
-                                                        onClick={() => { triggerHaptic(); setSelectedTier(t.id); }}
-                                                        className={`
-                                                    relative min-w-[200px] h-[160px] p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 snap-start flex flex-col overflow-hidden
-                                                    ${isSelected
-                                                                ? 'border-[#00D68F] bg-[#00D68F]/10 scale-[1.02] shadow-xl ring-4 ring-[#00D68F]/20'
-                                                                : 'border-transparent bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                                            }
-                                                `}
-                                                    >
-                                                        {/* Large Background Vehicle Image */}
-                                                        <div className={`absolute -right-8 -bottom-4 w-40 h-40 transition-all duration-500 opacity-40 ${isSelected ? 'scale-125 opacity-100 translate-x-4' : 'scale-110'}`}>
-                                                            {t.img ? (
-                                                                <img
-                                                                    src={t.img}
-                                                                    className={`w-full h-full object-contain ${theme === 'light' ? 'mix-blend-multiply' : ''}`}
-                                                                    alt={t.label}
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).style.display = 'none';
-                                                                        const parent = (e.target as HTMLImageElement).parentElement;
-                                                                        if (parent) {
-                                                                            const iconPlaceholder = parent.querySelector('.icon-placeholder');
-                                                                            if (iconPlaceholder) iconPlaceholder.classList.remove('hidden');
-                                                                        }
-                                                                    }}
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
-                                                                    <t.icon size={80} strokeWidth={1} />
-                                                                </div>
-                                                            )}
-                                                            <div className="icon-placeholder hidden w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
-                                                                <t.icon size={80} strokeWidth={1} />
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Text Content - Positioned Above Image */}
-                                                        <div className="relative z-10 flex flex-col h-full pointer-events-none">
-                                                            {isSelected && (
-                                                                <div className="bg-[#00D68F] text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md self-start mb-2">
-                                                                    SELECTED
-                                                                </div>
-                                                            )}
-                                                            <div className={`font-black text-xl mb-0.5 ${isSelected ? (theme === 'light' ? 'text-black' : 'text-white') : 'text-gray-900 dark:text-white'}`}>{t.label}</div>
-                                                            <div className={`text-xs font-bold mb-auto ${isSelected ? (theme === 'light' ? 'text-black/60' : 'text-white/60') : 'text-gray-500 dark:text-gray-400'}`}>{t.desc} • {t.time}</div>
-
-                                                            <div className={`flex flex-col ${isSelected ? 'text-[#00D68F]' : 'text-gray-900 dark:text-white'}`}>
-                                                                {user.referralBalance && user.referralBalance > 0 ? (
-                                                                    <>
-                                                                        <div className="text-[10px] line-through opacity-50 font-medium">D{calculatePrice(t.mult).originalPrice}</div>
-                                                                        <div className="font-black text-2xl flex items-center gap-1 drop-shadow-sm">
-                                                                            D{calculatePrice(t.mult).finalPrice}
-                                                                        </div>
-                                                                    </>
-                                                                ) : (
-                                                                    <div className="font-black text-2xl drop-shadow-sm">D{calculatePrice(t.mult).finalPrice}</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4 pt-2">
-                                        <div className={`flex p-1 rounded-xl ${inputBg}`}>
-                                            <button onClick={() => setRidePayMethod('wave')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${ridePayMethod === 'wave' ? 'bg-[#1E88E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Wave</button>
-                                            <button onClick={() => setRidePayMethod('cash')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${ridePayMethod === 'cash' ? 'bg-[#00D68F] text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Cash</button>
-                                        </div>
-
-                                        <button
-                                            onClick={confirmRide}
-                                            disabled={!destinations[0]}
-                                            className={`w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 disabled:shadow-none flex items-center justify-between px-6 active:scale-[0.98] transition-transform`}
-                                        >
-                                            <span>Book {tiers.find(t => t.id === selectedTier)?.label}</span>
-                                            <div className="flex flex-col items-end">
-                                                {user.referralBalance && user.referralBalance > 0 ? (
-                                                    <>
-                                                        <span className="text-xs line-through opacity-60">D{calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).originalPrice}</span>
-                                                        <span className="text-xl leading-none">D{calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice}</span>
-                                                    </>
-                                                ) : (
-                                                    <span className="text-xl">D{calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice}</span>
-                                                )}
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <RideBookingForm
+                            theme={theme}
+                            bookingStep={bookingStep}
+                            setBookingStep={setBookingStep}
+                            rideType={rideType}
+                            setRideType={setRideType}
+                            destinations={destinations}
+                            updateDestination={updateDestination}
+                            addDestination={addDestination}
+                            removeDestination={removeDestination}
+                            handleSearch={handleSearch}
+                            predictions={predictions}
+                            selectPrediction={selectPrediction}
+                            activeInputIndex={activeInputIndex}
+                            setActiveInputIndex={setActiveInputIndex}
+                            isCalculating={isCalculating}
+                            handleNextStep={handleNextStep}
+                            selectedTier={selectedTier}
+                            setSelectedTier={setSelectedTier}
+                            tiers={tiers}
+                            calculatePrice={calculatePrice}
+                            ridePayMethod={ridePayMethod}
+                            setRidePayMethod={setRidePayMethod}
+                            confirmRide={confirmRide}
+                            triggerHaptic={triggerHaptic}
+                            bgCard={bgCard}
+                            inputBg={inputBg}
+                            textSec={textSec}
+                            sessionToken={sessionToken}
+                            user={user}
+                            settings={settings}
+                            showAlert={showAlert}
+                        />
                     )}
 
                     {(status === 'searching' || status === 'accepted' || status === 'arrived' || status === 'in-progress') && (
-                        <div className="text-center py-4">
-                            {status === 'searching' && <div className="w-16 h-16 border-4 border-[#00D68F] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>}
-
-                            {(status === 'accepted' || status === 'arrived' || status === 'in-progress') && (
-                                <div className="animate-scale-in px-2">
-                                    <div className={`p-5 rounded-[24px] ${inputBg} shadow-sm mb-6`}>
-                                        <div className="flex justify-between items-start mb-5">
-                                            <div className="text-left">
-                                                <div className="text-[#00D68F] font-bold text-3xl mb-1 tabular-nums">
-                                                    {status === 'in-progress' ? 'On Trip' : (status === 'arrived' ? 'Arrived' : formatTime(etaSeconds))}
-                                                </div>
-                                                <div className={`${textSec} text-sm font-medium`}>
-                                                    {status === 'in-progress' ? `Heading to ${destinations[0]}` : (status === 'arrived' ? 'Driver is waiting' : 'Estimated arrival')}
-                                                </div>
-                                            </div>
-                                            <div className="relative">
-                                                <div className="w-16 h-16 rounded-full bg-[#00D68F]/10 flex items-center justify-center border-4 border-white dark:border-[#1C1C1E] shadow-md">
-                                                    <User size={32} className="text-[#00D68F] opacity-50" />
-                                                </div>
-                                                <div className={`absolute -bottom-2 right-1 px-1.5 py-0.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm flex items-center gap-1 ${3.8 >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
-                                                    3.8 >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
-                                                        'bg-red-500/10 text-red-500'
-                                                    }`}>
-                                                    <Star size={10} fill="currentColor" />
-                                                    <span className="text-[10px] font-black">3.8</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="h-px w-full bg-black/5 dark:bg-white/10 my-4"></div>
-                                        {/* Searching State */}
-                                        {status === 'searching' && (
-                                            <div className="flex flex-col items-center py-6">
-                                                <div className="w-20 h-20 relative mb-4">
-                                                    <div className="absolute inset-0 bg-[#00D68F]/20 rounded-full animate-ping"></div>
-                                                    <div className="absolute inset-0 bg-[#00D68F]/10 rounded-full animate-pulse"></div>
-                                                    <div className="relative w-full h-full rounded-full border-4 border-white dark:border-gray-800 bg-cover bg-center overflow-hidden flex items-center justify-center">
-                                                        {user.photo ? (
-                                                            <img src={user.photo} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="text-2xl font-black text-[#00D68F]">{user.name.charAt(0)}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <h3 className="text-xl font-bold mb-1">Finding your {rideType === 'delivery' ? 'courier' : 'driver'}...</h3>
-                                                <p className={`${textSec} text-sm mb-6`}>What nearby {rideType === 'delivery' ? 'scooters' : 'drivers'} see:</p>
-
-                                                <div className={`w-full ${inputBg} p-4 rounded-2xl flex items-center justify-between`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                                                            <User size={18} className="text-[#00D68F]" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold">{user.name}</p>
-                                                            <p className="text-[10px] uppercase font-black text-[#00D68F] tracking-widest">Customer</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20">
-                                                        <Star size={14} fill="#FF9500" className="text-[#FF9500]" />
-                                                        <span className="font-black">{user.rating.toFixed(1)}</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="w-full mt-6 py-4 bg-white/5 rounded-2xl border border-dashed border-white/10 flex items-center justify-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full bg-[#00D68F] animate-pulse"></div>
-                                                    <span className="text-xs font-medium opacity-50">Broadcasting your request accurately</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center text-[#00D68F]">
-                                                    <Car size={20} />
-                                                </div>
-                                                <div className="text-left">
-                                                    <div className="font-bold text-base">Toyota Prius</div>
-                                                    <div className={`${textSec} text-xs font-medium`}>Silver • Sedan</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-0.5">Plate</div>
-                                                <div className="font-mono font-bold text-lg bg-white dark:bg-black/40 px-2 py-1 rounded-lg border border-black/5 dark:border-white/10">BJL 4229</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {status !== 'in-progress' && (
-                                        <div className="flex gap-3">
-                                            <a
-                                                href={`tel:${assignedDriver?.phone || '+2201234567'}`}
-                                                className={`flex-1 py-4 rounded-2xl ${theme === 'light' ? 'bg-white border border-gray-100' : 'bg-[#2C2C2E] border border-white/5'} font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all text-inherit no-underline`}
-                                            >
-                                                <Phone size={20} className="text-[#00D68F]" /> <span>Call</span>
-                                            </a>
-                                            <a
-                                                href={`sms:${assignedDriver?.phone || '+2201234567'}`}
-                                                className={`flex-1 py-4 rounded-2xl ${theme === 'light' ? 'bg-white border border-gray-100' : 'bg-[#2C2C2E] border border-white/5'} font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all text-inherit no-underline`}
-                                            >
-                                                <MessageSquare size={20} className="text-[#00D68F]" /> <span>Message</span>
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {status === 'arrived' && <button onClick={startTrip} className="w-full bg-[#00D68F] text-black py-4 rounded-full font-bold shadow-lg mt-6">Start Trip</button>}
-
-                            {status === 'in-progress' && (
-                                <div className="mt-6 space-y-4">
-                                    <div className="bg-[#00D68F]/10 p-4 rounded-xl flex items-center justify-center gap-2 text-[#00D68F] font-bold text-sm">
-                                        <Navigation size={18} /> You are on your way
-                                    </div>
-                                    <button onClick={completeTrip} className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-full font-bold shadow-lg">Complete Ride</button>
-                                </div>
-                            )}
-
-                            {status === 'searching' && (
-                                <>
-                                    <h3 className="text-xl font-bold mb-1">Finding {rideType === 'delivery' ? 'courier' : 'driver'}...</h3>
-                                    <p className={`${textSec} mb-6`}>Searching within {searchRadius}km radius</p>
-                                    <button onClick={() => {
-                                        if (searchInterval) clearInterval(searchInterval);
-                                        setStatus('idle');
-                                    }} className="text-red-500 font-bold">Cancel</button>
-                                </>
-                            )}
-
-                            {(status === 'accepted' || status === 'arrived') && (
-                                <button
-                                    onClick={async () => {
-                                        if (confirm("Are you sure you want to cancel? The driver is already on the way.")) {
-                                            setStatus('idle');
-                                            // Optional: update supabase if needed
-                                            triggerHaptic();
-                                        }
-                                    }}
-                                    className="w-full py-4 text-red-500 font-bold opacity-50 hover:opacity-100 transition-opacity"
-                                >
-                                    Cancel Ride
-                                </button>
-                            )}
-                        </div>
-                    )}
-
-                    {status === 'review' && (
-                        <div className="text-center animate-scale-in">
-                            <h3 className="text-xl font-bold mb-4">How was your ride?</h3>
-                            <p className={`${textSec} mb-6`}>Your feedback helps us improve.</p>
-                            <div className="flex justify-center gap-3 mb-8">
-                                {[1, 2, 3, 4, 5].map(s => (
-                                    <button key={s} onClick={() => setRating(s)} className="active:scale-90 transition-transform">
-                                        <Star size={40} className={s <= rating ? "text-orange-400 fill-orange-400" : "text-gray-300 dark:text-gray-700"} strokeWidth={s <= rating ? 0 : 2} />
-                                    </button>
-                                ))}
-                            </div>
-                            <textarea
-                                value={reviewComment}
-                                onChange={(e) => setReviewComment(e.target.value)}
-                                placeholder="Leave a comment (optional)..."
-                                className={`w-full p-4 rounded-2xl ${inputBg} mb-6 outline-none resize-none h-32 focus:ring-2 focus:ring-[#00D68F] transition-all`}
-                            />
-                            <button onClick={submitReview} className="w-full bg-[#00D68F] text-black py-4 rounded-full font-bold shadow-lg">Submit Review</button>
-                        </div>
+                        <RideStatusPanel
+                            status={status}
+                            rideType={rideType}
+                            etaSeconds={etaSeconds}
+                            assignedDriver={assignedDriver}
+                            destinations={destinations}
+                            user={user}
+                            inputBg={inputBg}
+                            textSec={textSec}
+                            formatTime={formatTime}
+                            selectedTier={selectedTier}
+                            handleCancelRide={handleCancelRide}
+                        />
                     )}
                 </div>
             </div>
+
+            {showCancellationSummary && (
+                <RideCancellationSummary
+                    onClose={() => { setShowCancellationSummary(false); setStatus('idle'); navigate('dashboard'); }}
+                    bgCard={bgCard}
+                    textSec={textSec}
+                    inputBg={inputBg}
+                />
+            )}
+
+            {showPaymentSummary && (
+                <RidePaymentSummary
+                    assignedDriver={assignedDriver}
+                    rating={rating}
+                    setRating={setRating}
+                    reviewComment={reviewComment}
+                    setReviewComment={setReviewComment}
+                    calculatePrice={calculatePrice}
+                    tiers={tiers}
+                    selectedTier={selectedTier}
+                    loading={loading}
+                    submitReview={submitReview}
+                    ridePayMethod={ridePayMethod}
+                    bgCard={bgCard}
+                    inputBg={inputBg}
+                    textSec={textSec}
+                    user={user}
+                />
+            )}
+
+
         </div>
     );
 };
-
-const darkMapStyle = [
-    { "elementType": "geometry", "stylers": [{ "color": "#212121" }] },
-    { "elementType": "labels.icon", "stylers": [{ "visibility": "off" }] },
-    { "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-    { "elementType": "labels.text.stroke", "stylers": [{ "color": "#212121" }] },
-    { "featureType": "administrative", "elementType": "geometry", "stylers": [{ "color": "#757575" }] },
-    { "featureType": "administrative.country", "elementType": "labels.text.fill", "stylers": [{ "color": "#9e9e9e" }] },
-    { "featureType": "administrative.land_parcel", "stylers": [{ "visibility": "off" }] },
-    { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [{ "color": "#bdbdbd" }] },
-    { "featureType": "poi", "elementType": "labels.text.fill", "stylers": [{ "color": "#757575" }] },
-    { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#181818" }] },
-    { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#616161" }] },
-    { "featureType": "poi.park", "elementType": "labels.text.stroke", "stylers": [{ "color": "#1b1b1b" }] },
-    { "featureType": "road", "elementType": "geometry.fill", "stylers": [{ "color": "#2c2c2c" }] },
-    { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#8a8a8a" }] },
-    { "featureType": "road.arterial", "elementType": "geometry", "stylers": [{ "color": "#373737" }] },
-    { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#3c3c3c" }] },
-    { "featureType": "road.highway.controlled_access", "elementType": "geometry", "stylers": [{ "color": "#4e4e4e" }] },
-    { "featureType": "road.local", "elementType": "geometry", "stylers": [{ "color": "#000000" }] },
-    { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#000000" }] },
-    { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#3d3d3d" }] }
-];

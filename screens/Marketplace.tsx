@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Search, Star, MapPin, Heart } from 'lucide-react';
 import { Theme, Screen, Business, Category } from '../types';
+import { triggerHaptic } from '../utils/helpers';
 import { BottomNav } from '../components/Navigation';
 
 interface Props {
@@ -17,9 +18,19 @@ interface Props {
    favorites: string[];
    searchQuery: string;
    setSearchQuery: (q: string) => void;
+   showAlert: (
+      title: string,
+      message: string,
+      type?: 'success' | 'error' | 'info',
+      onConfirm?: () => void,
+      showCancel?: boolean,
+      confirmText?: string,
+      cancelText?: string,
+      onCancel?: () => void
+   ) => void;
 }
 
-export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery }: Props) => {
+export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
 
    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
@@ -49,7 +60,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
       <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
          <div className={`pt-safe px-6 pb-4 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-md z-10 sticky top-0 border-b ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'}`}>
             <h1 className="text-3xl font-bold mb-4">Marketplace</h1>
-            <div className={`flex items-center gap-3 p-3 rounded-xl ${inputBg}`}>
+            <div className={`flex items-center gap-3 p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md`}>
                <Search size={20} className={textSec} />
                <input
                   placeholder="Restaurants, groceries, etc."
@@ -120,7 +131,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                         <p className={`text-xs ${textSec} line-clamp-1 mb-1.5`}>{b.description}</p>
 
                         <div className="flex items-center gap-3 text-xs font-medium opacity-80">
-                           <span className="flex items-center gap-1 bg-orange-500/10 text-orange-600 px-1.5 py-0.5 rounded">
+                           <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${b.rating >= 5.0 ? 'bg-[#00D68F]/10 text-[#00D68F]' : b.rating >= 3.8 ? 'bg-orange-500/10 text-orange-600' : 'bg-red-500/10 text-red-600'}`}>
                               <Star size={10} fill="currentColor" /> {b.rating}
                            </span>
                            <span className={`flex items-center gap-1 ${textSec}`}>

@@ -2,20 +2,37 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
 import { Theme, Screen, UserData, Activity } from '../types';
-import { triggerHaptic, GreenGlow, sendPushNotification } from '../index';
+import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { GreenGlow } from '../components/GreenGlow';
+import { supabase } from '../supabaseClient';
 
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
     user: UserData;
-    setRecentActivity: React.Dispatch<React.SetStateAction<Activity[]>>;
+    setRecentActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
+    showAlert: (
+        title: string,
+        message: string,
+        type?: 'success' | 'error' | 'info',
+        onConfirm?: () => void,
+        showCancel?: boolean,
+        confirmText?: string,
+        cancelText?: string,
+        onCancel?: () => void
+    ) => void;
+    activeOrderId: string | null;
+    setActiveOrderId: (id: string | null) => void;
 }
 
-type OrderStatus = 'preparing' | 'picked-up' | 'arriving' | 'delivered';
+type OrderStatus = 'pending' | 'preparing' | 'picked-up' | 'arriving' | 'delivered';
 
-export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }: Props) => {
-    const [status, setStatus] = useState<OrderStatus>('preparing');
+export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities, showAlert, activeOrderId, setActiveOrderId }: Props) => {
+    const [status, setStatus] = useState<OrderStatus>('pending');
     const [progress, setProgress] = useState(25);
+    const [orderInfo, setOrderInfo] = useState<any>(null);
+    const [driver, setDriver] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
     const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -24,53 +41,103 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
     const inputBg = theme === 'light' ? 'bg-[#E5E5EA]' : 'bg-[#2C2C2E]';
 
     useEffect(() => {
-        // Mocking the delivery lifecycle
-        const timers = [
-            setTimeout(() => {
-                sendPush("Order Accepted", "Your order has been accepted by the merchant!");
-            }, 2000),
-            setTimeout(() => {
-                sendPush("Order Prepared", "Your order is being prepared.");
-            }, 5000),
-            setTimeout(() => {
-                sendPush("Order Ready", "Your order is ready for pickup!");
-            }, 8000),
-            setTimeout(() => {
-                setStatus('picked-up');
-                setProgress(50);
-                sendPush("Delivery Partner", "The delivery partner is on the way!");
-            }, 12000),
-            setTimeout(() => {
-                setStatus('arriving');
-                setProgress(85);
-                sendPush("Delivery Partner", "The delivery partner has arrived!");
-            }, 22000),
-            setTimeout(() => {
-                setStatus('delivered');
-                setProgress(100);
-                sendPush("SuperApp Market", "Order delivered! Enjoy your meal.");
+        if (!activeOrderId) return;
+        fetchOrderAndDriver();
 
-                const newActivity: Activity = {
-                    id: Math.random().toString(),
-                    type: 'order',
-                    title: 'Market Order',
-                    subtitle: 'Food Delivery',
-                    price: 250,
-                    date: 'Just now',
-                    status: 'completed'
-                };
-                setRecentActivity(prev => [newActivity, ...prev]);
-            }, 28000)
-        ];
+        // Subscribe to real-time changes
+        const channel = supabase
+            .channel(`order-tracking-${activeOrderId}`)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${activeOrderId}` },
+                (payload) => {
+                    console.log('Order Change Received:', payload.new);
+                    handleStatusUpdate(payload.new);
+                    if (payload.new.driver_id && (!driver || driver.id !== payload.new.driver_id)) {
+                        fetchDriver(payload.new.driver_id);
+                    }
+                }
+            )
+            .subscribe();
 
-        return () => timers.forEach(clearTimeout);
-    }, []);
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [activeOrderId]);
 
-    const sendPush = (title: string, msg: string) => {
-        sendPushNotification(title, msg);
+    const fetchOrderAndDriver = async () => {
+        try {
+            setIsLoading(true);
+            const { data: order, error } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', activeOrderId)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (order) {
+                setOrderInfo(order);
+                handleStatusUpdate(order);
+                if (order.driver_id) {
+                    await fetchDriver(order.driver_id);
+                }
+            }
+        } catch (err) {
+            console.error("Fetch Order Error:", err);
+            showAlert("Error", "Could not fetch order details", "error");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchDriver = async (driverId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', driverId)
+                .single();
+            if (error) throw error;
+            if (data) setDriver(data);
+        } catch (err) {
+            console.error("Fetch Driver Error:", err);
+        }
+    };
+
+    const handleStatusUpdate = (order: any) => {
+        const s = order.status;
+        let newStatus: OrderStatus = 'pending';
+        let newProgress = 25;
+
+        switch (s) {
+            case 'pending': newStatus = 'pending'; newProgress = 25; break;
+            case 'accepted': newStatus = 'pending'; newProgress = 35; break;
+            case 'preparing': newStatus = 'preparing'; newProgress = 50; break;
+            case 'ready': newStatus = 'preparing'; newProgress = 65; break;
+            case 'delivering': newStatus = 'picked-up'; newProgress = 85; break;
+            case 'completed':
+                newStatus = 'delivered';
+                newProgress = 100;
+                // If it's the first time reaching completed, notify user
+                if (status !== 'delivered') {
+                    sendPushNotification("DROPOFF: Order Delivered", "Your order has been delivered successfully!");
+                    triggerHaptic();
+                }
+                break;
+            case 'cancelled':
+                showAlert("Order Cancelled", "This order has been cancelled.", "info");
+                setActiveOrderId(null);
+                navigate('dashboard');
+                break;
+        }
+
+        setStatus(newStatus);
+        setProgress(newProgress);
+        setOrderInfo(order);
     };
 
     const statusConfig = {
+        pending: { label: 'Order Received', icon: Package, color: 'text-orange-500', bg: 'bg-orange-500/10' },
         preparing: { label: 'Preparing your order', icon: Package, color: 'text-orange-500', bg: 'bg-orange-500/10' },
         'picked-up': { label: 'Out for delivery', icon: Truck, color: 'text-blue-500', bg: 'bg-blue-500/10' },
         arriving: { label: 'Arriving now', icon: Truck, color: 'text-[#00D68F]', bg: 'bg-[#00D68F]/10' },
@@ -79,17 +146,31 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
 
     const Config = statusConfig[status];
 
+    if (isLoading && !orderInfo) {
+        return (
+            <div className={`h-full flex items-center justify-center ${bgMain}`}>
+                <Loader2 className="animate-spin text-[#00D68F]" size={40} />
+            </div>
+        );
+    }
+
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden`}>
             <GreenGlow />
 
             <div className="pt-safe px-6 pb-6 flex items-center justify-between z-10">
-                <button onClick={() => navigate('dashboard')} className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center active:scale-95 transition-transform`}>
+                <button
+                    onClick={() => {
+                        if (status === 'delivered') setActiveOrderId(null);
+                        navigate('dashboard');
+                    }}
+                    className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center active:scale-95 transition-transform`}
+                >
                     <ArrowLeft size={20} />
                 </button>
                 <div className="text-center">
                     <h1 className="font-bold">Order Tracking</h1>
-                    <p className={`text-[10px] ${textSec} uppercase tracking-widest font-black`}>Order #42991</p>
+                    <p className={`text-[10px] ${textSec} uppercase tracking-widest font-black`}>Order #{activeOrderId?.slice(0, 8)}</p>
                 </div>
                 <div className="w-10"></div>
             </div>
@@ -104,7 +185,9 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
                             )}
                         </div>
                         <h2 className="text-2xl font-black text-center mb-2">{Config.label}</h2>
-                        <p className={`text-center ${textSec} font-medium`}>Estimated arrival: {status === 'preparing' ? '25 min' : (status === 'delivered' ? 'Completed' : '5-8 min')}</p>
+                        <p className={`text-center ${textSec} font-medium`}>
+                            {status === 'delivered' ? 'Completed' : 'Estimated arrival: 25 min'}
+                        </p>
                     </div>
 
                     <div className="relative h-2 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden mb-12">
@@ -115,13 +198,13 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
                     </div>
 
                     <div className="space-y-6">
-                        <div className="flex items-center gap-4 opacity-100">
+                        <div className="flex items-center gap-4">
                             <div className={`w-8 h-8 rounded-full ${progress >= 25 ? 'bg-[#00D68F] text-black' : 'bg-gray-200 dark:bg-gray-800 text-gray-400'} flex items-center justify-center`}>
                                 <CheckCircle2 size={16} />
                             </div>
                             <div className="flex-1">
                                 <p className={`font-bold ${progress < 25 && 'opacity-50'}`}>Order Received</p>
-                                <p className={`text-[10px] ${textSec}`}>10:04 AM</p>
+                                <p className={`text-[10px] ${textSec}`}>{orderInfo?.created_at ? new Date(orderInfo.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending'}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -129,8 +212,17 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
                                 <CheckCircle2 size={16} />
                             </div>
                             <div className="flex-1">
-                                <p className={`font-bold ${progress < 50 && 'opacity-50'}`}>Pick up from Merchant</p>
-                                <p className={`text-[10px] ${textSec}`}>{status === 'preparing' ? 'Pending' : '10:12 AM'}</p>
+                                <p className={`font-bold ${progress < 50 && 'opacity-50'}`}>Preparing Order</p>
+                                <p className={`text-[10px] ${textSec}`}>{progress >= 50 ? 'In progress' : 'Pending'}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className={`w-8 h-8 rounded-full ${progress >= 85 ? 'bg-[#00D68F] text-black' : 'bg-gray-200 dark:bg-gray-800 text-gray-400'} flex items-center justify-center`}>
+                                <CheckCircle2 size={16} />
+                            </div>
+                            <div className="flex-1">
+                                <p className={`font-bold ${progress < 85 && 'opacity-50'}`}>Out for Delivery</p>
+                                <p className={`text-[10px] ${textSec}`}>{progress >= 85 ? 'On the way' : 'Pending'}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -139,32 +231,59 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivity }
                             </div>
                             <div className="flex-1">
                                 <p className={`font-bold ${progress < 100 && 'opacity-50'}`}>Delivered Successfully</p>
-                                <p className={`text-[10px] ${textSec}`}>Waiting...</p>
+                                <p className={`text-[10px] ${textSec}`}>{progress >= 100 ? 'Done' : 'Waiting...'}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className={`${bgCard} mt-6 rounded-[28px] p-6 shadow-sm`}>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full border-2 border-[#00D68F] bg-cover bg-center" style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=100)' }}></div>
-                            <div>
-                                <h3 className="font-bold">Momodou Bah</h3>
-                                <p className={`text-[10px] uppercase font-black text-[#00D68F]`}>Delivery Expert</p>
+                {driver ? (
+                    <div className={`${bgCard} mt-6 rounded-[28px] p-6 shadow-sm border border-white/5`}>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full border-2 border-[#00D68F] bg-cover bg-center bg-[#F2F2F7] flex items-center justify-center overflow-hidden">
+                                    {driver.avatar_url ? (
+                                        <img src={driver.avatar_url} alt={driver.full_name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Truck size={24} className="text-[#00D68F]" />
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold">{driver.full_name || 'Assigned Driver'}</h3>
+                                    <p className={`text-[10px] uppercase font-black text-[#00D68F]`}>Delivery Expert</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <a href={`tel:${driver.phone}`} className={`w-10 h-10 rounded-full ${inputBg} flex items-center justify-center text-[#00D68F] active:scale-95 transition-transform shadow-sm`}>
+                                    <Phone size={20} />
+                                </a>
+                                <a href={`sms:${driver.phone}?body=Hello, I'm waiting for my order!`} className={`w-10 h-10 rounded-full ${inputBg} flex items-center justify-center text-[#00D68F] active:scale-95 transition-transform shadow-sm`}>
+                                    <MessageSquare size={20} />
+                                </a>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <a href="tel:+2201234567" className={`w-10 h-10 rounded-full ${inputBg} flex items-center justify-center text-[#00D68F] active:scale-95 transition-transform`}>
-                                <Phone size={20} />
-                            </a>
-                            <a href="sms:+2201234567" className={`w-10 h-10 rounded-full ${inputBg} flex items-center justify-center text-[#00D68F] active:scale-95 transition-transform`}>
-                                <MessageSquare size={20} />
-                            </a>
+                        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Star size={14} className="fill-[#00D68F] text-[#00D68F]" />
+                                <span className="font-bold text-sm tracking-tight">{driver.average_rating || '5.0'}</span>
+                                <span className={`text-[10px] ${textSec}`}>({driver.total_ratings_count || '0'} reviews)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-2 h-2 rounded-full bg-[#00D68F] animate-pulse"></div>
+                                <span className="text-[10px] font-black uppercase tracking-wider text-[#00D68F]">Active Now</span>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className={`${bgCard} mt-6 rounded-[28px] p-8 shadow-sm flex flex-col items-center gap-3 text-center opacity-60`}>
+                        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center animate-pulse">
+                            <Truck size={24} className={textSec} />
+                        </div>
+                        <p className="text-sm font-bold">Waiting for delivery partner assignment...</p>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
+

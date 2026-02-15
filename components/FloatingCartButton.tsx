@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ShoppingCart } from 'lucide-react';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { CartItem, Theme } from '../types';
 
 interface Props {

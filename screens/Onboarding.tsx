@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
-import { triggerHaptic } from '../index';
+import { triggerHaptic } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -11,9 +11,19 @@ interface Props {
    theme: Theme;
    navigate: (scr: Screen) => void;
    setUser: React.Dispatch<React.SetStateAction<UserData>>;
+   showAlert: (
+      title: string,
+      message: string,
+      type?: 'success' | 'error' | 'info',
+      onConfirm?: () => void,
+      showCancel?: boolean,
+      confirmText?: string,
+      cancelText?: string,
+      onCancel?: () => void
+   ) => void;
 }
 
-export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
+export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props) => {
    const [step, setStep] = useState(1);
    const [phone, setPhone] = useState('');
    const [otp, setOtp] = useState('');
@@ -75,7 +85,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
 
       if (error) {
          console.error("OTP Error:", error);
-         alert(error.message);
+         showAlert("Error", error.message, "error");
       } else {
          setStep(3);
       }
@@ -98,7 +108,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
 
       if (error) {
          console.error("Verification Error:", error);
-         alert(error.message);
+         showAlert("Error", error.message, "error");
       } else if (data.session) {
          console.log("Verified Session:", data.session);
 
@@ -107,7 +117,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
             .from('profiles')
             .select('*')
             .eq('id', data.session.user.id)
-            .single();
+            .maybeSingle();
 
          if (profile) {
             setUser({
@@ -118,7 +128,12 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
                photo: profile.avatar_url || null,
                rating: Number(profile.average_rating) || 5.0
             });
-            navigate('dashboard');
+
+            if (!profile.full_name) {
+               setStep(4);
+            } else {
+               navigate('dashboard');
+            }
          } else {
             setStep(4);
          }
@@ -127,7 +142,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
 
    const handleCompleteProfile = async () => {
       triggerHaptic();
-      if (!name) { alert("Please enter your name"); return; }
+      if (!name) { showAlert("Required", "Please enter your name", "info"); return; }
       setLoading(true);
 
       // 1. Update Local State (Immediate UI feedback)
@@ -166,7 +181,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
                   console.log("Photo uploaded! URL:", finalAvatarUrl);
                } catch (uploadErr: any) {
                   console.error("Storage Error:", uploadErr);
-                  alert(`Photo upload failed, but we will save your profile anyway. \nError: ${uploadErr.message}`);
+                  showAlert("Note", `Photo upload failed. We will save your profile anyway.`, "info");
                }
             }
 
@@ -212,14 +227,12 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
 
             setStep(5); // Move to location selection
          } else {
-            alert("Session lost. Please log in again.");
+            showAlert("Error", "Session lost. Please log in again.", "error");
             setStep(1); // Reset
          }
       } catch (e: any) {
          console.error("Profile Save Error:", e);
-         // SHOW THE EXACT ERROR TO THE USER
-         // This is critical for debugging RLS/Policy issues
-         alert(`Save Failed: ${e.message || JSON.stringify(e)}. \n\nCheck your Supabase 'profiles' table RLS Policies!`);
+         showAlert("Save Error", e.message || "Could not save profile.", "error");
       } finally {
          setLoading(false);
       }
@@ -247,7 +260,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
          navigate('dashboard');
       } catch (err: any) {
          console.error("Save Location Error:", err);
-         alert(`Failed to save location: ${err.message}`);
+         showAlert("Error", `Failed to save location: ${err.message}`, "error");
       } finally {
          setLoading(false);
       }
@@ -256,33 +269,62 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
    const detectLocation = () => {
       setLoading(true);
       if (navigator.geolocation) {
-         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            // Reverse geocode to get address
-            const google = (window as any).google;
-            if (!google) {
-               setLoading(false);
-               alert("Google Maps not loaded.");
-               return;
-            }
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ location: coords }, (results: any, status: string) => {
-               if (status === 'OK' && results[0]) {
-                  const locData = { address: results[0].formatted_address, ...coords };
-                  setHomeLocation(locData);
-                  saveHomeAndFinish(locData);
-               } else {
+         const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+
+         navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+               const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+               console.log("Onboarding: Location detected", coords);
+
+               // Reverse geocode to get address
+               const google = (window as any).google;
+               if (!google) {
                   setLoading(false);
-                  alert("Could not detect address. Please set manually.");
+                  showAlert("Error", "Google Maps not loaded. Please try again.", "error");
+                  return;
                }
-            });
-         }, () => {
-            setLoading(false);
-            alert("Location access denied.");
-         });
+
+               const geocoder = new google.maps.Geocoder();
+               geocoder.geocode({ location: coords }, (results: any, status: string) => {
+                  if (status === 'OK' && results[0]) {
+                     const locData = { address: results[0].formatted_address, ...coords };
+                     setHomeLocation(locData);
+                     saveHomeAndFinish(locData);
+                  } else {
+                     setLoading(false);
+                     showAlert("Address Error", "Could not find address for this location.", "info");
+                  }
+               });
+            },
+            (error) => {
+               console.error("Onboarding: Geolocation Error", error);
+               setLoading(false);
+
+               let errorMsg = "Could not get your location.";
+               let errorTitle = "Location Error";
+
+               switch (error.code) {
+                  case 1: // PERMISSION_DENIED
+                     errorTitle = "Permission Denied";
+                     errorMsg = "Please allow location access in your browser or device settings.";
+                     break;
+                  case 2: // POSITION_UNAVAILABLE
+                     errorTitle = "Unavailable";
+                     errorMsg = "Location information is unavailable.";
+                     break;
+                  case 3: // TIMEOUT
+                     errorTitle = "Timeout";
+                     errorMsg = "The request to get your location timed out. Please try again.";
+                     break;
+               }
+
+               showAlert(errorTitle, errorMsg, "error");
+            },
+            options
+         );
       } else {
          setLoading(false);
-         alert("Geolocation not supported.");
+         showAlert("Not Supported", "Geolocation is not supported by this browser.", "error");
       }
    };
 
@@ -297,15 +339,17 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
             <div className="flex-1 flex flex-col justify-end pb-10 z-10">
                <div className="mb-10 relative">
                   {/* Animated Logo */}
-                  <div className="w-24 h-24 bg-black dark:bg-white rounded-[2rem] mb-8 flex items-center justify-center shadow-2xl animate-[bounce_3s_infinite]">
-                     <div className="w-12 h-12 bg-[#00D68F] rounded-full relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-6 h-6 bg-white/30 rounded-bl-full"></div>
-                     </div>
+                  <div className="w-24 h-24 mb-8 flex items-center justify-center animate-[bounce_3s_infinite]">
+                     <img
+                        src="/assets/logo.png"
+                        alt="DROPOFF"
+                        className="w-full h-full object-contain rounded-[2rem] shadow-2xl"
+                     />
                   </div>
 
                   <h1 className="text-6xl font-black tracking-tighter mb-6 leading-[0.95]">
                      Move<br />
-                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D68F] to-blue-500">Freely.</span>
+                     <span className="text-[#00D68F]">Freely.</span>
                   </h1>
                   <p className={`text-lg ${textSec} leading-relaxed max-w-[280px] font-medium`}>
                      The professional way to ride, shop, and manage your business.
@@ -323,14 +367,14 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
                   <p className={`text-xs ${textSec} text-center leading-relaxed px-2`}>
                      By continuing, you have agreed to our{' '}
                      <span
-                        onClick={() => window.open('https://example.com/terms', '_blank')}
+                        onClick={() => window.open('https://superapp-hub.vercel.app/terms', '_blank')}
                         className="text-[#00D68F] font-bold cursor-pointer hover:underline"
                      >
                         Terms of Services
                      </span>
                      {' '}and{' '}
                      <span
-                        onClick={() => window.open('https://example.com/policy', '_blank')}
+                        onClick={() => window.open('https://superapp-hub.vercel.app/privacy', '_blank')}
                         className="text-[#00D68F] font-bold cursor-pointer hover:underline"
                      >
                         Policy
@@ -350,10 +394,15 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
 
             <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
             <div className={`flex gap-3 pb-2 border-b-2 ${theme === 'light' ? 'border-black' : 'border-white'} mb-4`}>
+
                <div className="font-semibold text-2xl flex items-center gap-2"><span>🇬🇲</span> +220</div>
                <input
-                  type="tel" autoFocus placeholder="*** ****" value={phone} onChange={(e) => setPhone(e.target.value)}
-                  className={`flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700`}
+                  type="tel" autoFocus placeholder="*** ****" value={phone}
+                  onChange={(e) => {
+                     const val = e.target.value.replace(/\D/g, '').slice(0, 7);
+                     setPhone(val);
+                  }}
+                  className={`flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700 ${theme === 'light' ? 'text-black' : 'text-white'}`}
                />
             </div>
             <p className={`text-sm ${textSec}`}>We'll text you a verification code.</p>
@@ -381,7 +430,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
             <div className="flex items-center justify-center gap-3 mb-8 z-20 pointer-events-none">
                <div className="flex gap-2">
                   {[0, 1, 2].map((i) => (
-                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white border-black/5' : 'bg-[#1C1C1E] border-white/10'} shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
                         {otp[i] || ''}
                      </div>
                   ))}
@@ -389,7 +438,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
                <div className={`text-2xl font-bold opacity-30 ${textMain}`}>-</div>
                <div className="flex gap-2">
                   {[3, 4, 5].map((i) => (
-                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white border-black/5' : 'bg-[#1C1C1E] border-white/10'} shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
                         {otp[i] || ''}
                      </div>
                   ))}
@@ -476,9 +525,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser }: Props) => {
                   <div className={`flex items-center gap-3 p-4 rounded-xl ${inputBg}`}>
                      <Briefcase size={20} className={textSec} />
                      <input
-                        placeholder="e.g. Alex Morgan"
+                        placeholder="e.g. Buba Camara"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
+                        required
                         className="flex-1 bg-transparent outline-none font-medium"
                      />
                   </div>
