@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { Theme, Screen, CartItem, Business, Activity, UserData, Category, AppSettings } from './types';
 import { INITIAL_BUSINESSES } from './data';
 import { SmartAssistant } from './components/SmartAssistant';
-import { Sidebar } from './components/Navigation';
+import { BottomNav } from './components/Navigation';
 import { SplashScreen } from './components/SplashScreen'; // Import Splash
 import { FloatingCartButton } from './components/FloatingCartButton';
 import { CONFIG } from './config';
@@ -44,6 +44,7 @@ const App = () => {
   const [showAssistant, setShowAssistant] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
+  const [isRideSearching, setIsRideSearching] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
   const [prefilledTier, setPrefilledTier] = useState<string | null>(null);
@@ -89,6 +90,25 @@ const App = () => {
   });
   const userRef = useRef<UserData>(user);
   useEffect(() => { userRef.current = user; }, [user]);
+
+  const hasTriggeredFCM = useRef(false);
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (!hasTriggeredFCM.current) {
+        console.log("👆 User interacted, checking FCM...");
+        initFCM(user.id);
+        hasTriggeredFCM.current = true;
+        window.removeEventListener('click', handleInteraction);
+        window.removeEventListener('touchstart', handleInteraction);
+      }
+    };
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [user.id]);
 
   const [settings, setSettings] = useState<AppSettings>({
     min_ride_price: 150,
@@ -461,7 +481,6 @@ const App = () => {
   }, []);
 
 
-  const [isRideSearching, setIsRideSearching] = useState(false);
   const navigate = (scr: Screen, addToHistory = false) => {
     // Block navigation if searching for a ride
     // Exception: Allow navigation TO 'ride' or if we are already on the target screen (to avoid alert spam)
@@ -548,12 +567,15 @@ const App = () => {
   return (
     <div className={`flex h-[100dvh] w-full ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-black'} transition-colors overflow-hidden`}>
       {isLoading && <SplashScreen theme={theme} />}
-      {!isLoading && screen !== 'onboarding' && <Sidebar active={screen} navigate={navigate} theme={theme} />}
       <div className={`flex-1 relative flex justify-center bg-gray-100 dark:bg-black/50 overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
-        <div className={`w-full h-full md:max-w-[480px] md:shadow-2xl md:border-x md:border-gray-200 dark:md:border-gray-800 ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} relative overflow-hidden`}>
+        <div className={`w-full h-full ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} relative overflow-hidden`}>
           <div key={screen} className="h-full w-full animate-scale-in">
             {screen && renderScreen()}
           </div>
+
+          {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && screen !== 'business-detail' && (
+            <BottomNav active={screen} navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
+          )}
 
           {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && (
             <FloatingCartButton cart={cart} theme={theme} onClick={() => navigate('checkout', true)} />

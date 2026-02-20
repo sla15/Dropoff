@@ -1,30 +1,82 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 import { supabase } from "../supabaseClient";
 import { CONFIG as APP_CONFIG } from "../config";
-
-/* 
-// 📲 TWILIO SMS CONFIGURATION (FOR PRODUCTION)
-// This is as test numbers for now. Twilio API key will be added here later.
-const TWILIO_CONFIG = {
-  accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', // Placeholder
-  authToken: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',   // Placeholder
-  fromNumber: '+1234567890'                        // Placeholder
-};
-*/
 
 // Firebase configuration from config.ts
 const firebaseConfig = APP_CONFIG.FIREBASE_CONFIG;
 
-// Initialize Firebase
 // Initialize Firebase variables
 let app: any = null;
 let messaging: any = null;
 
+const isNative = Capacitor.isNativePlatform();
+
 export const initFCM = async (userId?: string) => {
     try {
+        // Dynamic check for user interaction on web
+        if (!isNative && Notification.permission === 'default') {
+            console.log("🔔 FCM: Web permission is default. Waiting for interaction or retrying...");
+        }
+
+        if (isNative) {
+            await initNativePush(userId);
+        } else {
+            await initWebPush(userId);
+        }
+    } catch (err) {
+        console.error("❌ FCM: System initialization error:", err);
+    }
+};
+
+const initNativePush = async (userId?: string) => {
+    try {
+        console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
+
+        let permStatus = await PushNotifications.checkPermissions();
+
+        if (permStatus.receive === 'prompt') {
+            permStatus = await PushNotifications.requestPermissions();
+        }
+
+        if (permStatus.receive !== 'granted') {
+            console.warn("⚠️ FCM: Native notification permission not granted");
+            return;
+        }
+
+        // ADD LISTENERS BEFORE REGISTERING
+        PushNotifications.addListener('registration', async (token) => {
+            console.log('✅ FCM: Native registration successful, token:', token.value);
+            if (userId) {
+                await syncFCMTokenToSupabase(userId, token.value);
+            }
+        });
+
+        PushNotifications.addListener('registrationError', (err) => {
+            console.error('❌ FCM: Native registration error:', err.error);
+        });
+
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+            console.log('🔔 FCM: Push received:', notification);
+        });
+
+        PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+            console.log('🔔 FCM: Push action performed:', notification);
+        });
+
+        await PushNotifications.register();
+
+    } catch (err) {
+        console.error("❌ FCM: Native init error:", err);
+    }
+};
+
+const initWebPush = async (userId?: string) => {
+    try {
         if (!APP_CONFIG.FIREBASE_CONFIG.apiKey) {
-            console.warn("⚠️ FCM: Firebase config missing. Skipping init.");
+            console.warn("⚠️ FCM: Firebase config missing. Skipping web init.");
             return;
         }
 
@@ -33,12 +85,12 @@ export const initFCM = async (userId?: string) => {
             messaging = getMessaging(app);
         }
 
-        console.log("🔔 FCM: Starting initialization...");
+        console.log("🔔 FCM: Initializing Web Push...");
 
         // Request permission
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
-            console.warn("⚠️ FCM: Notification permission not granted");
+            console.warn("⚠️ FCM: Web notification permission not granted");
             return;
         }
 
@@ -48,51 +100,53 @@ export const initFCM = async (userId?: string) => {
         });
 
         if (token) {
-            console.log("✅ FCM: Token generated:", token);
+            console.log("✅ FCM: Web token generated:", token);
             if (userId) {
                 await syncFCMTokenToSupabase(userId, token);
             }
         } else {
-            console.warn("⚠️ FCM: No registration token available");
+            console.warn("⚠️ FCM: No web registration token available");
         }
 
         // Listen for foreground messages
         onMessage(messaging, (payload) => {
-            console.log("🔔 FCM: Message received in foreground:", payload);
-
-            // Display the notification even when app is in foreground
+            console.log("🔔 FCM: Web message received in foreground:", payload);
             const notificationTitle = payload.notification?.title || 'New Notification';
             const notificationOptions = {
                 body: payload.notification?.body || '',
                 icon: '/favicon.ico',
                 badge: '/favicon.ico',
-                data: payload.data,
-                requireInteraction: false,
-                tag: payload.data?.type || 'default' // Prevents duplicate notifications
+                data: payload.data
             };
 
-            // Show the notification
             if (Notification.permission === 'granted') {
                 new Notification(notificationTitle, notificationOptions);
             }
         });
 
     } catch (err) {
-        console.error("❌ FCM: Initialization error:", err);
+        console.error("❌ FCM: Web init error:", err);
     }
 };
 
 export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
+        if (!userId || !token) return;
+
+        console.log(`📡 FCM: Syncing token to user ${userId}...`);
+
         const { error } = await supabase
             .from('profiles')
-            .update({ fcm_token: token })
+            .update({
+                fcm_token: token,
+                updated_at: new Date().toISOString()
+            })
             .eq('id', userId);
 
         if (error) {
             console.error('❌ FCM: Failed to sync token to Supabase:', error);
         } else {
-            console.log('✅ FCM: Token synced to Supabase');
+            console.log('✅ FCM: Token synced to Supabase successfully');
         }
     } catch (err) {
         console.error('❌ FCM: Sync exception:', err);

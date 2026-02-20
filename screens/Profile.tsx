@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
-import { BottomNav } from '../components/Navigation';
 import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -40,17 +39,14 @@ type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
 const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, bgCard: string }) => {
     const [dragY, setDragY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
+    const [isPeeked, setIsPeeked] = useState(false);
     const startY = useRef(0);
     const drawerRef = useRef<HTMLDivElement>(null);
+    const PEEK_Y = 480;
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        // Only allow dragging from the top header area to prevent conflict with scrolling content
-        const target = e.target as HTMLElement;
         const scrollContainer = drawerRef.current?.querySelector('.overflow-y-auto');
-
-        // If content is scrolled down, don't drag drawer
         if (scrollContainer && scrollContainer.scrollTop > 0) return;
-
         startY.current = e.touches[0].clientY;
         setIsDragging(true);
     };
@@ -60,45 +56,62 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
         const currentY = e.touches[0].clientY;
         const delta = currentY - startY.current;
 
-        // Only allow dragging down
-        if (delta > 0) {
-            setDragY(delta);
+        if (isPeeked) {
+            // If peeked, allow dragging UP
+            if (delta < 0) {
+                setDragY(Math.max(0, PEEK_Y + delta));
+            }
+        } else {
+            // If expanded, allow dragging DOWN
+            if (delta > 0) {
+                setDragY(delta);
+            }
         }
     };
 
     const handleTouchEnd = () => {
         setIsDragging(false);
-        if (dragY > 100) { // Threshold to close
-            onClose();
+        if (isPeeked) {
+            if (dragY < PEEK_Y - 100) {
+                setDragY(0);
+                setIsPeeked(false);
+            } else {
+                setDragY(PEEK_Y);
+            }
         } else {
-            setDragY(0); // Snap back
+            if (dragY > 150) {
+                setDragY(PEEK_Y);
+                setIsPeeked(true);
+            } else {
+                setDragY(0);
+            }
         }
     };
 
     return (
-        <div className={`fixed inset-0 z-50 flex flex-col justify-end transition-opacity duration-300 ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
+        <div className={`fixed inset-0 z-50 flex flex-col justify-end transition-opacity duration-500 ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
             <div
                 ref={drawerRef}
-                className={`w-full ${theme === 'light' ? 'bg-white/80' : 'bg-[#1C1C1E]/80'} backdrop-blur-xl rounded-t-[32px] pb-safe relative z-10 max-h-[90vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+                className={`w-full ${theme === 'light' ? 'bg-white/85' : 'bg-[#1C1C1E]/85'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[92vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
                 style={{
                     transform: `translateY(${dragY}px)`,
-                    transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'
                 }}
             >
                 {/* Drag Handle Area */}
                 <div
-                    className="w-full pt-4 pb-2 flex justify-center cursor-grab active:cursor-grabbing touch-none"
+                    className="w-full pt-5 pb-2 flex justify-center cursor-grab active:cursor-grabbing touch-none"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                 >
-                    <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full flex-shrink-0"></div>
+                    <div className="w-16 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full flex-shrink-0 opacity-40"></div>
                 </div>
 
-                <div className="px-6 pb-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800">
-                    <h2 className="text-2xl font-bold">{title}</h2>
-                    <button onClick={onClose} className={`p-2 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'}`}>
+                <div className="px-8 pb-4 flex justify-between items-center border-b border-gray-100/50 dark:border-gray-800/50">
+                    <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+                    <button onClick={onClose} className={`p-2.5 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-white/10 active:bg-white/20'} transition-colors`}>
                         <X size={20} />
                     </button>
                 </div>
@@ -349,8 +362,6 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 </div>
             </div>
 
-            <BottomNav active="profile" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
-
             {/* --- DRAWERS --- */}
 
             {/* Account Settings Drawer */}
@@ -581,7 +592,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         </a>
 
-                        <a href="mailto:support@superapp.gm" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
+                        <a href="mailto:support@dropoff.gm" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
                             <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
                                 <Mail size={24} />
                             </div>

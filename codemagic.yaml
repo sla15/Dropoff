@@ -1,0 +1,53 @@
+workflows:
+  android-workflow:
+    name: Android Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+      groups:
+        - supabase_config   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+        - google_maps        # VITE_GOOGLE_MAPS_API_KEY
+        - firebase_config    # ALL VITE_FIREBASE_* vars + VITE_FCM_VAPID_KEY
+      vars:
+        PACKAGE_NAME: "com.dropoffgambia.customer"
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web project
+        script: npm run build
+      - name: Sync Capacitor
+        script: npx cap sync android
+      - name: Build Android
+        script: |
+          cd android
+          ./gradlew assembleRelease
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/outputs/bundle/release/*.aab
+
+  ios-workflow:
+    name: iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+    environment:
+      node: 20
+      xcode: latest
+      groups:
+        - supabase_config
+        - google_maps
+        - firebase_config
+    scripts:
+      - name: Install dependencies
+        script: npm install
+      - name: Build web project
+        script: npm run build
+      - name: Sync Capacitor
+        script: npx cap sync ios
+      - name: Build iOS
+        script: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath App.xcarchive archive
+          xcodebuild -exportArchive -archivePath App.xcarchive -exportOptionsPlist exportOptions.plist -exportPath .
+    artifacts:
+      - ios/App/*.ipa

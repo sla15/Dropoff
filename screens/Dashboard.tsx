@@ -3,8 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, SavedLocation, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
-import { GreenGlow } from '../components/GreenGlow';
-import { BottomNav } from '../components/Navigation';
+
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 import { NotificationPrompt } from '../components/NotificationPrompt';
@@ -102,19 +101,30 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
   };
 
   useEffect(() => {
-    // Check if we should show the notification prompt
     const checkNotificationStatus = async () => {
-      // Only prompt if they are logged in
       if (!user.id) return;
 
-      const permission = (Notification as any)?.permission;
+      let isGranted = false;
+      let isDefault = false;
+
+      const { Capacitor } = (window as any);
+      if (Capacitor?.isNativePlatform()) {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const perm = await PushNotifications.checkPermissions();
+        isGranted = perm.receive === 'granted';
+        isDefault = perm.receive === 'prompt';
+      } else {
+        const permission = (Notification as any)?.permission;
+        isGranted = permission === 'granted';
+        isDefault = permission === 'default';
+      }
+
       const hasPromptedThisSession = sessionStorage.getItem('notif_prompt_seen');
 
-      // If they haven't granted permission AND haven't been prompted in this session
-      if (permission === 'default' && !hasPromptedThisSession) {
-        console.log('🔔 Dashboard: User needs a notification prompt (permission is default)');
-        setTimeout(() => setShowNotificationPrompt(true), 3000); // Wait 3s after load
-      } else if (permission === 'granted') {
+      if (isDefault && !hasPromptedThisSession) {
+        console.log('🔔 Dashboard: User needs a notification prompt (permission is prompt/default)');
+        setTimeout(() => setShowNotificationPrompt(true), 3000);
+      } else if (isGranted) {
         // If already granted but maybe no ID in DB, try to sync
         const { data: profile } = await supabase
           .from('profiles')
@@ -294,7 +304,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     navigate('ride');
   };
 
-  const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
+  const bgMain = theme === 'light' ? 'bg-[#F8F9FA]' : 'bg-[#000000]';
   const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
   const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
   const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
@@ -302,7 +312,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
   return (
     <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden animate-scale-in`}>
-      <GreenGlow />
       <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-md transition-all`}>
         <div className="flex justify-between items-center mt-2">
           <div className="flex items-center gap-3">
@@ -333,7 +342,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               </div>
             </div>
           </div>
-          <button onClick={toggleTheme} className={`w-10 h-10 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-[#1C1C1E]'} flex items-center justify-center transition-colors`}>
+          <button onClick={toggleTheme} className={`w-10 h-10 rounded-full ${theme === 'light' ? 'bg-gray-100 shadow-inner' : 'bg-[#1C1C1E]'} flex items-center justify-center transition-all active:scale-95`}>
             {theme === 'light' ? <Sun size={20} className="text-orange-500" /> : <Moon size={20} className="text-[#00D68F]" />}
           </button>
         </div>
@@ -353,7 +362,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               onChange={(e) => searchMode === 'market' ? setSearchQuery(e.target.value) : handleMapSearch(e.target.value)}
               onKeyDown={handleSearch}
               placeholder={searchMode === 'market' ? "What to order?" : "Where to go?"}
-              className={`w-full h-14 pl-12 pr-12 rounded-[20px] ${theme === 'light' ? 'bg-[#F2F2F7]/50 border border-white/40' : 'bg-[#1C1C1E]/50 border border-white/5'} backdrop-blur-md font-medium outline-none text-base placeholder:opacity-50 focus:ring-2 focus:ring-[#00D68F] transition-all cursor-text shadow-sm`}
+              className={`w-full h-14 pl-12 pr-12 rounded-[22px] ${theme === 'light' ? 'bg-white border-none shadow-[0_8px_30px_rgba(0,0,0,0.04)] focus:shadow-[0_8px_30px_rgba(0,214,143,0.1)]' : 'bg-[#1C1C1E]/50 border border-white/5 shadow-sm'} backdrop-blur-md font-medium outline-none text-base placeholder:opacity-50 transition-all cursor-text`}
             />
             {searchQuery && (
               <button
@@ -420,24 +429,24 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       </div>
 
       <div className="flex-1 px-5 pt-2 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
-        <div className="grid grid-cols-2 gap-4">
-          <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[24px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-sm cursor-pointer`}>
-            <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
+        <div className="grid grid-cols-2 gap-6">
+          <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-[0_30px_40px_-20px_rgba(0,0,0,0.06)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-            <div className="absolute bottom-4 right-4 text-right z-10">
-              <div className="flex justify-end mb-1"><div className="w-8 h-8 rounded-full bg-[#00D68F] flex items-center justify-center text-white"><Car size={16} /></div></div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Ride</h2>
-              <p className="text-xs text-white/80 flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+            <div className="absolute bottom-5 right-5 text-right z-10">
+              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-white shadow-xl"><Car size={20} /></div></div>
+              <h2 className="text-xl font-black text-white tracking-tight">Ride</h2>
+              <p className="text-[10px] uppercase font-bold text-white/60 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
             </div>
           </div>
 
-          <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[24px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-sm cursor-pointer`}>
-            <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
+          <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-[0_30px_40px_-20px_rgba(0,0,0,0.06)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-            <div className="absolute bottom-4 right-4 text-right z-10">
-              <div className="flex justify-end mb-1"><div className="w-8 h-8 rounded-full bg-[#FF9500] flex items-center justify-center text-white"><ShoppingBag size={16} /></div></div>
-              <h2 className="text-xl font-bold text-white tracking-tight">Market</h2>
-              <p className="text-xs text-white/80">Shops</p>
+            <div className="absolute bottom-5 right-5 text-right z-10">
+              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-white shadow-xl"><ShoppingBag size={20} /></div></div>
+              <h2 className="text-xl font-black text-white tracking-tight">Market</h2>
+              <p className="text-[10px] uppercase font-bold text-white/60 tracking-widest">Premium Shops</p>
             </div>
           </div>
         </div>
@@ -693,8 +702,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           </button>
         </div>
       )}
-
-      <BottomNav active="dashboard" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
 
       <NotificationPrompt
         isOpen={showNotificationPrompt}

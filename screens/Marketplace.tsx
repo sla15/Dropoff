@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Search, Star, MapPin, Heart } from 'lucide-react';
 import { Theme, Screen, Business, Category } from '../types';
 import { triggerHaptic } from '../utils/helpers';
-import { BottomNav } from '../components/Navigation';
 
 interface Props {
    theme: Theme;
@@ -155,7 +154,6 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                </div>
             )}
          </div>
-         <BottomNav active="marketplace" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
       </div>
    );
 };

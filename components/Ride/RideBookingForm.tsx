@@ -1,6 +1,6 @@
-import React from 'react';
 import { ArrowLeft, ArrowRight, Locate, MapPin as MapPinFilled, Plus, Trash, X, Info, Car, Bike } from 'lucide-react';
 import { Theme, UserData, AppSettings } from '../../types';
+import { Skeleton } from '../Skeleton';
 
 interface RideBookingFormProps {
     theme: Theme;
@@ -185,12 +185,8 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                 </div>
             ) : (
                 <div className="space-y-6 animate-scale-in relative">
-                    {isCalculating && (
-                        <div className="absolute inset-0 z-50 bg-white/50 dark:bg-black/50 backdrop-blur-[2px] rounded-3xl flex flex-col items-center justify-center gap-3 animate-in fade-in duration-300">
-                            <div className="w-8 h-8 border-4 border-[#00D68F]/30 border-t-[#00D68F] rounded-full animate-spin"></div>
-                            <p className="text-xs font-bold text-[#00D68F]">Updating fare...</p>
-                        </div>
-                    )}
+                    {/* Fare Calculation Skeleton Overlay (Removed absolute overlay for more natural feel) */}
+
                     <div className="flex items-center justify-between px-1">
                         <button
                             onClick={() => setBookingStep('planning')}
@@ -227,74 +223,87 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                             <h3 className="font-bold text-sm">Available Tiers</h3>
                         </div>
                         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 px-1 snap-x">
-                            {tiers.map(t => {
-                                const isSelected = selectedTier === t.id;
-                                const price = calculatePrice(t.mult);
-                                return (
-                                    <div
-                                        key={t.id}
-                                        onClick={() => { triggerHaptic(); setSelectedTier(t.id); }}
-                                        className={`
-                                    relative min-w-[200px] h-[160px] p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 snap-start flex flex-col overflow-hidden
-                                    ${isSelected
-                                                ? 'border-[#00D68F] bg-[#00D68F]/10 scale-[1.02] shadow-xl ring-4 ring-[#00D68F]/20'
-                                                : 'border-transparent bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                            }
-                                `}
-                                    >
-                                        {/* Large Background Vehicle Image */}
-                                        <div className={`absolute -right-8 -bottom-4 w-40 h-40 transition-all duration-500 opacity-40 ${isSelected ? 'scale-125 opacity-100 translate-x-4' : 'scale-110'}`}>
-                                            {t.img ? (
-                                                <img
-                                                    src={t.img}
-                                                    className={`w-full h-full object-contain ${theme === 'light' ? 'mix-blend-multiply' : ''}`}
-                                                    alt={t.label}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.display = 'none';
-                                                        const parent = (e.target as HTMLImageElement).parentElement;
-                                                        if (parent) {
-                                                            const iconPlaceholder = parent.querySelector('.icon-placeholder');
-                                                            if (iconPlaceholder) iconPlaceholder.classList.remove('hidden');
-                                                        }
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
-                                                    <t.icon size={80} strokeWidth={1} />
-                                                </div>
-                                            )}
-                                            <div className="icon-placeholder hidden w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
-                                                <t.icon size={80} strokeWidth={1} />
-                                            </div>
-                                        </div>
-
-                                        {/* Text Content - Positioned Above Image */}
-                                        <div className="relative z-10 flex flex-col h-full pointer-events-none">
-                                            {isSelected && (
-                                                <div className="bg-[#00D68F] text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md self-start mb-2">
-                                                    SELECTED
-                                                </div>
-                                            )}
-                                            <div className={`font-black text-xl mb-0.5 ${isSelected ? (theme === 'light' ? 'text-black' : 'text-white') : 'text-gray-900 dark:text-white'}`}>{t.label}</div>
-                                            <div className={`text-xs font-bold mb-auto ${isSelected ? (theme === 'light' ? 'text-black/60' : 'text-white/60') : 'text-gray-500 dark:text-gray-400'}`}>{t.desc} • {t.time}</div>
-
-                                            <div className={`flex flex-col ${isSelected ? 'text-[#00D68F]' : 'text-gray-900 dark:text-white'}`}>
-                                                {user.referralBalance && user.referralBalance > 0 ? (
-                                                    <>
-                                                        <div className="text-[10px] line-through opacity-50 font-medium">D{calculatePrice(t.mult).originalPrice}</div>
-                                                        <div className="font-black text-2xl flex items-center gap-1 drop-shadow-sm">
-                                                            D{calculatePrice(t.mult).finalPrice}
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div className="font-black text-2xl drop-shadow-sm">D{calculatePrice(t.mult).finalPrice}</div>
-                                                )}
-                                            </div>
+                            {isCalculating ? (
+                                // Show 3 Skeleton Cards
+                                [1, 2, 3].map(i => (
+                                    <div key={i} className="min-w-[200px] h-[160px] p-5 rounded-3xl bg-gray-100 dark:bg-gray-800 flex flex-col gap-3">
+                                        <Skeleton className="w-12 h-4 mb-2" />
+                                        <Skeleton className="w-24 h-6" />
+                                        <Skeleton className="w-16 h-4" />
+                                        <div className="mt-auto">
+                                            <Skeleton className="w-20 h-8" />
                                         </div>
                                     </div>
+                                ))
+                            ) : (
+                                tiers.map(t => {
+                                    const isSelected = selectedTier === t.id;
+                                    const price = calculatePrice(t.mult);
+                                    return (
+                                        <div
+                                            key={t.id}
+                                            onClick={() => { triggerHaptic(); setSelectedTier(t.id); }}
+                                            className={`
+                                        relative min-w-[200px] h-[160px] p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 snap-start flex flex-col overflow-hidden
+                                        ${isSelected
+                                                    ? 'border-[#00D68F] bg-[#00D68F]/10 scale-[1.02] shadow-xl ring-4 ring-[#00D68F]/20'
+                                                    : 'border-transparent bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                }
+                                    `}
+                                        >
+                                            {/* Large Background Vehicle Image */}
+                                            <div className={`absolute -right-8 -bottom-4 w-40 h-40 transition-all duration-500 opacity-40 ${isSelected ? 'scale-125 opacity-100 translate-x-4' : 'scale-110'}`}>
+                                                {t.img ? (
+                                                    <img
+                                                        src={t.img}
+                                                        className={`w-full h-full object-contain ${theme === 'light' ? 'mix-blend-multiply' : ''}`}
+                                                        alt={t.label}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                            const parent = (e.target as HTMLImageElement).parentElement;
+                                                            if (parent) {
+                                                                const iconPlaceholder = parent.querySelector('.icon-placeholder');
+                                                                if (iconPlaceholder) iconPlaceholder.classList.remove('hidden');
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
+                                                        <t.icon size={80} strokeWidth={1} />
+                                                    </div>
+                                                )}
+                                                <div className="icon-placeholder hidden w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-600">
+                                                    <t.icon size={80} strokeWidth={1} />
+                                                </div>
+                                            </div>
 
-                                );
-                            })}
+                                            {/* Text Content - Positioned Above Image */}
+                                            <div className="relative z-10 flex flex-col h-full pointer-events-none">
+                                                {isSelected && (
+                                                    <div className="bg-[#00D68F] text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md self-start mb-2">
+                                                        SELECTED
+                                                    </div>
+                                                )}
+                                                <div className={`font-black text-xl mb-0.5 ${isSelected ? (theme === 'light' ? 'text-black' : 'text-white') : 'text-gray-900 dark:text-white'}`}>{t.label}</div>
+                                                <div className={`text-xs font-bold mb-auto ${isSelected ? (theme === 'light' ? 'text-black/60' : 'text-white/60') : 'text-gray-500 dark:text-gray-400'}`}>{t.desc} • {t.time}</div>
+
+                                                <div className={`flex flex-col ${isSelected ? 'text-[#00D68F]' : 'text-gray-900 dark:text-white'}`}>
+                                                    {user.referralBalance && user.referralBalance > 0 ? (
+                                                        <>
+                                                            <div className="text-[10px] line-through opacity-50 font-medium">D{calculatePrice(t.mult).originalPrice}</div>
+                                                            <div className="font-black text-2xl flex items-center gap-1 drop-shadow-sm">
+                                                                D{calculatePrice(t.mult).finalPrice}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="font-black text-2xl drop-shadow-sm">D{calculatePrice(t.mult).finalPrice}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
 
@@ -306,13 +315,19 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
 
                         <button
                             onClick={confirmRide}
-                            disabled={!destinations[0]}
+                            disabled={!destinations[0] || isCalculating}
                             className={`w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 disabled:shadow-none flex items-center justify-between px-6 active:scale-[0.98] transition-transform`}
                         >
-                            <span>Book {tiers.find(t => t.id === selectedTier)?.label}</span>
-                            <div className="flex flex-col items-end text-right">
-                                <span className="text-xl leading-none font-bold">D{calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice}</span>
-                            </div>
+                            {isCalculating ? (
+                                <Skeleton className="w-full h-8 bg-black/10" />
+                            ) : (
+                                <>
+                                    <span>Book {tiers.find(t => t.id === selectedTier)?.label}</span>
+                                    <div className="flex flex-col items-end text-right">
+                                        <span className="text-xl leading-none font-bold">D{calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice}</span>
+                                    </div>
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

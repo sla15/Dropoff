@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
-import { GreenGlow } from '../components/GreenGlow';
+
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { darkMapStyle } from '../utils/mapStyles'; // Ensure this exists or is handled
@@ -97,6 +97,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const notifiedDriversRef = useRef<Set<string>>(new Set());
 
     // Drag Sheet State
+    const PEEK_OFFSET = 460;
     const [sheetOffset, setSheetOffset] = useState(0);
     const [isSheetMinimized, setIsSheetMinimized] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -1418,28 +1419,33 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         if (isSheetMinimized) {
             if (deltaY < 0) {
-                setSheetOffset(Math.max(0, 500 + deltaY));
+                // Dragging UP from peek
+                setSheetOffset(Math.max(0, PEEK_OFFSET + deltaY));
             }
         } else {
             if (deltaY > 0) {
-                setSheetOffset(deltaY);
+                // Dragging DOWN from full
+                setSheetOffset(Math.min(PEEK_OFFSET, deltaY));
             }
         }
     };
 
+
     const handleSheetTouchEnd = () => {
         setIsDragging(false);
         if (isSheetMinimized) {
+            // If dragging UP from minimized
             if (sheetOffset < 400) {
                 setIsSheetMinimized(false);
                 setSheetOffset(0);
             } else {
-                setSheetOffset(500);
+                setSheetOffset(PEEK_OFFSET);
             }
         } else {
-            if (sheetOffset > 150) {
+            // If dragging DOWN from expanded
+            if (sheetOffset > 100) {
                 setIsSheetMinimized(true);
-                setSheetOffset(500);
+                setSheetOffset(PEEK_OFFSET);
             } else {
                 setSheetOffset(0);
             }
@@ -1450,7 +1456,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const currentPrice = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
 
     return (
-        <div className={`h-full flex flex-col ${bgMain} ${textMain} relative`}>
+        <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden transition-colors duration-500`}>
             {isLocating && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[20] animate-bounce-in">
                     <div className="bg-white dark:bg-[#1C1C1E] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-[#00D68F]/20">
@@ -1491,10 +1497,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {/* Bottom Card / Draggable Sheet */}
             <div
-                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/60' : 'bg-[#1C1C1E]/60'} backdrop-blur-xl rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[85vh] transition-transform duration-300 ease-out`}
+                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/70' : 'bg-[#1C1C1E]/70'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] transition-transform duration-300 ease-out`}
                 style={{
                     transform: sheetTransform,
-                    transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)'
+                    transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
                 }}
             >
                 {/* Drag Handle */}

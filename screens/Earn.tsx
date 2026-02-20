@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Gift, Copy, Share2, ChevronRight, Award } from 'lucide-react';
 import { Theme, Screen, Reward, AppSettings } from '../types';
-import { BottomNav } from '../components/Navigation';
 import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 
@@ -174,8 +173,6 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                     ))}
                 </div>
             </div>
-
-            <BottomNav active="earn" navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
         </div>
     );
 };

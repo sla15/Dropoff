@@ -399,8 +399,13 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                <input
                   type="tel" autoFocus placeholder="*** ****" value={phone}
                   onChange={(e) => {
-                     const val = e.target.value.replace(/\D/g, '').slice(0, 7);
-                     setPhone(val);
+                     const val = e.target.value.replace(/\D/g, '');
+                     // If it's longer than 7 digits and starts with 220, take the last 7
+                     if (val.length > 7 && val.startsWith('220')) {
+                        setPhone(val.slice(-7));
+                     } else {
+                        setPhone(val.slice(0, 7));
+                     }
                   }}
                   className={`flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700 ${theme === 'light' ? 'text-black' : 'text-white'}`}
                />
