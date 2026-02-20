@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
@@ -137,26 +139,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     };
 
-    const handleLocateMe = (isInitial = false, manualMap?: any) => {
+    const handleLocateMe = async (isInitial = false, manualMap?: any) => {
         const targetMap = manualMap || map;
         setIsLocating(true);
         setLocationMethod(null);
         console.log("RideScreen: handleLocateMe triggered", { isInitial, hasMap: !!targetMap });
-
-        if (!navigator.geolocation) {
-            if (user.last_lat && user.last_lng) {
-                const pos = { lat: user.last_lat, lng: user.last_lng };
-                setUserLocation(pos);
-                setLocationMethod('profile');
-                if (targetMap) {
-                    targetMap.panTo(pos);
-                    updateMarker(pos, undefined, targetMap);
-                }
-            }
-            setIsLocating(false);
-            if (!isInitial) showAlert("Geolocation Error", "Your browser does not support geolocation.", "error");
-            return;
-        }
 
         let fallbackApplied = false;
         const fallbackTimeout = setTimeout(() => {
@@ -171,67 +158,50 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 }
                 fallbackApplied = true;
             }
-        }, 4000); // Increased fallback to 4s to give GPS more time
+        }, 4000);
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                clearTimeout(fallbackTimeout);
-                const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
-                console.log("RideScreen: Real GPS success:", pos);
-                setUserLocation(pos);
-                setLocationMethod('gps');
-                setIsLocating(false);
-
-                supabase.from('profiles').update({
-                    last_lat: pos.lat,
-                    last_lng: pos.lng
-                }).eq('id', user.id).then(({ error }) => {
-                    if (error) console.error("Error persisting location:", error);
-                });
-
-                if (targetMap) {
-                    targetMap.panTo(pos);
-                    if (isInitial) targetMap.setZoom(14);
-                    updateMarker(pos, undefined, targetMap);
+        try {
+            if (Capacitor.isNativePlatform()) {
+                const permissions = await Geolocation.checkPermissions();
+                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+                    await Geolocation.requestPermissions();
                 }
-                if (!isInitial) triggerHaptic();
-            },
-            (error) => {
-                clearTimeout(fallbackTimeout);
-                setIsLocating(false);
-                console.log("Geolocation error:", error);
+            }
 
-                let errorTitle = "Location Error";
-                let errorMsg = "Could not get your current location.";
+            const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
 
-                switch (error.code) {
-                    case 1: // PERMISSION_DENIED
-                        errorTitle = "Permission Denied";
-                        errorMsg = "Please allow location access in your browser or device settings.";
-                        break;
-                    case 2: // POSITION_UNAVAILABLE
-                        errorTitle = "Unavailable";
-                        errorMsg = "Location information is unavailable.";
-                        break;
-                    case 3: // TIMEOUT
-                        errorTitle = "Timeout";
-                        errorMsg = "Taking too long to get location. Try again or set manually.";
-                        break;
-                }
+            clearTimeout(fallbackTimeout);
+            const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+            console.log("RideScreen: Real GPS success:", pos);
+            setUserLocation(pos);
+            setLocationMethod('gps');
+            setIsLocating(false);
 
-                if (!userLocation && user.last_lat && user.last_lng) {
-                    const pos = { lat: user.last_lat, lng: user.last_lng };
-                    setUserLocation(pos);
-                    setLocationMethod('profile');
-                    if (targetMap) {
-                        targetMap.panTo(pos);
-                        updateMarker(pos, undefined, targetMap);
-                    }
-                }
-                if (!isInitial) showAlert(errorTitle, errorMsg, "error");
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
+            supabase.from('profiles').update({
+                last_lat: pos.lat,
+                last_lng: pos.lng
+            }).eq('id', user.id).then(({ error }) => {
+                if (error) console.error("Error persisting location:", error);
+            });
+
+            if (targetMap) {
+                targetMap.panTo(pos);
+                if (isInitial) targetMap.setZoom(14);
+                updateMarker(pos, undefined, targetMap);
+            }
+            if (!isInitial) triggerHaptic();
+        } catch (err) {
+            clearTimeout(fallbackTimeout);
+            console.error("RideScreen: Geolocation error:", err);
+            setIsLocating(false);
+            if (!isInitial && !fallbackApplied) {
+                showAlert("Geolocation Error", "Could not get your current location.", "error");
+            }
+        }
     };
 
     // Initialize Map

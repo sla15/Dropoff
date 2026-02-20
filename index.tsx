@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import './index.css';
 import { createRoot } from 'react-dom/client';
 import { Theme, Screen, CartItem, Business, Activity, UserData, Category, AppSettings } from './types';
@@ -162,39 +164,51 @@ const App = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      console.warn("Geolocation is not supported by this browser.");
-      return;
-    }
+    let watchId: string | null = null;
 
-    const geoId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        console.log("📍 Location updated:", latitude, longitude);
-        setUserLocation({ lat: latitude, lng: longitude });
-
-        // Update user state for components that rely on it
-        setUser(prev => ({
-          ...prev,
-          last_lat: latitude,
-          last_lng: longitude
-        }));
-
-        // Geocode coordinates to address if possible (simplified version)
-        if (window.google?.maps?.Geocoder) {
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-            if (status === 'OK' && results?.[0]) {
-              setUser(prev => ({ ...prev, location: results[0].formatted_address }));
-            }
-          });
+    const startWatching = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const permissions = await Geolocation.checkPermissions();
+          if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+            await Geolocation.requestPermissions();
+          }
         }
-      },
-      (err) => console.error("Geolocation error:", err),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
 
-    return () => navigator.geolocation.clearWatch(geoId);
+        watchId = await Geolocation.watchPosition(
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
+          (pos) => {
+            if (!pos) return;
+            const { latitude, longitude } = pos.coords;
+            console.log("📍 Location updated:", latitude, longitude);
+            setUserLocation({ lat: latitude, lng: longitude });
+
+            setUser(prev => ({
+              ...prev,
+              last_lat: latitude,
+              last_lng: longitude
+            }));
+
+            if (window.google?.maps?.Geocoder) {
+              const geocoder = new window.google.maps.Geocoder();
+              geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+                if (status === 'OK' && results?.[0]) {
+                  setUser(prev => ({ ...prev, location: results[0].formatted_address }));
+                }
+              });
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Geolocation error:", err);
+      }
+    };
+
+    startWatching();
+
+    return () => {
+      if (watchId) Geolocation.clearWatch({ id: watchId });
+    };
   }, []);
 
   // Sync with DB if session exists

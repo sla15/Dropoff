@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { Search, MapPin, Map as MapIcon, Locate, X, ArrowRight, Loader2 } from 'lucide-react';
 import { Theme } from '../types';
 import { triggerHaptic } from '../utils/helpers';
@@ -159,56 +161,65 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
         });
     };
 
-    const useCurrentLocation = () => {
+    const useCurrentLocation = async () => {
         setLoading(true);
         setLocationMethod(null);
-        if (navigator.geolocation) {
-            // Set a timeout to use profile fallback if GPS is taking too long
-            const fallbackTimeout = setTimeout(() => {
-                if (!selectedCoords && user?.last_lat && user?.last_lng) {
-                    console.log("LocationPicker: GPS slow, applying profile fallback...");
-                    const coords = { lat: user.last_lat, lng: user.last_lng };
-                    map.panTo(coords);
-                    marker.setPosition(coords);
-                    setSelectedCoords(coords);
-                    reverseGeocode(coords);
-                    setLocationMethod('profile');
-                }
-            }, 4000);
 
-            navigator.geolocation.getCurrentPosition((pos) => {
-                clearTimeout(fallbackTimeout);
-                const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const fallbackTimeout = setTimeout(() => {
+            if (!selectedCoords && user?.last_lat && user?.last_lng) {
+                console.log("LocationPicker: GPS slow, applying profile fallback...");
+                const coords = { lat: user.last_lat, lng: user.last_lng };
                 map.panTo(coords);
                 marker.setPosition(coords);
                 setSelectedCoords(coords);
                 reverseGeocode(coords);
-                setLocationMethod('gps');
-                setLoading(false);
+                setLocationMethod('profile');
+            }
+        }, 4000);
 
-                // Silently persist to Supabase
-                const { supabase } = require('../supabaseClient');
-                supabase.from('profiles').update({
-                    last_lat: coords.lat,
-                    last_lng: coords.lng
-                }).eq('id', user?.id).then(({ error }: any) => {
-                    if (error) console.error("Error persisting location:", error);
-                });
-            }, () => {
-                clearTimeout(fallbackTimeout);
-                setLoading(false);
-                // Final fallback if GPS fails
-                if (!selectedCoords && user?.last_lat && user?.last_lng) {
-                    const coords = { lat: user.last_lat, lng: user.last_lng };
-                    map.panTo(coords);
-                    marker.setPosition(coords);
-                    setSelectedCoords(coords);
-                    reverseGeocode(coords);
-                    setLocationMethod('profile');
+        try {
+            if (Capacitor.isNativePlatform()) {
+                const permissions = await Geolocation.checkPermissions();
+                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+                    await Geolocation.requestPermissions();
                 }
-            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-        } else {
+            }
+
+            const pos = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+
+            clearTimeout(fallbackTimeout);
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            map.panTo(coords);
+            marker.setPosition(coords);
+            setSelectedCoords(coords);
+            reverseGeocode(coords);
+            setLocationMethod('gps');
             setLoading(false);
+
+            // Silently persist to Supabase
+            const { supabase } = require('../supabaseClient');
+            supabase.from('profiles').update({
+                last_lat: coords.lat,
+                last_lng: coords.lng
+            }).eq('id', user?.id).then(({ error }: any) => {
+                if (error) console.error("Error persisting location:", error);
+            });
+        } catch (err) {
+            clearTimeout(fallbackTimeout);
+            setLoading(false);
+            // Final fallback if GPS fails
+            if (!selectedCoords && user?.last_lat && user?.last_lng) {
+                const coords = { lat: user.last_lat, lng: user.last_lng };
+                map.panTo(coords);
+                marker.setPosition(coords);
+                setSelectedCoords(coords);
+                reverseGeocode(coords);
+                setLocationMethod('profile');
+            }
         }
     };
 

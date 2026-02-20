@@ -1,5 +1,6 @@
-
 import React, { useState, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
 import { triggerHaptic } from '../utils/helpers';
@@ -266,65 +267,47 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       }
    };
 
-   const detectLocation = () => {
+   const detectLocation = async () => {
       setLoading(true);
-      if (navigator.geolocation) {
-         const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+      try {
+         if (Capacitor.isNativePlatform()) {
+            const permissions = await Geolocation.checkPermissions();
+            if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+               await Geolocation.requestPermissions();
+            }
+         }
 
-         navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-               const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-               console.log("Onboarding: Location detected", coords);
+         const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+         });
 
-               // Reverse geocode to get address
-               const google = (window as any).google;
-               if (!google) {
-                  setLoading(false);
-                  showAlert("Error", "Google Maps not loaded. Please try again.", "error");
-                  return;
-               }
+         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+         console.log("Onboarding: Location detected", coords);
 
-               const geocoder = new google.maps.Geocoder();
-               geocoder.geocode({ location: coords }, (results: any, status: string) => {
-                  if (status === 'OK' && results[0]) {
-                     const locData = { address: results[0].formatted_address, ...coords };
-                     setHomeLocation(locData);
-                     saveHomeAndFinish(locData);
-                  } else {
-                     setLoading(false);
-                     showAlert("Address Error", "Could not find address for this location.", "info");
-                  }
-               });
-            },
-            (error) => {
-               console.error("Onboarding: Geolocation Error", error);
+         const google = (window as any).google;
+         if (!google) {
+            setLoading(false);
+            showAlert("Error", "Google Maps not loaded. Please try again.", "error");
+            return;
+         }
+
+         const geocoder = new google.maps.Geocoder();
+         geocoder.geocode({ location: coords }, (results: any, status: string) => {
+            if (status === 'OK' && results[0]) {
+               const locData = { address: results[0].formatted_address, ...coords };
+               setHomeLocation(locData);
+               saveHomeAndFinish(locData);
+            } else {
                setLoading(false);
-
-               let errorMsg = "Could not get your location.";
-               let errorTitle = "Location Error";
-
-               switch (error.code) {
-                  case 1: // PERMISSION_DENIED
-                     errorTitle = "Permission Denied";
-                     errorMsg = "Please allow location access in your browser or device settings.";
-                     break;
-                  case 2: // POSITION_UNAVAILABLE
-                     errorTitle = "Unavailable";
-                     errorMsg = "Location information is unavailable.";
-                     break;
-                  case 3: // TIMEOUT
-                     errorTitle = "Timeout";
-                     errorMsg = "The request to get your location timed out. Please try again.";
-                     break;
-               }
-
-               showAlert(errorTitle, errorMsg, "error");
-            },
-            options
-         );
-      } else {
+               showAlert("Address Error", "Could not find address for this location.", "info");
+            }
+         });
+      } catch (err: any) {
+         console.error("Onboarding: Geolocation Error", err);
          setLoading(false);
-         showAlert("Not Supported", "Geolocation is not supported by this browser.", "error");
+         showAlert("Location Error", "Could not get your location. Please check your settings.", "error");
       }
    };
 
