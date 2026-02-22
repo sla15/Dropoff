@@ -367,107 +367,109 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             {/* Account Settings Drawer */}
             {activeDrawer === 'account' && (
                 <Drawer title="Account Settings" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard}>
-                    <div className="flex justify-center mb-8">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleImageUpload}
-                            className="hidden"
-                            accept="image/*"
-                        />
-                        <div
-                            className={`w-24 h-24 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333] relative cursor-pointer`}
-                            style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {!user.photo && (
-                                <span className="text-[#00D68F] font-bold text-3xl">
-                                    {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
-                                </span>
-                            )}
-                            <div className="absolute bottom-0 right-0 bg-[#00D68F] p-1.5 rounded-full border-2 border-white dark:border-black cursor-pointer shadow-sm">
-                                <Camera size={14} className="text-black" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4 mb-8">
-                        {/* Status Message */}
-                        {loading && (
-                            <div className="flex items-center gap-2 justify-center py-2 text-[#00D68F] animate-pulse">
-                                <Loader2 size={16} className="animate-spin" />
-                                <span className="text-xs font-bold uppercase tracking-widest">Saving Changes...</span>
-                            </div>
-                        )}
-                        <div>
-                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Full Name</label>
-                            <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
-                        </div>
-                        <div>
-                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Phone Number</label>
-                            <input value={editPhone} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
-                        </div>
-                        <div>
-                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>
-                            <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
-                        </div>
-                        <div>
-                            <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
-                            <div
-                                onClick={() => setShowLP(true)}
-                                className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md cursor-pointer flex items-center justify-between group`}
-                            >
-                                <span className={`flex-1 font-medium truncate ${!editLocation ? 'opacity-30' : ''}`}>
-                                    {editLocation || 'Set Home Location'}
-                                </span>
-                                <MapPin size={18} className="text-[#00D68F] opacity-50 group-active:opacity-100" />
-                            </div>
-                        </div>
-
-                        {showLP && (
-                            <LocationPicker
-                                theme={theme}
-                                title="Home Address"
-                                user={user}
-                                onClose={() => setShowLP(false)}
-                                onConfirm={(loc) => {
-                                    setHomeLocData(loc);
-                                    setEditLocation(loc.address);
-                                    setShowLP(false);
-                                }}
+                    <div className="pb-20">
+                        <div className="flex justify-center mb-8">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleImageUpload}
+                                className="hidden"
+                                accept="image/*"
                             />
-                        )}
+                            <div
+                                className={`w-24 h-24 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333] relative cursor-pointer`}
+                                style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                {!user.photo && (
+                                    <span className="text-[#00D68F] font-bold text-3xl">
+                                        {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                                    </span>
+                                )}
+                                <div className="absolute bottom-0 right-0 bg-[#00D68F] p-1.5 rounded-full border-2 border-white dark:border-black cursor-pointer shadow-sm">
+                                    <Camera size={14} className="text-black" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 mb-8">
+                            {/* Status Message */}
+                            {loading && (
+                                <div className="flex items-center gap-2 justify-center py-2 text-[#00D68F] animate-pulse">
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span className="text-xs font-bold uppercase tracking-widest">Saving Changes...</span>
+                                </div>
+                            )}
+                            <div>
+                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Full Name</label>
+                                <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
+                            </div>
+                            <div>
+                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Phone Number</label>
+                                <input value={editPhone} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
+                            </div>
+                            <div>
+                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>
+                                <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
+                            </div>
+                            <div>
+                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
+                                <div
+                                    onClick={() => setShowLP(true)}
+                                    className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md cursor-pointer flex items-center justify-between group`}
+                                >
+                                    <span className={`flex-1 font-medium truncate ${!editLocation ? 'opacity-30' : ''}`}>
+                                        {editLocation || 'Set Home Location'}
+                                    </span>
+                                    <MapPin size={18} className="text-[#00D68F] opacity-50 group-active:opacity-100" />
+                                </div>
+                            </div>
+
+                            {showLP && (
+                                <LocationPicker
+                                    theme={theme}
+                                    title="Home Address"
+                                    user={user}
+                                    onClose={() => setShowLP(false)}
+                                    onConfirm={(loc) => {
+                                        setHomeLocData(loc);
+                                        setEditLocation(loc.address);
+                                        setShowLP(false);
+                                    }}
+                                />
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleSaveProfile}
+                            disabled={loading}
+                            className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
+                        >
+                            {loading ? <Loader2 className="animate-spin" /> : 'Save Changes'}
+                        </button>
+
+                        <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
+
+                        <button
+                            onClick={async () => {
+                                await supabase.auth.signOut();
+                                setScreen('onboarding');
+                            }}
+                            className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform"
+                        >
+                            <LogOut size={20} /> Log Out
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                triggerHaptic();
+                                setShowDeleteModal(true);
+                            }}
+                            className="w-full p-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                        >
+                            <Trash2 size={20} /> Delete Account
+                        </button>
                     </div>
-
-                    <button
-                        onClick={handleSaveProfile}
-                        disabled={loading}
-                        className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
-                    >
-                        {loading ? <Loader2 className="animate-spin" /> : 'Save Changes'}
-                    </button>
-
-                    <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
-
-                    <button
-                        onClick={async () => {
-                            await supabase.auth.signOut();
-                            setScreen('onboarding');
-                        }}
-                        className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform"
-                    >
-                        <LogOut size={20} /> Log Out
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            triggerHaptic();
-                            setShowDeleteModal(true);
-                        }}
-                        className="w-full p-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                    >
-                        <Trash2 size={20} /> Delete Account
-                    </button>
                 </Drawer>
             )}
 

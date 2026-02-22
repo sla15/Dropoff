@@ -38,6 +38,8 @@ export interface Business {
   location: string;
   isOpen: boolean;
   distance: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface CartItem extends Product {

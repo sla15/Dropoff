@@ -114,7 +114,7 @@ const initWebPush = async (userId?: string) => {
             const notificationTitle = payload.notification?.title || 'New Notification';
             const notificationOptions = {
                 body: payload.notification?.body || '',
-                icon: '/favicon.ico',
+                icon: 'public\assets\logo.png',
                 badge: '/favicon.ico',
                 data: payload.data
             };
@@ -133,8 +133,9 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
         if (!userId || !token) return;
 
-        console.log(`📡 FCM: Syncing token to user ${userId}...`);
+        console.log(`📡 FCM: Overwriting token for user ${userId}...`);
 
+        // Overwrite the single token in profiles table as requested
         const { error } = await supabase
             .from('profiles')
             .update({
@@ -146,7 +147,7 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
         if (error) {
             console.error('❌ FCM: Failed to sync token to Supabase:', error);
         } else {
-            console.log('✅ FCM: Token synced to Supabase successfully');
+            console.log('✅ FCM: Token overwritten successfully (Single device strategy)');
         }
     } catch (err) {
         console.error('❌ FCM: Sync exception:', err);

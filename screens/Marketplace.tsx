@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Search, Star, MapPin, Heart } from 'lucide-react';
-import { Theme, Screen, Business, Category } from '../types';
+import { Theme, Screen, Business, Category, UserData } from '../types';
 import { triggerHaptic } from '../utils/helpers';
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
    favorites: string[];
    searchQuery: string;
    setSearchQuery: (q: string) => void;
+   user: UserData;
    showAlert: (
       title: string,
       message: string,
@@ -29,7 +30,21 @@ interface Props {
    ) => void;
 }
 
-export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert }: Props) => {
+// Haversine formula to calculate distance in KM
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+   const R = 6371; // Radius of the earth in km
+   const dLat = (lat2 - lat1) * Math.PI / 180;
+   const dLon = (lon2 - lon1) * Math.PI / 180;
+   const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+   const d = R * c;
+   return d;
+};
+
+export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
 
    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
@@ -134,7 +149,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                               <Star size={10} fill="currentColor" /> {b.rating}
                            </span>
                            <span className={`flex items-center gap-1 ${textSec}`}>
-                              <MapPin size={10} /> {b.distance}
+                              <MapPin size={10} /> {user.last_lat && user.last_lng && b.lat && b.lng ? `${getDistance(user.last_lat, user.last_lng, b.lat, b.lng).toFixed(1)} km` : b.distance}
                            </span>
                         </div>
                      </div>

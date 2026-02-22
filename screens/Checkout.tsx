@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MapPin, ChevronRight, Truck, Plus, Minus, Trash2, Copy, Check } from 'lucide-react';
+import { ArrowLeft, MapPin, ChevronRight, Truck, Plus, Minus, Trash2, Copy, Check, Info } from 'lucide-react';
 import { Theme, Screen, CartItem, UserData, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
@@ -27,8 +27,7 @@ interface Props {
 }
 
 export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId }: Props) => {
-    const [deliveryNote, setDeliveryNote] = useState('');
-    const [merchants, setMerchants] = useState<Record<string, { name: string, phone: string }>>({});
+    const [merchants, setMerchants] = useState<Record<string, { name: string, phone: string, lat?: number, lng?: number }>>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPicker, setShowPicker] = useState(false);
@@ -37,11 +36,25 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
         lat: user.last_lat || 13.4432,
         lng: user.last_lng || -16.6322
     });
-
+    const [deliveryNote, setDeliveryNote] = useState('');
+    const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
 
     const uniqueBusinessIds = Array.from(new Set(cart.map(item => item.businessId)));
-    const multiStopFee = (uniqueBusinessIds.length - 1) * 30; // D30 for each extra stop
-    const deliveryFee = Number(settings.min_delivery_fee) + multiStopFee;
+
+    // Calculate Delivery Fee
+    const getDeliveryFee = () => {
+        if (!settings) return 0;
+        const minFee = Number(settings.min_delivery_fee);
+        if (deliveryDistance === null) return minFee;
+
+        const pricePerKm = Number(settings.price_per_km);
+        const distanceKm = deliveryDistance / 1000;
+        const calculatedFee = distanceKm * pricePerKm;
+
+        return Math.max(minFee, calculatedFee);
+    };
+
+    const deliveryFee = getDeliveryFee();
     const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
     const total = subtotal + deliveryFee;
 
@@ -56,7 +69,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             if (uniqueBusinessIds.length === 0) return;
             const { data, error } = await supabase
                 .from('businesses')
-                .select('id, name, owner_id')
+                .select('id, name, owner_id, lat, lng')
                 .in('id', uniqueBusinessIds);
 
             if (data && !error) {
@@ -67,12 +80,14 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     .in('id', ownerIds);
 
                 if (owners && !ownerError) {
-                    const merchantMap: Record<string, { name: string, phone: string }> = {};
+                    const merchantMap: Record<string, { name: string, phone: string, lat?: number, lng?: number }> = {};
                     data.forEach(b => {
                         const owner = owners.find(o => o.id === b.owner_id);
                         merchantMap[b.id] = {
                             name: b.name,
-                            phone: owner?.phone || '+220 123 4567'
+                            phone: owner?.phone || '+220 123 4567',
+                            lat: b.lat,
+                            lng: b.lng
                         };
                     });
                     setMerchants(merchantMap);
@@ -81,6 +96,56 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
         };
         fetchMerchantInfo();
     }, [cart]);
+
+    // Distance Matrix Calculation
+    React.useEffect(() => {
+        const calculateRouteDistance = async () => {
+            if (uniqueBusinessIds.length === 0 || !merchants || Object.keys(merchants).length < uniqueBusinessIds.length) return;
+            if (!window.google) return;
+
+            const service = new window.google.maps.DistanceMatrixService();
+
+            // For a multi-merchant order, the route is:
+            // Pickup 1 -> Pickup 2 -> ... -> Customer Dropoff
+            // We want the total distance.
+
+            // Sort merchants to optimize route? For now, we'll just follow cart order or merchant order
+            const waypoints = uniqueBusinessIds.map(id => merchants[id]).filter(m => m && m.lat && m.lng);
+            if (waypoints.length === 0) return;
+
+            // Sequential distance:
+            // Driver (approx from first merchant) -> Merchant 1 -> Merchant 2 -> Customer
+            // Simplified: distance from M1 to M2 + M2 to M3 ... + Last M to Customer
+
+            let totalMeters = 0;
+            const points = [...waypoints, { lat: deliveryLocation.lat, lng: deliveryLocation.lng }];
+
+            for (let i = 0; i < points.length - 1; i++) {
+                try {
+                    const result = await new Promise<any>((resolve, reject) => {
+                        service.getDistanceMatrix({
+                            origins: [{ lat: points[i].lat, lng: points[i].lng }],
+                            destinations: [{ lat: points[i + 1].lat, lng: points[i + 1].lng }],
+                            travelMode: window.google.maps.TravelMode.DRIVING,
+                        }, (response: any, status: any) => {
+                            if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+                                resolve(response.rows[0].elements[0].distance.value);
+                            } else {
+                                reject(status);
+                            }
+                        });
+                    });
+                    totalMeters += result;
+                } catch (e) {
+                    console.error("Distance Matrix Error:", e);
+                }
+            }
+
+            setDeliveryDistance(totalMeters);
+        };
+
+        calculateRouteDistance();
+    }, [merchants, deliveryLocation, uniqueBusinessIds.length]);
 
     const copyToClipboard = (text: string, id: string) => {
         if (navigator.clipboard) {
@@ -121,12 +186,15 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
             const customerId = session.user.id;
 
+            // Generate batch_id for multi-merchant orders
+            const batchId = uniqueBusinessIds.length > 1 ? crypto.randomUUID() : null;
+
             // 1. Split cart by merchant and create orders
             for (const [bizId, items] of Object.entries(groupedCart)) {
                 const bizSubtotal = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-                // Share the delivery fee proportionally or add it to one (simple approach: full fee on first order or split)
-                // For simplicity, we add the shared delivery fee divided by merchant count
-                const merchantDeliveryShare = deliveryFee / uniqueBusinessIds.length;
+
+                // Split delivery fee proportionally based on subtotal
+                const merchantDeliveryShare = deliveryFee * (bizSubtotal / subtotal);
                 const orderTotal = bizSubtotal + merchantDeliveryShare;
 
                 const { data: orderData, error: orderError } = await supabase
@@ -134,20 +202,22 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     .insert({
                         customer_id: customerId,
                         business_id: bizId,
+                        batch_id: batchId,
                         total_amount: orderTotal,
                         status: 'pending',
                         delivery_instructions: deliveryNote,
                         delivery_address: deliveryLocation.address
                     })
-                    .eq('label', 'Home')
-                    .maybeSingle();
+                    .select()
+                    .single();
 
                 if (orderError) throw orderError;
+                if (!orderData) throw new Error("Could not create order. Please try again.");
 
                 // 2. Insert Order Items
                 const orderItemsToInsert = items.map(item => ({
                     order_id: orderData.id,
-                    product_id: item.originalProductId, // Use the preserved UUID
+                    product_id: item.originalProductId,
                     quantity: item.quantity,
                     price_at_time: item.price
                 }));
@@ -165,7 +235,6 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             // 3. Success
             setCart([]);
             navigate('order-tracking');
-            // Success feedback would usually be a cleaner modal
         } catch (err: any) {
             console.error("Order Placement Error:", err);
             showAlert("Order Failed", err.message, "error");
@@ -295,46 +364,19 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     </div>
                 </div>
 
-                {/* Wave Payment Instructions */}
-                {uniqueBusinessIds.length > 0 && (
-                    <div className={`${bgCard} rounded-2xl p-4 mb-6 shadow-sm`}>
-                        <h2 className="font-bold mb-4 flex items-center gap-2 text-sm uppercase tracking-wide opacity-70">
-                            Payment Instructions
-                        </h2>
-                        <div className="space-y-4">
-                            {Object.entries(groupedCart).map(([bizId, items]) => {
-                                const mSubtotal = items.reduce((s, i) => s + (i.price * i.quantity), 0);
-                                const merchant = merchants[bizId];
-                                return (
-                                    <div key={bizId} className={`${inputBg} p-4 rounded-xl space-y-3`}>
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="text-[10px] uppercase font-black opacity-50 mb-1">Send to {merchant?.name || items[0].businessName}</p>
-                                                <p className="font-black text-lg text-[#00D68F]">D{mSubtotal.toFixed(2)}</p>
-                                            </div>
-                                            <div className="bg-white/10 px-2 py-1 rounded text-[10px] font-bold">Wave Payment</div>
-                                        </div>
-                                        <div className="flex items-center justify-between gap-3 bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-black/5 dark:border-white/5">
-                                            <div className="flex-1">
-                                                <p className={`text-[10px] ${textSec} font-bold`}>Wave Account Number</p>
-                                                <p className="font-bold">{merchant?.phone || "Loading..."}</p>
-                                            </div>
-                                            <button
-                                                onClick={() => merchant?.phone && copyToClipboard(merchant.phone, bizId)}
-                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${copiedId === bizId ? 'bg-[#00D68F] text-black' : 'bg-white/10 hover:bg-white/20'}`}
-                                            >
-                                                {copiedId === bizId ? <Check size={18} /> : <Copy size={18} />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <p className={`mt-4 text-[10px] text-center ${textSec} px-4 italic leading-relaxed`}>
-                            Please send the exact amounts to each merchant listed above. Your order will be confirmed once payments are received.
-                        </p>
+                {/* Payment Notice */}
+                <div className={`${bgCard} rounded-2xl p-6 mb-6 shadow-sm border-2 border-[#00D68F]/20`}>
+                    <h2 className="font-bold mb-3 flex items-center gap-2 text-sm uppercase tracking-wide text-[#00D68F]">
+                        <Check size={16} /> Pay Cash on Delivery
+                    </h2>
+                    <p className="text-sm font-medium leading-relaxed opacity-80">
+                        Please have <span className="font-black text-[#00D68F]">D{total.toFixed(2)}</span> ready to pay the driver in cash when they arrive with your order.
+                    </p>
+                    <div className={`mt-4 p-3 rounded-xl ${inputBg} text-[10px] font-bold flex items-center gap-2`}>
+                        <Info size={14} className="shrink-0" />
+                        <span>This total includes items from {uniqueBusinessIds.length} shop{uniqueBusinessIds.length > 1 ? 's' : ''} and the delivery fee.</span>
                     </div>
-                )}
+                </div>
             </div>
 
             <div className={`p-4 ${bgCard} pb-safe border-t ${separator}`}>

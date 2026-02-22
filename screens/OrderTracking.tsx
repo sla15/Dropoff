@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2, X, Plus } from 'lucide-react';
 import { Theme, Screen, UserData, Activity } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { GreenGlow } from '../components/GreenGlow';
@@ -134,6 +134,41 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         setStatus(newStatus);
         setProgress(newProgress);
         setOrderInfo(order);
+    };
+
+    const handleCancelOrder = async () => {
+        if (!activeOrderId) return;
+
+        showAlert(
+            "Cancel Order?",
+            "Are you sure you want to cancel this order? This cannot be undone.",
+            "info",
+            async () => {
+                try {
+                    setIsLoading(true);
+                    const { error } = await supabase
+                        .from('orders')
+                        .update({ status: 'cancelled' })
+                        .eq('id', activeOrderId);
+
+                    if (error) throw error;
+
+                    triggerHaptic();
+                    setActiveOrderId(null);
+                    localStorage.removeItem('active_order_id');
+                    showAlert("Cancelled", "Your order has been cancelled successfully.", "success");
+                    navigate('dashboard');
+                } catch (err) {
+                    console.error("Cancel Order Error:", err);
+                    showAlert("Error", "Could not cancel order. Please try again.", "error");
+                } finally {
+                    setIsLoading(true);
+                }
+            },
+            true,
+            "Yes, Cancel",
+            "No, Keep it"
+        );
     };
 
     const statusConfig = {
@@ -281,6 +316,16 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                         </div>
                         <p className="text-sm font-bold">Waiting for delivery partner assignment...</p>
                     </div>
+                )}
+
+                {orderInfo?.status === 'pending' && (
+                    <button
+                        onClick={handleCancelOrder}
+                        className="mt-8 w-full py-4 rounded-2xl border-2 border-red-500/20 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 active:bg-red-500/10 transition-all shadow-sm"
+                    >
+                        <X size={18} />
+                        Cancel Order
+                    </button>
                 )}
             </div>
         </div>

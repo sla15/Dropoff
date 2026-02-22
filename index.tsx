@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+declare global { interface Window { google: any; } }
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import './index.css';
@@ -32,14 +33,47 @@ import { initFCM } from './utils/fcm';
 
 // Google Maps initialization is handled in index.html to ensure the callback is available before the script loads.
 const App = () => {
-  // --- 1. THEME & CORE STATE ---
-  const getInitialTheme = (): Theme => {
-    const saved = localStorage.getItem('app_theme') as Theme | null;
-    if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const isNative = Capacitor.isNativePlatform();
+
+  // 🌓 Theme Management (Apple-style)
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const saved = localStorage.getItem('ride_theme') || localStorage.getItem('app_theme');
+    if (saved) return saved as Theme;
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  });
+
+  const setTheme = (t: Theme) => {
+    setThemeState(t);
+    localStorage.setItem('ride_theme', t);
+    localStorage.setItem('app_theme', t);
   };
 
-  const [theme, setTheme] = useState<Theme>(getInitialTheme());
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('ride_theme') && !localStorage.getItem('app_theme')) {
+        setThemeState(e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    document.body.className = theme === 'dark' ? 'bg-black' : 'bg-[#F2F2F7]';
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    if (isNative) {
+      import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
+        StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light });
+        StatusBar.setBackgroundColor({ color: theme === 'dark' ? '#000000' : '#F2F2F7' });
+      }).catch(console.error);
+    }
+  }, [theme, isNative]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [screen, setScreen] = useState<Screen>('splash');
   const [history, setHistory] = useState<Screen[]>([]);
@@ -69,15 +103,7 @@ const App = () => {
     type: 'info'
   });
 
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
-    return localStorage.getItem('active_order_id');
-  });
-
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('app_cart');
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // 👤 User State (At the top to prevent ReferenceErrors)
   const [user, setUser] = useState<UserData>({
     id: '',
     name: '',
@@ -93,24 +119,52 @@ const App = () => {
   const userRef = useRef<UserData>(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
+  // FCM Initialization Logic
   const hasTriggeredFCM = useRef(false);
+
   useEffect(() => {
-    const handleInteraction = () => {
-      if (!hasTriggeredFCM.current) {
-        console.log("👆 User interacted, checking FCM...");
-        initFCM(user.id);
-        hasTriggeredFCM.current = true;
-        window.removeEventListener('click', handleInteraction);
-        window.removeEventListener('touchstart', handleInteraction);
-      }
+    if (!user.id) return;
+
+    const startFCM = async () => {
+      if (hasTriggeredFCM.current) return;
+      console.log("🚀 Proactive FCM Trigger for user:", user.id);
+      await initFCM(user.id);
+      hasTriggeredFCM.current = true;
     };
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('touchstart', handleInteraction);
+
+    // Native can init immediately on login
+    if (isNative) {
+      startFCM();
+      return;
+    }
+
+    // Web needs interaction for permission, but let's try once if already granted
+    if (Notification.permission === 'granted') {
+      startFCM();
+    }
+
+    const handleInteraction = () => {
+      startFCM();
+    };
+
+    window.addEventListener('click', handleInteraction, { once: true });
+    window.addEventListener('touchstart', handleInteraction, { once: true });
+    window.addEventListener('keydown', handleInteraction, { once: true });
     return () => {
       window.removeEventListener('click', handleInteraction);
       window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
     };
-  }, [user.id]);
+  }, [user.id, isNative]);
+
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+    return localStorage.getItem('active_order_id');
+  });
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem('app_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [settings, setSettings] = useState<AppSettings>({
     min_ride_price: 150,
@@ -170,13 +224,13 @@ const App = () => {
       try {
         if (Capacitor.isNativePlatform()) {
           const permissions = await Geolocation.checkPermissions();
-          if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+          if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
             await Geolocation.requestPermissions();
           }
         }
 
         watchId = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
+          { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
           (pos) => {
             if (!pos) return;
             const { latitude, longitude } = pos.coords;
@@ -261,77 +315,15 @@ const App = () => {
     }
   }, [user.id]);
 
-  // --- 2. THEME PERSISTENCE & LISTENER ---
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('app_theme')) {
-        setTheme(e.matches ? 'dark' : 'light');
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('app_theme', newTheme);
     triggerHaptic();
   };
 
-  // --- 3. DATA FETCHING ---
-  useEffect(() => {
-    const recoverSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          if (profile) {
-            setUser({
-              id: profile.id,
-              name: profile.full_name || '',
-              phone: profile.phone || '',
-              email: profile.email || '',
-              location: profile.location || 'Banjul, The Gambia',
-              photo: profile.avatar_url || null,
-              role: profile.role || 'customer',
-              rating: Number(profile.average_rating) || 5.0,
-              referralCode: profile.referral_code || '',
-              referralBalance: profile.referral_balance || 0,
-              last_lat: profile.last_lat,
-              last_lng: profile.last_lng
-            });
-
-            // Fetch relevant data for the user
-            fetchFavorites(profile.id);
-            fetchActivities(profile.id);
-          }
-        }
-      } catch (err) {
-        console.error("Session recovery error:", err);
-      }
-    };
-
-    recoverSession();
-    fetchSettings();
-    fetchBusinesses();
-    fetchCategories();
-  }, []);
-
+  // --- 4. DATA FETCHING & INITIALIZATION ---
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase.from('app_settings').select('*').limit(1).maybeSingle();
@@ -341,8 +333,6 @@ const App = () => {
 
   const fetchBusinesses = async () => {
     try {
-      // NOTE: We no longer fetch products here to improve scalability.
-      // Products are now fetched on-demand in BusinessDetailScreen.
       const { data, error } = await supabase.from('businesses').select(`*`);
       if (data && !error) {
         setBusinesses(data.map((b: any) => ({
@@ -354,12 +344,12 @@ const App = () => {
           reviews: 0,
           deliveryTime: '30-45 min',
           image: b.image_url || 'https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80',
-          logo: b.image_url,
+          logo: b.image_url || null,
           phone: '',
           location: b.location_address || '',
           isOpen: b.is_open,
           distance: '2.5 km',
-          products: [] // Initially empty, will be fetched in Detail screen
+          products: []
         })));
       }
     } catch (err) { console.error(err); }
@@ -421,11 +411,13 @@ const App = () => {
               phone: profile.phone || '',
               email: profile.email || '',
               location: profile.location || 'Banjul, The Gambia',
-              photo: profile.avatar_url || '',
+              photo: profile.avatar_url || null,
               role: profile.role || 'customer',
               rating: Number(profile.average_rating) || 5.0,
               referralCode: profile.referral_code || '',
-              referralBalance: Number(profile.referral_balance) || 0
+              referralBalance: profile.referral_balance || 0,
+              last_lat: profile.last_lat,
+              last_lng: profile.last_lng
             });
             fetchFavorites(session.user.id);
             fetchActivities(session.user.id);
@@ -568,7 +560,7 @@ const App = () => {
     switch (screen) {
       case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
       case 'dashboard': return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivities={recentActivities} setRecentActivities={setRecentActivities} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setPrefilledTier={setPrefilledTier} setPrefilledDistance={setPrefilledDistance} setMarketSearchQuery={setMarketSearchQuery} settings={settings} showAlert={showAlert} activeOrderId={activeOrderId} />;
-      case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} />;
+      case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} />;
@@ -612,6 +604,7 @@ const App = () => {
               settings={settings}
               showAlert={showAlert}
               onSearchingChange={setIsRideSearching}
+              indexLocation={userLocation}
             />
           </div>
         </div>

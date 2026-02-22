@@ -37,9 +37,10 @@ interface Props {
         onCancel?: () => void
     ) => void;
     onSearchingChange?: (searching: boolean) => void;
+    indexLocation?: { lat: number, lng: number } | null;
 }
 
-export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, showAlert, onSearchingChange }: Props) => {
+export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, showAlert, onSearchingChange, indexLocation }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
 
     useEffect(() => {
@@ -99,8 +100,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const notifiedDriversRef = useRef<Set<string>>(new Set());
 
     // Drag Sheet State
-    const PEEK_OFFSET = 460;
-    const [sheetOffset, setSheetOffset] = useState(0);
+    const PEEK_OFFSET = 320; // Reduced from 460 to ensure visibility
+    const [sheetOffset, setSheetOffset] = useState(0); // Expanded by default
     const [isSheetMinimized, setIsSheetMinimized] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const sheetStartY = useRef(0);
@@ -163,14 +164,14 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         try {
             if (Capacitor.isNativePlatform()) {
                 const permissions = await Geolocation.checkPermissions();
-                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
                     await Geolocation.requestPermissions();
                 }
             }
 
             const position = await Geolocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 30000,
                 maximumAge: 0
             });
 
@@ -260,11 +261,22 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     // Re-center Map when screen becomes active
     useEffect(() => {
-        if (active && map && !userLocation) {
-            console.log("RideScreen: Screen became active, triggering auto-locate");
-            handleLocateMe(true);
+        if (active && map) {
+            if (indexLocation) {
+                console.log("RideScreen: Using proactive indexLocation:", indexLocation);
+                setUserLocation(indexLocation);
+                setLocationMethod('gps');
+                map.panTo(indexLocation);
+                updateMarker(indexLocation, undefined, map);
+
+                // Force a second update verify to ensure pin is visible
+                setTimeout(() => updateMarker(indexLocation, undefined, map), 500);
+            } else if (!userLocation) {
+                console.log("RideScreen: Screen active, no indexLocation, triggering auto-locate");
+                handleLocateMe(true);
+            }
         }
-    }, [active, !!map]);
+    }, [active, !!map, indexLocation]);
 
     // Initial Location Capture once Map is ready
     // Removed duplicate useEffect, centering is handled in initMap
@@ -408,155 +420,89 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (!map) return;
 
         const getVehicleIcon = (vType: string) => {
-            const iconRoot = '/assets/drivers%20vehicle%20types/';
+            const iconRoot = 'assets/drivers%20vehicle%20types/';
             let iconName = 'car_economic_3d_backup.png';
-            let markerClass = 'driver-marker';
 
-            if (vType === 'premium') {
-                iconName = 'car_premium_3d_backup.png';
-                markerClass = 'driver-marker driver-marker-prem';
-            }
-            if (vType === 'scooter') {
-                iconName = 'car_scooter_3d_backup.png';
-                markerClass = 'driver-marker driver-marker-moto';
-            }
+            if (vType === 'premium') iconName = 'car_premium_3d_backup.png';
+            if (vType === 'scooter') iconName = 'car_scooter_3d_backup.png';
 
             return {
-                url: `${iconRoot}${iconName}`,
-                scaledSize: new (window as any).google.maps.Size(50, 50),
-                anchor: new (window as any).google.maps.Point(25, 25),
-                className: markerClass // Custom property to apply CSS via OverlayView if needed, or just standard marker
+                url: iconRoot + iconName,
+                scaledSize: new (window as any).google.maps.Size(48, 48),
+                anchor: new (window as any).google.maps.Point(24, 24),
+                optimized: false
             };
         };
 
-        const fetchInitialDrivers = async () => {
-            const { data, error } = await supabase
-                .from('drivers')
-                .select('*')
-                .eq('is_online', true);
+        const refreshMarkers = (drivers: any[]) => {
+            const markersMap = driverMarkersRef.current;
+            const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
 
-            if (data) {
-                const markersMap = driverMarkersRef.current;
-                data.forEach(d => {
-                    const position = { lat: d.current_lat, lng: d.current_lng };
+            drivers.forEach(d => {
+                const position = { lat: d.current_lat, lng: d.current_lng };
+                let marker = markersMap.get(d.id);
+
+                if (marker) {
+                    marker.setPosition(position);
+                    marker.setVisible(!isRequestActive || d.id === assignedDriverId);
+                    marker.setMap(map);
+                } else {
                     const icon = getVehicleIcon(d.vehicle_category || 'economic');
+                    marker = new (window as any).google.maps.Marker({
+                        position,
+                        map: map,
+                        icon,
+                        title: `Driver ${d.id}`,
+                        optimized: false,
+                        visible: !isRequestActive || d.id === assignedDriverId
+                    });
+                    markersMap.set(d.id, marker);
+                }
 
-                    let marker = markersMap.get(d.id);
-                    if (marker) {
-                        marker.setPosition(position);
-                        marker.setMap(map); // Ensure it's on the CURRENT map instance
-                    } else {
-                        marker = new (window as any).google.maps.Marker({
-                            position,
-                            map: map,
-                            icon: {
-                                url: icon.url,
-                                scaledSize: icon.scaledSize,
-                                anchor: icon.anchor
-                            },
-                            title: `Driver ${d.id}`,
-                            optimized: false
-                        });
-                        markersMap.set(d.id, marker);
-                    }
-                });
-            }
+                // ETA Logic for assigned driver
+                if (d.id === assignedDriverId && userLocation) {
+                    setAssignedDriver(d);
+                    const service = new (window as any).google.maps.DistanceMatrixService();
+                    service.getDistanceMatrix({
+                        origins: [position],
+                        destinations: [userLocation],
+                        travelMode: (window as any).google.maps.TravelMode.DRIVING,
+                    }, (response: any, status: string) => {
+                        if (status === 'OK' && response.rows[0].elements[0].duration) {
+                            setEtaSeconds(response.rows[0].elements[0].duration.value);
+                        }
+                    });
+                }
+            });
+
+            // Cleanup offline drivers
+            const currentIds = new Set(drivers.map(d => d.id));
+            markersMap.forEach((m, id) => {
+                if (!currentIds.has(id)) {
+                    m.setMap(null);
+                    markersMap.delete(id);
+                }
+            });
         };
 
-        fetchInitialDrivers();
+        const fetchDrivers = async () => {
+            const { data } = await supabase.from('drivers').select('*').eq('is_online', true);
+            if (data) refreshMarkers(data);
+        };
+
+        fetchDrivers();
 
         const channel = supabase
             .channel('driver-locations')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'drivers' },
-                async (payload) => {
-                    console.log('Driver change detected:', payload);
-                    const updatedDriver = payload.new as any;
-                    const oldDriver = payload.old as any;
-                    const markersMap = driverMarkersRef.current;
-
-                    // Handle deletion or going offline
-                    if (payload.eventType === 'DELETE' || (updatedDriver && !updatedDriver.is_online)) {
-                        const marker = markersMap.get(updatedDriver?.id || oldDriver?.id);
-                        if (marker) {
-                            marker.setMap(null);
-                            markersMap.delete(updatedDriver?.id || oldDriver?.id);
-                        }
-                    }
-                    // Handle insertion or update
-                    else if (updatedDriver && updatedDriver.is_online) {
-                        let marker = markersMap.get(updatedDriver.id);
-                        const position = { lat: updatedDriver.current_lat, lng: updatedDriver.current_lng };
-
-                        if (marker) {
-                            marker.setPosition(position);
-                        } else {
-                            const icon = getVehicleIcon(updatedDriver.vehicle_category || 'economic');
-                            marker = new (window as any).google.maps.Marker({
-                                position: position,
-                                map: map,
-                                icon: {
-                                    url: icon.url,
-                                    scaledSize: icon.scaledSize,
-                                    anchor: icon.anchor
-                                },
-                                title: `Driver ${updatedDriver.id}`,
-                                optimized: false
-                            });
-                            markersMap.set(updatedDriver.id, marker);
-                        }
-
-                        // Update local assignedDriver if this is our match
-                        if (updatedDriver.id === assignedDriverId) {
-                            setAssignedDriver(updatedDriver);
-
-                            // Use Distance Matrix for precise ETA
-                            if (userLocation) {
-                                const service = new (window as any).google.maps.DistanceMatrixService();
-                                service.getDistanceMatrix({
-                                    origins: [position],
-                                    destinations: [userLocation],
-                                    travelMode: (window as any).google.maps.TravelMode.DRIVING,
-                                }, (response: any, status: string) => {
-                                    if (status === 'OK' && response.rows[0].elements[0].duration) {
-                                        setEtaSeconds(response.rows[0].elements[0].duration.value);
-                                    }
-                                });
-
-                                const dist = calculateProximity(
-                                    updatedDriver.current_lat,
-                                    updatedDriver.current_lng,
-                                    userLocation.lat,
-                                    userLocation.lng
-                                );
-
-                                if (dist < 0.1 && status === 'accepted' && currentRideId) {
-                                    const { data: rideData, error: rideError } = await supabase
-                                        .from('rides')
-                                        .select('status, driver_id, profiles!rides_driver_id_fkey(full_name, phone, avatar_url, average_rating), drivers!rides_driver_id_fkey(vehicle_model, vehicle_plate, current_lat, current_lng)')
-                                        .eq('id', currentRideId)
-                                        .maybeSingle();
-
-                                    if (rideData && !rideError) {
-                                        console.log("RideScreen: Proximity refresh success", rideData);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            )
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, async (payload) => {
+                fetchDrivers();
+            })
             .subscribe();
 
         return () => {
-            console.log("RideScreen: Cleaning up driver markers and channel...");
             supabase.removeChannel(channel);
-            // Optional: Hide markers instead of full deletion if you expect a quick re-mount,
-            // but for a clean start on map re-init, nulling map is safer.
-            driverMarkersRef.current.forEach(m => m.setMap(null));
         };
-    }, [map, assignedDriverId, userLocation, status]);
+    }, [map, status, assignedDriverId]);
 
     const calculateProximity = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 6371; // km
@@ -574,17 +520,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     };
 
     // Handle Driver Visibility based on Status
-    useEffect(() => {
-        const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
-
-        driverMarkersRef.current.forEach((marker: any, id) => {
-            if (isRequestActive) {
-                marker.setVisible(id === assignedDriverId);
-            } else {
-                marker.setVisible(true);
-            }
-        });
-    }, [status, assignedDriverId]);
+    // Removed redundant useEffect, handled in stable effect above
 
     // Simulated driver movement for dummy data demonstration
     useEffect(() => {
@@ -1102,42 +1038,34 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 user_lat: userLocation.lat,
                 user_lng: userLocation.lng,
                 radius_km: currentRadius,
-                required_category: categoryMap[selectedTier] || 'economic'
+                required_category: rideType === 'delivery' ? 'any' : (categoryMap[selectedTier] || 'economic')
             });
 
             if (nearbyDrivers && nearbyDrivers.length > 0) {
                 console.log(`Found ${nearbyDrivers.length} nearby drivers.`);
 
                 // Actually notify drivers who haven't been notified yet
-                for (const driver of nearbyDrivers) {
-                    const driverId = driver.driver_id;
-                    if (!notifiedDriversRef.current.has(driverId)) {
-                        notifiedDriversRef.current.add(driverId);
+                const driversToNotify = nearbyDrivers
+                    .filter(d => !notifiedDriversRef.current.has(d.driver_id))
+                    .map(d => d.driver_id);
 
-                        // Get driver's FCM token
-                        const { data: profileData } = await supabase
-                            .from('profiles')
-                            .select('fcm_token')
-                            .eq('id', driverId)
-                            .single();
+                if (driversToNotify.length > 0) {
+                    driversToNotify.forEach(id => notifiedDriversRef.current.add(id));
 
-                        if (profileData?.fcm_token) {
-                            // Call Edge Function to send notification
-                            try {
-                                await supabase.functions.invoke('send-fcm-notification', {
-                                    body: {
-                                        tokens: [profileData.fcm_token],
-                                        title: 'New Ride Request! 🚗',
-                                        message: 'A new request is waiting near you.',
-                                        target: 'driver',
-                                        data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
-                                    }
-                                });
-                                console.log(`✅ Notified driver ${driverId}`);
-                            } catch (err) {
-                                console.warn(`Failed to notify driver ${driverId}:`, err);
+                    // Call Edge Function to send notification to all device tokens of these drivers
+                    try {
+                        await supabase.functions.invoke('send-fcm-notification', {
+                            body: {
+                                userIds: driversToNotify,
+                                title: 'New Ride Request! 🚗',
+                                message: 'A new request is waiting near you.',
+                                target: 'driver',
+                                data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
                             }
-                        }
+                        });
+                        console.log(`✅ Requested notifications for ${driversToNotify.length} drivers`);
+                    } catch (err) {
+                        console.warn(`Failed to notify drivers:`, err);
                     }
                 }
             }
@@ -1403,17 +1331,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     const handleSheetTouchEnd = () => {
         setIsDragging(false);
+        // "Will not full close" - Ensure even minimized state is very visible
+        const SNAP_THRESHOLD = 150;
+
         if (isSheetMinimized) {
-            // If dragging UP from minimized
-            if (sheetOffset < 400) {
+            if (sheetOffset < PEEK_OFFSET - SNAP_THRESHOLD) {
                 setIsSheetMinimized(false);
                 setSheetOffset(0);
             } else {
                 setSheetOffset(PEEK_OFFSET);
             }
         } else {
-            // If dragging DOWN from expanded
-            if (sheetOffset > 100) {
+            if (sheetOffset > SNAP_THRESHOLD) {
                 setIsSheetMinimized(true);
                 setSheetOffset(PEEK_OFFSET);
             } else {
@@ -1467,7 +1396,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {/* Bottom Card / Draggable Sheet */}
             <div
-                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/70' : 'bg-[#1C1C1E]/70'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] transition-transform duration-300 ease-out`}
+                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/70' : 'bg-[#1C1C1E]/70'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] min-h-[350px] transition-transform duration-300 ease-out`}
                 style={{
                     transform: sheetTransform,
                     transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
