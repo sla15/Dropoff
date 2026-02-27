@@ -39,7 +39,10 @@ const App = () => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('ride_theme') || localStorage.getItem('app_theme');
     if (saved) return saved as Theme;
-    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'light';
+    }
+    return 'dark';
   });
 
   const setTheme = (t: Theme) => {
@@ -159,6 +162,10 @@ const App = () => {
 
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
     return localStorage.getItem('active_order_id');
+  });
+
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(() => {
+    return localStorage.getItem('active_batch_id');
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -291,11 +298,34 @@ const App = () => {
     }
   }, [activeOrderId]);
 
+  useEffect(() => {
+    if (activeBatchId) {
+      localStorage.setItem('active_batch_id', activeBatchId);
+    } else {
+      localStorage.removeItem('active_batch_id');
+    }
+  }, [activeBatchId]);
+
   // Sync active orders on mount
   useEffect(() => {
-    if (user.id && !activeOrderId) {
+    if (user.id && !activeOrderId && !activeBatchId) {
       const fetchActiveOrder = async () => {
         try {
+          // Check for active batch first
+          const { data: batchData } = await supabase
+            .from('orders')
+            .select('batch_id')
+            .eq('customer_id', user.id)
+            .not('batch_id', 'is', null)
+            .in('status', ['pending', 'accepted', 'preparing', 'ready', 'delivering'])
+            .limit(1)
+            .maybeSingle();
+
+          if (batchData?.batch_id) {
+            setActiveBatchId(batchData.batch_id);
+            return;
+          }
+
           const { data, error } = await supabase
             .from('orders')
             .select('id')
@@ -563,9 +593,9 @@ const App = () => {
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
-      case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} />;
+      case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} />;
       case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
-      case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} />;
+      case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
       default: return null;
     }
   };
@@ -588,7 +618,7 @@ const App = () => {
           )}
 
           {/* Persistent Ride Layer */}
-          <div className={`absolute inset-0 z-[5] ${screen === 'ride' ? 'block' : 'hidden'}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${screen === 'ride' ? 'opacity-100 z-[5] pointer-events-auto' : 'opacity-0 -z-10 pointer-events-none'}`}>
             <RideScreen
               theme={theme}
               navigate={navigate}

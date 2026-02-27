@@ -105,18 +105,18 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
             <div className="pt-safe px-6 pb-6">
-                <h1 className="text-3xl font-bold">Gifts & Earn</h1>
+                <h1 className="text-3xl font-black tracking-tight">Gifts & Earn</h1>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 pb-32" onScroll={handleScroll}>
                 {/* Hero Card */}
-                <div className="bg-[#00D68F] rounded-[32px] p-6 text-black shadow-lg mb-6 relative overflow-hidden">
+                <div className="bg-[#00D68F] rounded-[32px] p-6 text-black shadow-[0_20px_40px_-15px_rgba(0,214,143,0.5)] mb-6 relative overflow-hidden group">
                     <div className="relative z-10">
-                        <div className="w-12 h-12 bg-black/10 rounded-full flex items-center justify-center mb-4">
+                        <div className="w-12 h-12 bg-black/10 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
                             <Gift size={24} className="text-black" />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount || 0).toFixed(2)}</h2>
-                        <p className="opacity-70 mb-6 text-sm font-medium">Share your code and earn rewards when your friends take their first ride or order.</p>
+                        <h2 className="text-3xl font-black tracking-tight mb-2 leading-tight">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount || 0).toFixed(2)}</h2>
+                        <p className="opacity-80 mb-6 text-sm font-bold tracking-wide">Share your code and earn rewards when your friends take their first ride or order.</p>
 
                         <div className="flex gap-3">
                             <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-xl p-3 flex items-center justify-between border border-black/5">
@@ -138,12 +138,12 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                 </div>
 
                 {/* Balance */}
-                <div className={`${bgCard} rounded-[24px] p-5 mb-6 flex items-center justify-between shadow-sm`}>
+                <div className={`${bgCard} rounded-[24px] p-6 mb-8 flex items-center justify-between shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/5`}>
                     <div>
-                        <p className={`text-xs font-bold uppercase ${textSec} mb-1`}>Rewards Balance</p>
-                        <h3 className="text-3xl font-bold">D{(referralBalance || 0).toFixed(2)}</h3>
+                        <p className={`text-[10px] font-black tracking-widest uppercase ${textSec} mb-1`}>Rewards Balance</p>
+                        <h3 className="text-3xl font-black">D{(referralBalance || 0).toFixed(2)}</h3>
                     </div>
-                    <button className={`${theme === 'light' ? 'bg-gray-100' : 'bg-white/10'} px-4 py-2 rounded-full text-sm font-bold`}>
+                    <button className={`${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-white/10 hover:bg-white/20'} px-5 py-2.5 rounded-full text-sm font-bold transition-colors active:scale-95`}>
                         History
                     </button>
                 </div>
@@ -155,20 +155,20 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                         <div className={`p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center opacity-60`}>
                             <Gift size={32} className="mb-2" />
                             <p className="font-bold">No active rewards</p>
-                            <p className="text-xs">Invite friends to some earn perks!</p>
+                            <p className="text-xs">Invite friends to earn some perks!</p>
                         </div>
                     )}
 
                     {activeRewards.map(reward => (
-                        <div key={reward.id} className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-sm`}>
+                        <div key={reward.id} className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border border-transparent dark:border-white/5 cursor-pointer active:scale-[0.98] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(0,0,0,0.04)]`}>
                             <div className={`w-12 h-12 rounded-full ${reward.type.includes('delivery') ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
                                 {reward.type.includes('delivery') ? <Award size={24} /> : <Gift size={24} />}
                             </div>
                             <div className="flex-1">
                                 <h4 className="font-bold">{reward.title}</h4>
-                                <p className={`text-xs ${textSec}`}>{reward.description}</p>
+                                <p className={`text-xs ${textSec} font-medium`}>{reward.description}</p>
                             </div>
-                            <ChevronRight size={16} className={textSec} />
+                            <ChevronRight size={16} className={`${textSec} opacity-50`} />
                         </div>
                     ))}
                 </div>

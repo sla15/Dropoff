@@ -13,6 +13,7 @@ import { RideBookingForm } from '../components/Ride/RideBookingForm';
 import { RideStatusPanel } from '../components/Ride/RideStatusPanel';
 import { RideCancellationSummary } from '../components/Ride/RideCancellationSummary';
 import { RidePaymentSummary } from '../components/Ride/RidePaymentSummary';
+import { LocationSearchOverlay } from '../components/Ride/LocationSearchOverlay';
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
@@ -62,6 +63,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [loading, setLoading] = useState(false);
     const [showPaymentSummary, setShowPaymentSummary] = useState(false);
     const [showCancellationSummary, setShowCancellationSummary] = useState(false);
+    const [showSearchOverlay, setShowSearchOverlay] = useState(false);
     const [isMinimalRating, setIsMinimalRating] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
     const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
@@ -115,7 +117,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         const google = (window as any).google;
         if (!google) return;
 
-        const markerIcon = {
+        const avatarUrlStr = user?.photo;
+
+        let currentIcon: any = {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 12,
             fillColor: '#00D68F',
@@ -124,19 +128,76 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             strokeColor: 'white'
         };
 
+        if (userMarkerRef.current && userMarkerRef.current.getIcon()?.url?.startsWith('data:image/png')) {
+            currentIcon = userMarkerRef.current.getIcon();
+        }
+
         if (userMarkerRef.current) {
             userMarkerRef.current.setPosition(pos);
+            // GUARANTEE MARKER VISIBILITY by always re-applying it to the active map
             userMarkerRef.current.setMap(activeMap);
-            userMarkerRef.current.setIcon(markerIcon);
+            userMarkerRef.current.setVisible(true);
+
+            if (userMarkerRef.current.getIcon() !== currentIcon) {
+                userMarkerRef.current.setIcon(currentIcon);
+            }
         } else {
             userMarkerRef.current = new google.maps.Marker({
                 position: pos,
                 map: activeMap,
                 title: label || user.name || 'You',
-                icon: markerIcon,
+                icon: currentIcon,
                 zIndex: 100,
                 optimized: false
             });
+        }
+
+        // Asynchronously load and set the custom avatar canvas
+        if (avatarUrlStr && (!userMarkerRef.current.getIcon()?.url?.startsWith('data:image/png'))) {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const size = 64;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                // Draw outer border (Brand color or White)
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fill();
+
+                // Draw image cropped to inner circle
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, (size / 2) - 4, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(img, 0, 0, size, size);
+                ctx.restore();
+
+                // Draw brand color stroke ring inside
+                ctx.beginPath();
+                ctx.arc(size / 2, size / 2, (size / 2) - 4, 0, Math.PI * 2);
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#00D68F';
+                ctx.stroke();
+
+                const dataUrl = canvas.toDataURL('image/png');
+                if (userMarkerRef.current) {
+                    userMarkerRef.current.setIcon({
+                        url: dataUrl,
+                        scaledSize: new google.maps.Size(48, 48),
+                        anchor: new google.maps.Point(24, 24)
+                    });
+                }
+            };
+            img.onerror = () => {
+                console.warn('Failed to load avatar for map marker, using fallback.');
+            };
+            img.src = avatarUrlStr;
         }
     };
 
@@ -171,8 +232,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             const position = await Geolocation.getCurrentPosition({
                 enableHighAccuracy: true,
-                timeout: 30000,
-                maximumAge: 0
+                timeout: 10000,
+                maximumAge: 30000
             });
 
             clearTimeout(fallbackTimeout);
@@ -304,15 +365,17 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             const { data: staleSearches } = await supabase
                 .from('rides')
                 .select('*')
-                .eq('customer_id', user.id)
+                .eq('customer_id', session.user.id) // FIXED: use session.user.id
                 .eq('status', 'searching')
-                .maybeSingle();
-            if (staleSearches) {
+                .limit(10); // Find any lingering searches
+
+            if (staleSearches && staleSearches.length > 0) {
                 console.log("Cleaning up stale searches on launch:", staleSearches.length);
+                const staleIds = staleSearches.map(s => s.id);
                 await supabase
                     .from('rides')
                     .update({ status: 'cancelled' })
-                    .eq('id', staleSearches.id);
+                    .in('id', staleIds);
             }
 
             // 1. Restore only actual active bookings
@@ -788,7 +851,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             return;
         }
 
-        if (autocompleteService.current) {
+        if (autocompleteService) {
             // Start session if not exists
             if (!sessionToken.current) {
                 const google = (window as any).google;
@@ -798,7 +861,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 }
             }
 
-            autocompleteService.current.getPlacePredictions({
+            autocompleteService.getPlacePredictions({
                 input: val,
                 sessionToken: sessionToken.current,
                 componentRestrictions: { country: 'gm' } // Restrict to Gambia
@@ -1377,6 +1440,23 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 status={status}
             />
 
+            {/* Location Search Full-Screen Overlay */}
+            {showSearchOverlay && (
+                <LocationSearchOverlay
+                    theme={theme}
+                    onClose={() => setShowSearchOverlay(false)}
+                    user={user}
+                    destinations={destinations}
+                    updateDestination={updateDestination}
+                    addDestination={addDestination}
+                    removeDestination={removeDestination}
+                    userLocation={userLocation}
+                    calculateRouteAndPrice={calculateRouteAndPrice}
+                    setBookingStep={setBookingStep}
+                    handleLocateMe={handleLocateMe}
+                />
+            )}
+
             {/* Back Button & Locate Me */}
             <div className="z-10 px-6 pt-safe flex items-center justify-between pointer-events-none">
                 <button
@@ -1446,6 +1526,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             user={user}
                             settings={settings}
                             showAlert={showAlert}
+                            setShowSearchOverlay={setShowSearchOverlay}
+                            expandSheet={() => {
+                                setIsSheetMinimized(false);
+                                setSheetOffset(0);
+                            }}
                         />
                     )}
 

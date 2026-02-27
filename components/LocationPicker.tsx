@@ -62,18 +62,39 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
             styles: theme === 'dark' ? darkMapStyle : []
         });
 
-        const newMarker = new google.maps.Marker({
-            position: center,
-            map: newMap,
-            draggable: true,
-            icon: {
+        const getMarkerIcon = () => {
+            const avatarUrlStr = user?.photo || user?.avatar_url;
+            if (avatarUrlStr) {
+                const svg = `
+                <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="24" cy="24" r="22" fill="#00D68F" stroke="white" stroke-width="4"/>
+                  <clipPath id="circleClip">
+                    <circle cx="24" cy="24" r="20" />
+                  </clipPath>
+                  <image href="${avatarUrlStr}" x="0" y="0" height="48" width="48" clip-path="url(#circleClip)" preserveAspectRatio="xMidYMid meet" />
+                </svg>
+            `.trim();
+                return {
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+                    scaledSize: new google.maps.Size(48, 48),
+                    anchor: new google.maps.Point(24, 24)
+                };
+            }
+            return {
                 path: google.maps.SymbolPath.CIRCLE,
                 scale: 12,
                 fillColor: "#00D68F",
                 fillOpacity: 1,
                 strokeWeight: 4,
                 strokeColor: "#FFFFFF",
-            }
+            };
+        };
+
+        const newMarker = new google.maps.Marker({
+            position: center,
+            map: newMap,
+            draggable: true,
+            icon: getMarkerIcon()
         });
 
         newMarker.addListener('dragend', () => {

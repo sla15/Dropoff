@@ -24,9 +24,10 @@ interface Props {
         onCancel?: () => void
     ) => void;
     setActiveOrderId: (id: string | null) => void;
+    setActiveBatchId: (id: string | null) => void;
 }
 
-export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId }: Props) => {
+export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId, setActiveBatchId }: Props) => {
     const [merchants, setMerchants] = useState<Record<string, { name: string, phone: string, lat?: number, lng?: number }>>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,6 +187,20 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
             const customerId = session.user.id;
 
+            // Verify all businesses are open
+            const { data: bizData, error: bizError } = await supabase
+                .from('businesses')
+                .select('id, name, is_open')
+                .in('id', uniqueBusinessIds);
+
+            if (bizError) throw bizError;
+
+            const closedBusinesses = bizData?.filter(b => !b.is_open) || [];
+            if (closedBusinesses.length > 0) {
+                const names = closedBusinesses.map(b => b.name).join(", ");
+                throw new Error(`The following businesses are currently closed: ${names}. Please remove their items from your cart to proceed.`);
+            }
+
             // Generate batch_id for multi-merchant orders
             const batchId = uniqueBusinessIds.length > 1 ? crypto.randomUUID() : null;
 
@@ -230,6 +245,10 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
                 // Track this order specifically for real-time tracking
                 setActiveOrderId(orderData.id);
+            }
+
+            if (batchId) {
+                setActiveBatchId(batchId);
             }
 
             // 3. Success

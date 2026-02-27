@@ -23,14 +23,17 @@ interface Props {
     ) => void;
     activeOrderId: string | null;
     setActiveOrderId: (id: string | null) => void;
+    activeBatchId: string | null;
+    setActiveBatchId: (id: string | null) => void;
 }
 
 type OrderStatus = 'pending' | 'preparing' | 'picked-up' | 'arriving' | 'delivered';
 
-export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities, showAlert, activeOrderId, setActiveOrderId }: Props) => {
+export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities, showAlert, activeOrderId, setActiveOrderId, activeBatchId, setActiveBatchId }: Props) => {
     const [status, setStatus] = useState<OrderStatus>('pending');
     const [progress, setProgress] = useState(25);
     const [orderInfo, setOrderInfo] = useState<any>(null);
+    const [batchOrders, setBatchOrders] = useState<any[]>([]);
     const [driver, setDriver] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -41,18 +44,26 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     const inputBg = theme === 'light' ? 'bg-[#E5E5EA]' : 'bg-[#2C2C2E]';
 
     useEffect(() => {
-        if (!activeOrderId) return;
+        if (!activeOrderId && !activeBatchId) return;
         fetchOrderAndDriver();
+
+        const channelId = activeBatchId ? `batch-tracking-${activeBatchId}` : `order-tracking-${activeOrderId}`;
+        const filterStr = activeBatchId ? `batch_id=eq.${activeBatchId}` : `id=eq.${activeOrderId}`;
 
         // Subscribe to real-time changes
         const channel = supabase
-            .channel(`order-tracking-${activeOrderId}`)
+            .channel(channelId)
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${activeOrderId}` },
+                { event: 'UPDATE', schema: 'public', table: 'orders', filter: filterStr },
                 (payload) => {
                     console.log('Order Change Received:', payload.new);
-                    handleStatusUpdate(payload.new);
+                    if (activeBatchId) {
+                        setBatchOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
+                    } else {
+                        handleStatusUpdate(payload.new);
+                    }
+
                     if (payload.new.driver_id && (!driver || driver.id !== payload.new.driver_id)) {
                         fetchDriver(payload.new.driver_id);
                     }
@@ -63,23 +74,56 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [activeOrderId]);
+    }, [activeOrderId, activeBatchId]);
+
+    useEffect(() => {
+        if (activeBatchId && batchOrders.length > 0) {
+            // Calculate aggregate status
+            const statuses = batchOrders.map(o => o.status);
+
+            // Priority for global status
+            if (statuses.every(s => s === 'completed')) handleStatusUpdate(batchOrders[0]);
+            else if (statuses.some(s => s === 'delivering')) setStatus('picked-up');
+            else if (statuses.some(s => s === 'ready' || s === 'preparing')) setStatus('preparing');
+            else setStatus('pending');
+
+            // Find an order that best represents the current driver context
+            const activeOrder = batchOrders.find(o => ['delivering', 'ready', 'preparing'].includes(o.status)) || batchOrders[0];
+            setOrderInfo(activeOrder);
+        }
+    }, [batchOrders, activeBatchId]);
 
     const fetchOrderAndDriver = async () => {
         try {
             setIsLoading(true);
-            const { data: order, error } = await supabase
-                .from('orders')
-                .select('*')
-                .eq('id', activeOrderId)
-                .maybeSingle();
 
-            if (error) throw error;
-            if (order) {
-                setOrderInfo(order);
-                handleStatusUpdate(order);
-                if (order.driver_id) {
-                    await fetchDriver(order.driver_id);
+            if (activeBatchId) {
+                const { data: orders, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('batch_id', activeBatchId);
+
+                if (error) throw error;
+                if (orders && orders.length > 0) {
+                    setBatchOrders(orders);
+                    if (orders[0].driver_id) {
+                        await fetchDriver(orders[0].driver_id);
+                    }
+                }
+            } else {
+                const { data: order, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('id', activeOrderId)
+                    .maybeSingle();
+
+                if (error) throw error;
+                if (order) {
+                    setOrderInfo(order);
+                    handleStatusUpdate(order);
+                    if (order.driver_id) {
+                        await fetchDriver(order.driver_id);
+                    }
                 }
             }
         } catch (err) {
@@ -137,7 +181,8 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     };
 
     const handleCancelOrder = async () => {
-        if (!activeOrderId) return;
+        const targetId = activeBatchId || activeOrderId;
+        if (!targetId) return;
 
         showAlert(
             "Cancel Order?",
@@ -149,13 +194,15 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     const { error } = await supabase
                         .from('orders')
                         .update({ status: 'cancelled' })
-                        .eq('id', activeOrderId);
+                        .match(activeBatchId ? { batch_id: activeBatchId } : { id: activeOrderId });
 
                     if (error) throw error;
 
                     triggerHaptic();
                     setActiveOrderId(null);
+                    setActiveBatchId(null);
                     localStorage.removeItem('active_order_id');
+                    localStorage.removeItem('active_batch_id');
                     showAlert("Cancelled", "Your order has been cancelled successfully.", "success");
                     navigate('dashboard');
                 } catch (err) {
@@ -204,8 +251,10 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     <ArrowLeft size={20} />
                 </button>
                 <div className="text-center">
-                    <h1 className="font-bold">Order Tracking</h1>
-                    <p className={`text-[10px] ${textSec} uppercase tracking-widest font-black`}>Order #{activeOrderId?.slice(0, 8)}</p>
+                    <h1 className="font-bold">{activeBatchId ? 'Batch Tracking' : 'Order Tracking'}</h1>
+                    <p className={`text-[10px] ${textSec} uppercase tracking-widest font-black`}>
+                        {activeBatchId ? `Batch #${activeBatchId.slice(0, 8)}` : `Order #${activeOrderId?.slice(0, 8)}`}
+                    </p>
                 </div>
                 <div className="w-10"></div>
             </div>
@@ -231,6 +280,30 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                             style={{ width: `${progress}%` }}
                         ></div>
                     </div>
+
+                    {activeBatchId && batchOrders.length > 0 && (
+                        <div className="mb-12 space-y-4">
+                            <h3 className="text-xs font-black uppercase tracking-widest opacity-40 mb-2">Merchant Progress</h3>
+                            <div className="space-y-3">
+                                {batchOrders.map((order, idx) => (
+                                    <div key={order.id} className={`p-3 rounded-2xl ${inputBg} flex items-center justify-between`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-[#00D68F]/10 flex items-center justify-center text-[#00D68F] font-bold text-xs">
+                                                {idx + 1}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm">Shop {idx + 1}</p>
+                                                <p className={`text-[10px] uppercase font-black ${order.status === 'completed' ? 'text-[#00D68F]' : 'text-orange-500'}`}>
+                                                    {order.status}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {order.status === 'completed' && <CheckCircle2 size={16} className="text-[#00D68F]" />}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-6">
                         <div className="flex items-center gap-4">

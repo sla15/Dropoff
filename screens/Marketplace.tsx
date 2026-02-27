@@ -73,12 +73,12 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
    return (
       <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
          <div className={`pt-safe px-6 pb-4 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-md z-10 sticky top-0 border-b ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'}`}>
-            <h1 className="text-3xl font-bold mb-4">Marketplace</h1>
-            <div className={`flex items-center gap-3 p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md`}>
-               <Search size={20} className={textSec} />
+            <h1 className="text-3xl font-black tracking-tight mb-4">Marketplace</h1>
+            <div className={`flex items-center gap-3 p-3 rounded-[22px] h-14 ${theme === 'light' ? 'bg-white border-none shadow-[0_12px_40px_rgba(0,0,0,0.06)] focus-within:shadow-[0_12px_40px_rgba(0,214,143,0.15)] focus-within:ring-2 focus-within:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/60 border border-white/5 shadow-lg focus-within:ring-2 focus-within:ring-[#00D68F]/30'} backdrop-blur-xl transition-all`}>
+               <Search size={20} className={`${textSec} ml-2`} />
                <input
                   placeholder="Restaurants, groceries, etc."
-                  className="bg-transparent flex-1 outline-none font-medium"
+                  className="bg-transparent flex-1 outline-none font-bold text-base placeholder:opacity-50 h-full"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                />
@@ -129,18 +129,18 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                   <div
                      key={b.id}
                      onClick={() => { setSelectedBusiness(b); navigate('business-detail', true); }}
-                     className={`group ${bgCard} p-4 rounded-[20px] shadow-sm cursor-pointer active:scale-[0.98] transition-all flex items-center gap-4`}
+                     className={`group ${bgCard} p-4 rounded-[24px] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border-b border-transparent dark:border-white/5 ${b.isOpen ? 'cursor-pointer active:scale-[0.98] hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)]' : 'opacity-50 grayscale cursor-not-allowed'} transition-all duration-300 flex items-center gap-4`}
                   >
                      {/* Logo / Image on Left */}
                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800 border border-black/5 dark:border-white/5 relative">
                         <img src={b.logo || b.image} className="w-full h-full object-cover" alt={b.name} />
-                        {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase">Closed</div>}
+                        {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
                      </div>
 
                      {/* Content Middle */}
                      <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start">
-                           <h3 className="text-base font-bold truncate pr-2">{b.name}</h3>
+                           <h3 className="text-base font-black tracking-tight truncate pr-2">{b.name}</h3>
                         </div>
                         <p className={`text-xs ${textSec} line-clamp-1 mb-1.5`}>{b.description}</p>
 
@@ -158,6 +158,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                      <button
                         onClick={(e) => toggleFavorite(b.id, e)}
                         className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${favorites.includes(b.id) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-gray-50 dark:bg-white/5 text-gray-400'}`}
+                        disabled={!b.isOpen}
                      >
                         <Heart size={20} className={favorites.includes(b.id) ? "fill-current" : ""} />
                      </button>

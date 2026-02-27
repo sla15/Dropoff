@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRight, Locate, MapPin as MapPinFilled, Plus, Trash, X, Info, Car, Bike } from 'lucide-react';
+import React from 'react';
+import { ArrowLeft, ArrowRight, Locate, MapPin as MapPinFilled, Plus, Trash, X, Info, Car, Bike, Search } from 'lucide-react';
 import { Theme, UserData, AppSettings } from '../../types';
 import { Skeleton } from '../Skeleton';
 
@@ -34,6 +35,8 @@ interface RideBookingFormProps {
     sessionToken: any;
     settings: AppSettings;
     showAlert: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
+    expandSheet?: () => void;
+    setShowSearchOverlay: (show: boolean) => void;
 }
 
 export const RideBookingForm: React.FC<RideBookingFormProps> = ({
@@ -67,7 +70,9 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
     sessionToken,
     user,
     settings,
-    showAlert
+    showAlert,
+    expandSheet,
+    setShowSearchOverlay
 }) => {
     const minFare = rideType === 'delivery' ? settings.min_delivery_fee : settings.min_ride_price;
 
@@ -104,69 +109,27 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                             </div>
                         </div>
 
-                        {destinations.map((dest, idx) => (
-                            <div key={idx} className="relative flex flex-col gap-1">
-                                <div className="relative flex items-center gap-3 animate-scale-in">
-                                    <div className="w-4 h-4 rounded-full border-[3px] border-red-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
-                                    <div className={`flex-1 flex items-center gap-2 p-3.5 rounded-xl ${inputBg} focus-within:ring-2 ring-[#00D68F] transition-all`}>
-                                        <input
-                                            placeholder={
-                                                idx === destinations.length - 1
-                                                    ? "Final Destination"
-                                                    : `Stop ${idx + 1}`
-                                            }
-                                            className="bg-transparent outline-none flex-1 font-bold text-sm"
-                                            value={dest}
-                                            onChange={(e) => handleSearch(e.target.value, idx)}
-                                            onFocus={() => {
-                                                setActiveInputIndex(idx);
-                                                if (!sessionToken.current) {
-                                                    const google = (window as any).google;
-                                                    if (google) {
-                                                        sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                        {dest.length > 0 && (
-                                            <button
-                                                onClick={() => updateDestination(idx, '')}
-                                                className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                                            >
-                                                <X size={14} className="opacity-50" />
-                                            </button>
-                                        )}
-                                        {destinations.length > 1 && (
-                                            <button onClick={() => removeDestination(idx)} className="p-1.5 bg-black/5 dark:bg-white/10 rounded-full hover:bg-black/10 transition-colors">
-                                                <Trash size={12} className="opacity-50" />
-                                            </button>
+                        {/* Summarized View for Overlay Trigger */}
+                        <div
+                            onClick={() => { triggerHaptic(); setShowSearchOverlay(true); }}
+                            className={`p-4 rounded-2xl ${bgCard} border border-gray-100 dark:border-gray-800 shadow-sm transition-all active:scale-[0.98] cursor-pointer`}
+                        >
+                            <div className="flex items-start gap-4">
+                                <MapPinFilled size={20} className="text-red-500 shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-base truncate mb-1">
+                                        {destinations[0] || "Where to?"}
+                                    </div>
+                                    <div className={`text-xs ${textSec} flex items-center gap-1`}>
+                                        {destinations.length > 1 ? (
+                                            <span className="bg-[#00D68F]/20 text-[#00D68F] px-1.5 py-0.5 rounded font-black uppercase text-[9px] tracking-wider">+{destinations.length - 1} Stop(s)</span>
+                                        ) : (
+                                            "Tap to search or map pin"
                                         )}
                                     </div>
                                 </div>
-
-                                {activeInputIndex === idx && predictions.length > 0 && (
-                                    <div className={`absolute top-full left-7 right-0 z-50 ${bgCard} mt-2 rounded-2xl shadow-2xl border border-black/5 dark:border-white/10 overflow-hidden`}>
-                                        {predictions.map((p: any) => (
-                                            <button
-                                                key={p.place_id}
-                                                onClick={() => selectPrediction(p)}
-                                                className={`w-full p-4 text-left hover:bg-[#00D68F]/10 border-b border-black/5 dark:border-white/5 last:border-0 flex items-start gap-3`}
-                                            >
-                                                <MapPinFilled size={18} className="text-[#00D68F] flex-shrink-0 mt-0.5" />
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-sm">{p.structured_formatting?.main_text || p.description}</span>
-                                                    <span className="text-[10px] opacity-50 truncate">{p.structured_formatting?.secondary_text || ''}</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                <Search size={20} className="opacity-30 shrink-0" />
                             </div>
-                        ))}
-
-                        <div className="relative flex items-center gap-3 pl-0.5">
-                            <div className="w-3.5 flex justify-center"><Plus size={14} className="text-[#00D68F]" /></div>
-                            <button onClick={addDestination} className="text-sm font-bold text-[#00D68F] active:opacity-60">Add Stop</button>
                         </div>
                     </div>
 

@@ -46,7 +46,10 @@ interface Props {
 export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
-  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
+    const cached = localStorage.getItem('cached_locations');
+    return cached ? JSON.parse(cached) : [];
+  });
   const [showSaveDrawer, setShowSaveDrawer] = useState(false);
   const [saveStep, setSaveStep] = useState(1);
   const [newLocLabel, setNewLocLabel] = useState('');
@@ -94,7 +97,10 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         .select('*')
         .eq('user_id', session.user.id);
       if (error) throw error;
-      if (data) setSavedLocations(data);
+      if (data) {
+        setSavedLocations(data);
+        localStorage.setItem('cached_locations', JSON.stringify(data));
+      }
     } catch (err) {
       console.error("Fetch Locations Error:", err);
     }
@@ -328,9 +334,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               </div>
             </div>
             <div className="flex flex-col">
-              <span className={`text-xs ${textSec} font-medium`}>{getGreeting()}</span>
+              <span className={`text-[11px] ${textSec} font-bold uppercase tracking-wider mb-0.5`}>{getGreeting()}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold">{user.name || 'Alex'}</span>
+                <span className="text-2xl font-black tracking-tight">{user.name || 'Alex'}</span>
                 {settings.is_rating_enabled && (
                   <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
                     user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
@@ -362,7 +368,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               onChange={(e) => searchMode === 'market' ? setSearchQuery(e.target.value) : handleMapSearch(e.target.value)}
               onKeyDown={handleSearch}
               placeholder={searchMode === 'market' ? "What to order?" : "Where to go?"}
-              className={`w-full h-14 pl-12 pr-12 rounded-[22px] ${theme === 'light' ? 'bg-white border-none shadow-[0_8px_30px_rgba(0,0,0,0.04)] focus:shadow-[0_8px_30px_rgba(0,214,143,0.1)]' : 'bg-[#1C1C1E]/50 border border-white/5 shadow-sm'} backdrop-blur-md font-medium outline-none text-base placeholder:opacity-50 transition-all cursor-text`}
+              className={`w-full h-14 pl-12 pr-12 rounded-[22px] ${theme === 'light' ? 'bg-white border-none shadow-[0_12px_40px_rgba(0,0,0,0.06)] focus:shadow-[0_12px_40px_rgba(0,214,143,0.15)] focus:ring-2 focus:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/60 border border-white/5 shadow-lg focus:ring-2 focus:ring-[#00D68F]/30'} backdrop-blur-xl font-bold outline-none text-base placeholder:opacity-50 transition-all cursor-text`}
             />
             {searchQuery && (
               <button
@@ -430,23 +436,23 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
       <div className="flex-1 px-5 pt-2 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
         <div className="grid grid-cols-2 gap-6">
-          <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-[0_30px_40px_-20px_rgba(0,0,0,0.06)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+          <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
             <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-            <div className="absolute bottom-5 right-5 text-right z-10">
-              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-white shadow-xl"><Car size={20} /></div></div>
-              <h2 className="text-xl font-black text-white tracking-tight">Ride</h2>
-              <p className="text-[10px] uppercase font-bold text-white/60 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+            <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
+              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.4)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
+              <h2 className="text-2xl font-black text-white tracking-tight">Ride</h2>
+              <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
             </div>
           </div>
 
-          <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.98] transition-all duration-300 shadow-[0_30px_40px_-20px_rgba(0,0,0,0.06)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+          <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
             <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-            <div className="absolute bottom-5 right-5 text-right z-10">
-              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-white shadow-xl"><ShoppingBag size={20} /></div></div>
-              <h2 className="text-xl font-black text-white tracking-tight">Market</h2>
-              <p className="text-[10px] uppercase font-bold text-white/60 tracking-widest">Premium Shops</p>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+            <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
+              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.4)] transition-transform group-hover:scale-110"><ShoppingBag size={20} /></div></div>
+              <h2 className="text-2xl font-black text-white tracking-tight">Market</h2>
+              <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest">Premium Shops</p>
             </div>
           </div>
         </div>
@@ -476,9 +482,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
             <div
               onClick={() => { triggerHaptic(); setShowSaveDrawer(true); }}
-              className={`w-[100px] h-[100px] p-2 rounded-[28px] border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 transition-all`}
+              className={`w-[100px] h-[100px] p-2 rounded-[28px] border-[2px] border-dashed border-gray-300/50 dark:border-gray-700/50 ${theme === 'light' ? 'bg-gray-50/50' : 'bg-white/5'} flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 hover:border-gray-400 active:scale-95 hover:-translate-y-1 shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-all`}
             >
-              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-white dark:bg-[#1C1C1E] shadow-sm flex items-center justify-center">
                 <Plus size={20} className={textSec} />
               </div>
               <div className={`text-[10px] font-bold ${textSec}`}>Add New</div>
@@ -530,7 +536,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                   triggerHaptic();
                   setExpandedActivity(expandedActivity === activity.id ? null : activity.id);
                 }}
-                className={`${bgCard} p-4 rounded-[20px] shadow-sm cursor-pointer active:scale-[0.99] transition-all duration-300 group overflow-hidden relative`}
+                className={`${bgCard} p-4 rounded-[24px] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border-b border-transparent dark:border-white/5 cursor-pointer active:scale-[0.98] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)] transition-all duration-300 group overflow-hidden relative`}
               >
                 {/* Liquid Shimmer Highlight */}
                 <div className="absolute -top-10 -left-10 w-24 h-24 bg-gradient-to-br from-white/20 to-transparent blur-xl pointer-events-none rotate-45"></div>

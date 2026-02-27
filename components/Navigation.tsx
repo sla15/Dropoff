@@ -19,9 +19,9 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
             <div
                 className={`
           pointer-events-auto
-          ${theme === 'light' ? 'bg-white/50 text-black border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.1)]' : 'bg-[#1C1C1E]/40 text-white border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.3)]'} 
-          backdrop-blur-2xl rounded-full px-6 flex items-center justify-center gap-2 relative
-          w-fit mx-auto py-2 overflow-visible border-[0.5px] min-w-[280px]
+          ${theme === 'light' ? 'bg-white/30 text-black border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]' : 'bg-[#1C1C1E]/30 text-white border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'} 
+          backdrop-blur-xl rounded-[2rem] px-6 flex items-center justify-center gap-2 relative
+          w-fit mx-auto py-2 overflow-visible border-[1px] min-w-[280px]
         `}
             >
                 {/* Liquid Top Highlighter */}

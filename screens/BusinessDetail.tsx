@@ -117,7 +117,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     };
 
     const addToCart = (product: Product, variation?: string) => {
-        if (!selectedBusiness) return;
+        if (!selectedBusiness || !selectedBusiness.isOpen) return;
         triggerHaptic();
         setCart(prev => {
             const cartItemId = variation ? `${product.id}-${variation}` : product.id;
@@ -169,7 +169,12 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 </button>
 
                 <div className="absolute bottom-6 left-6 right-6 text-white">
-                    <h1 className="text-3xl font-bold mb-2">{selectedBusiness.name}</h1>
+                    <div className="flex items-center gap-3 mb-2">
+                        <h1 className="text-3xl font-bold">{selectedBusiness.name}</h1>
+                        {!selectedBusiness.isOpen && (
+                            <span className="bg-red-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider">Closed</span>
+                        )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm opacity-90">
                         <Star size={14} fill="currentColor" className={selectedBusiness.rating >= 5.0 ? 'text-[#00D68F]' : selectedBusiness.rating >= 3.8 ? 'text-orange-400' : 'text-red-500'} />
                         <span className="font-bold">{selectedBusiness.rating}</span>
@@ -208,7 +213,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                         </div>
                     ) : products.length > 0 ? (
                         filteredProducts.map(p => (
-                            <ProductCard key={p.id} product={p} addToCart={addToCart} theme={theme} bgCard={bgCard} textSec={textSec} />
+                            <ProductCard key={p.id} product={p} addToCart={addToCart} theme={theme} bgCard={bgCard} textSec={textSec} isOpen={selectedBusiness.isOpen} />
                         ))
                     ) : (
                         <div className={`text-center py-10 ${textSec}`}>
@@ -367,13 +372,14 @@ interface ProductCardProps {
     theme: Theme;
     bgCard: string;
     textSec: string;
+    isOpen: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart, theme, bgCard, textSec }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, addToCart, theme, bgCard, textSec, isOpen }) => {
     const [selectedVar, setSelectedVar] = useState(product.categories?.[0] || '');
 
     return (
-        <div className={`${bgCard} p-3 rounded-2xl flex gap-4 shadow-sm active:scale-[0.99] transition-transform cursor-pointer`} onClick={() => addToCart(product, selectedVar)}>
+        <div className={`${bgCard} p-3 rounded-2xl flex gap-4 shadow-sm transition-transform ${isOpen ? 'active:scale-[0.99] cursor-pointer' : 'opacity-60 grayscale cursor-not-allowed'}`} onClick={() => addToCart(product, selectedVar)}>
             <img src={product.image} className="w-24 h-24 rounded-xl object-cover bg-gray-100" alt={product.name} />
             <div className="flex-1 flex flex-col justify-between py-1">
                 <div>
