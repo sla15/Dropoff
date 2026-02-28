@@ -1044,83 +1044,101 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (!ride) return;
         setCurrentRideId(ride.id);
 
-        // 2. Setup Realtime Subscription for this specific ride (only if not already subscribed)
-        // Note: In a production app, we'd manage this subscription more carefully to avoid duplicates.
-        const rideSubscription = supabase
-            .channel(`ride-${ride.id}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${ride.id}` },
-                async (payload) => {
-                    console.log('Ride update received:', payload);
-                    const updatedRide = payload.new as any;
+        // 2. Setup Realtime Subscription for this specific ride with Auto-Reconnect
+        let currentSubscription: any = null;
+        let isSubscriptionActive = true;
 
-                    if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
-                        // Driver accepted!
-                        // Do NOT unsubscribe here, we need to hear about arrived, in-progress, etc.
-                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+        const setupRideSubscription = () => {
+            if (!isSubscriptionActive) return;
 
-                        // Fetch driver details with profile info
-                        const { data: driverData, error: driverError } = await supabase
-                            .from('drivers')
-                            .select(`
-                                *,
-                                profile:profiles(
-                                    full_name,
-                                    phone,
-                                    average_rating
-                                )
-                            `)
-                            .eq('id', updatedRide.driver_id)
-                            .single();
+            currentSubscription = supabase
+                .channel(`ride-${ride.id}`)
+                .on(
+                    'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${ride.id}` },
+                    async (payload) => {
+                        console.log('Ride update received:', payload);
+                        const updatedRide = payload.new as any;
 
-                        if (driverData && !driverError) {
-                            const formattedDriver = {
-                                ...driverData,
-                                name: (driverData.profile as any)?.full_name || 'Driver',
-                                phone: (driverData.profile as any)?.phone || '',
-                                rating: (driverData.profile as any)?.average_rating || 5.0
-                            };
-                            setAssignedDriverId(updatedRide.driver_id);
-                            setAssignedDriver(formattedDriver);
-                            setStatus('accepted');
-                            sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                        if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
+                            // Driver accepted!
+                            if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+
+                            // Fetch driver details with profile info
+                            const { data: driverData, error: driverError } = await supabase
+                                .from('drivers')
+                                .select(`
+                                    *,
+                                    profile:profiles(
+                                        full_name,
+                                        phone,
+                                        average_rating
+                                    )
+                                `)
+                                .eq('id', updatedRide.driver_id)
+                                .single();
+
+                            if (driverData && !driverError) {
+                                const formattedDriver = {
+                                    ...driverData,
+                                    name: (driverData.profile as any)?.full_name || 'Driver',
+                                    phone: (driverData.profile as any)?.phone || '',
+                                    rating: (driverData.profile as any)?.average_rating || 5.0
+                                };
+                                setAssignedDriverId(updatedRide.driver_id);
+                                setAssignedDriver(formattedDriver);
+                                setStatus('accepted');
+                                sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                                triggerHaptic();
+                            }
+                        } else if (updatedRide.status === 'arrived') {
+                            setStatus('arrived');
                             triggerHaptic();
-                        }
-                    } else if (updatedRide.status === 'arrived') {
-                        setStatus('arrived');
-                        triggerHaptic();
-                    } else if (updatedRide.status === 'in-progress') {
-                        setStatus('in-progress');
-                        triggerHaptic();
-                    } else if (updatedRide.status === 'completed') {
-                        rideSubscription.unsubscribe();
-                        completeTrip();
-                    } else if (updatedRide.status === 'cancelled') {
-                        rideSubscription.unsubscribe();
-                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
+                        } else if (updatedRide.status === 'in-progress') {
+                            setStatus('in-progress');
+                            triggerHaptic();
+                        } else if (updatedRide.status === 'completed') {
+                            isSubscriptionActive = false;
+                            if (currentSubscription) currentSubscription.unsubscribe();
+                            completeTrip();
+                        } else if (updatedRide.status === 'cancelled') {
+                            isSubscriptionActive = false;
+                            if (currentSubscription) currentSubscription.unsubscribe();
+                            if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
 
-                        // If it was already accepted, show cancellation summary modal
-                        if (status === 'accepted' || status === 'arrived' || status === 'in-progress') {
-                            setStatus('cancelled_by_driver'); // Internal status to clear UI
-                            setShowCancellationSummary(true);
-                            setIsMinimalRating(true); // Simplified rating for cancellations
-                        } else {
-                            // Full Cleanup for pre-acceptance cancellation
-                            if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-                            markersRef.current.forEach(m => m?.setMap(null));
-                            markersRef.current = [];
-                            setDestinations(['']);
-                            setBookingStep('planning');
-                            setAssignedDriverId(null);
-                            setAssignedDriver(null);
-                            setStatus('idle');
-                            showAlert("Cancelled", "Your ride request was cancelled.", "info");
+                            // If it was already accepted, show cancellation summary modal
+                            if (status === 'accepted' || status === 'arrived' || status === 'in-progress') {
+                                setStatus('cancelled_by_driver'); // Internal status to clear UI
+                                setShowCancellationSummary(true);
+                                setIsMinimalRating(true); // Simplified rating for cancellations
+                            } else {
+                                // Full Cleanup for pre-acceptance cancellation
+                                if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+                                markersRef.current.forEach(m => m?.setMap(null));
+                                markersRef.current = [];
+                                setDestinations(['']);
+                                setBookingStep('planning');
+                                setAssignedDriverId(null);
+                                setAssignedDriver(null);
+                                setStatus('idle');
+                                showAlert("Cancelled", "Your ride request was cancelled.", "info");
+                            }
                         }
                     }
-                }
-            )
-            .subscribe();
+                )
+                .subscribe((status) => {
+                    if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                        if (isSubscriptionActive) {
+                            console.log('⚠️ Ride subscription lost. Reconnecting in 3s...');
+                            setTimeout(() => {
+                                if (isSubscriptionActive) setupRideSubscription();
+                            }, 3000);
+                        }
+                    }
+                });
+        };
+
+        setupRideSubscription();
 
         // 3. Start Search Loop with Dynamic Radius and Actual Notifications
         let currentRadius = startRadius;

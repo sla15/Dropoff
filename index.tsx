@@ -511,6 +511,7 @@ const App = () => {
         }
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           console.log('⚠️ Realtime connection lost. Reconnecting in 5s...');
+          supabase.removeChannel(channel);
           setTimeout(() => {
             if (userId) subscribeToChanges(userId);
           }, 5000);
