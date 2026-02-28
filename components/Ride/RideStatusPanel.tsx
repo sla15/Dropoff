@@ -14,6 +14,7 @@ interface RideStatusPanelProps {
     formatTime: (seconds: number) => string;
     selectedTier: string;
     handleCancelRide: () => void;
+    theme: string;
 }
 
 export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
@@ -27,7 +28,8 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
     textSec,
     formatTime,
     selectedTier,
-    handleCancelRide
+    handleCancelRide,
+    theme
 }) => {
     return (
         <div className="text-center py-4 relative">

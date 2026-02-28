@@ -2,8 +2,16 @@ import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 
 export const triggerHaptic = () => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(10);
+    try {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            // Only vibrate if there's been some user interaction to avoid browser warnings
+            if ('userActivation' in navigator && !(navigator as any).userActivation.hasBeenActive) {
+                return;
+            }
+            navigator.vibrate(10);
+        }
+    } catch (e) {
+        // Ignore haptic errors
     }
 };
 

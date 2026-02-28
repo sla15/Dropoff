@@ -333,8 +333,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 // Force a second update verify to ensure pin is visible
                 setTimeout(() => updateMarker(indexLocation, undefined, map), 500);
             } else if (!userLocation) {
-                console.log("RideScreen: Screen active, no indexLocation, triggering auto-locate");
-                handleLocateMe(true);
+                console.log("RideScreen: Screen active, no indexLocation, triggering auto-locate in 60s");
+                const delayTimer = setTimeout(() => {
+                    handleLocateMe(true);
+                }, 60000); // Wait 60 seconds
+                return () => clearTimeout(delayTimer);
             }
         }
     }, [active, !!map, indexLocation]);
@@ -1547,6 +1550,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             formatTime={formatTime}
                             selectedTier={selectedTier}
                             handleCancelRide={handleCancelRide}
+                            theme={theme}
                         />
                     )}
                 </div>
