@@ -12,8 +12,14 @@ interface Props {
 export const FloatingCartButton = ({ cart, theme, onClick }: Props) => {
     const [isDragging, setIsDragging] = useState(false);
     const [position, setPosition] = useState(() => {
-        const saved = localStorage.getItem('cart_pos');
-        return saved ? JSON.parse(saved) : { x: 0, y: 0 };
+        try {
+            const saved = localStorage.getItem('cart_pos');
+            return saved ? JSON.parse(saved) : { x: 0, y: 0 };
+        } catch (e) {
+            console.error("Failed to parse cart_pos", e);
+            localStorage.removeItem('cart_pos');
+            return { x: 0, y: 0 };
+        }
     });
     const [rel, setRel] = useState({ x: 0, y: 0 });
     const dragStartedAt = useRef(0);

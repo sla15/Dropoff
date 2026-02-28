@@ -169,8 +169,14 @@ const App = () => {
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('app_cart');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('app_cart');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to parse cart from localStorage", e);
+      localStorage.removeItem('app_cart');
+      return [];
+    }
   });
 
   const [settings, setSettings] = useState<AppSettings>({

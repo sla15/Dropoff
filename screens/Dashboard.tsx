@@ -47,8 +47,14 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
-    const cached = localStorage.getItem('cached_locations');
-    return cached ? JSON.parse(cached) : [];
+    try {
+      const cached = localStorage.getItem('cached_locations');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      console.error("Failed to parse cached_locations", e);
+      localStorage.removeItem('cached_locations');
+      return [];
+    }
   });
   const [showSaveDrawer, setShowSaveDrawer] = useState(false);
   const [saveStep, setSaveStep] = useState(1);
@@ -541,8 +547,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 {/* Liquid Shimmer Highlight */}
                 <div className="absolute -top-10 -left-10 w-24 h-24 bg-gradient-to-br from-white/20 to-transparent blur-xl pointer-events-none rotate-45"></div>
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${activity.type === 'ride' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
-                    {activity.type === 'ride' ? <Car size={20} /> : <ShoppingBag size={20} />}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${activity.type.startsWith('ride') || activity.type.startsWith('delivery') ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                    {activity.type.startsWith('ride') || activity.type.startsWith('delivery') ? <Car size={20} /> : <ShoppingBag size={20} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
@@ -570,7 +576,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                       onClick={(e) => {
                         e.stopPropagation();
                         triggerHaptic();
-                        if (activity.type === 'ride') {
+                        if (activity.type.startsWith('ride') || activity.type.startsWith('delivery')) {
                           setPrefilledDestination(activity.title);
                           const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
                           setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
