@@ -98,14 +98,13 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                         </div>
                     </div>
 
-                    <div className="relative pl-4 space-y-4">
-                        <div className="absolute left-[23px] top-4 bottom-8 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-
+                    <div className="space-y-4">
                         <div className="relative flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-full border-[3px] border-blue-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
+                            <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center flex-shrink-0">
+                                <Locate size={18} className="text-[#00D68F]" />
+                            </div>
                             <div className={`flex-1 p-3.5 rounded-xl ${inputBg} font-medium text-sm ${textSec} flex items-center justify-between`}>
                                 <span>Current Location</span>
-                                <Locate size={14} className="opacity-50" />
                             </div>
                         </div>
 
@@ -115,9 +114,11 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                             className={`p-4 rounded-2xl ${bgCard} border border-gray-100 dark:border-gray-800 shadow-sm transition-all active:scale-[0.98] cursor-pointer`}
                         >
                             <div className="flex items-start gap-4">
-                                <MapPinFilled size={20} className="text-red-500 shrink-0 mt-0.5" />
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-base truncate mb-1">
+                                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                                    <MapPinFilled size={20} className="text-red-500" />
+                                </div>
+                                <div className="flex-1 min-w-0 flex flex-col justify-center min-h-[40px]">
+                                    <div className="font-bold text-base truncate">
                                         {destinations[0] || "Where to?"}
                                     </div>
                                     <div className={`text-xs ${textSec} flex items-center gap-1`}>
@@ -128,7 +129,9 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                                         )}
                                     </div>
                                 </div>
-                                <Search size={20} className="opacity-30 shrink-0" />
+                                <div className="h-10 flex items-center">
+                                    <Search size={20} className="opacity-30" />
+                                </div>
                             </div>
                         </div>
                     </div>

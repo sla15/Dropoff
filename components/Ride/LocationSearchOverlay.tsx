@@ -151,34 +151,35 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
     };
 
     return (
-        <div className={`fixed inset-0 z-[100] ${bgMain} ${textMain} flex flex-col animate-slide-in-up`}>
+        <div className={`fixed inset-0 z-[100] bg-white/10 dark:bg-black/20 backdrop-blur-md ${textMain} flex flex-col animate-slide-in-up`}>
             {/* Header */}
-            <div className={`pt-safe px-4 pb-4 flex items-center gap-4 ${bgMain} shadow-sm z-10 sticky top-0`}>
-                <button onClick={() => { triggerHaptic(); onClose(); }} className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-gray-800'} transition-colors`}>
-                    <ArrowLeft size={24} />
+            <div className={`pt-safe px-4 pb-4 flex items-center gap-4 bg-white/60 dark:bg-black/60 backdrop-blur-xl shadow-sm z-10 sticky top-0`}>
+                <button onClick={() => { triggerHaptic(); onClose(); }} className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}>
+                    <ArrowLeft size={24} className="text-black dark:text-white" />
                 </button>
-                <h1 className="text-xl font-bold flex-1 text-center pr-10">Where to?</h1>
+                <h1 className="text-xl font-bold flex-1 text-center pr-10 text-black dark:text-white">Where to?</h1>
             </div>
 
             <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
                 {/* Inputs Area */}
-                <div className={`${bgCard} p-6 shadow-sm`}>
-                    <div className="relative pl-4 space-y-4">
-                        <div className="absolute left-[23px] top-6 bottom-8 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
-
+                <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl p-6 shadow-sm">
+                    <div className="space-y-4">
                         <div className="relative flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-full border-[3px] border-blue-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
-                            <div className={`flex-1 p-4 rounded-xl ${inputBg} font-medium text-sm ${textSec} flex items-center justify-between`}>
-                                <span>Current Location</span>
-                                <Locate size={18} className="opacity-50 text-[#00D68F]" onClick={() => handleLocateMe(false)} />
+                            <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center flex-shrink-0">
+                                <Locate size={18} className="text-[#00D68F]" onClick={() => handleLocateMe(false)} />
+                            </div>
+                            <div className={`flex-1 p-4 rounded-xl ${inputBg} bg-white/60 dark:bg-[#1C1C1E]/60 backdrop-blur-md font-medium text-sm ${textSec} flex items-center justify-between`}>
+                                <span className="text-black dark:text-white/70">Current Location</span>
                             </div>
                         </div>
 
                         {destinations.map((dest, idx) => (
                             <div key={idx} className="relative flex flex-col gap-1 items-start w-full">
                                 <div className="relative flex items-center gap-3 w-full">
-                                    <div className="w-4 h-4 rounded-full border-[3px] border-red-500 bg-white dark:bg-black z-10 flex-shrink-0 shadow-sm"></div>
-                                    <div className={`flex-1 flex items-center gap-2 p-3 rounded-xl ${inputBg} ${activeInputIndex === idx ? 'ring-2 ring-[#00D68F] bg-white dark:bg-[#1C1C1E]' : ''} transition-all shadow-sm`}>
+                                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                                        <MapPin size={20} className="text-red-500" />
+                                    </div>
+                                    <div className={`flex-1 flex items-center gap-2 p-3 rounded-xl ${inputBg} ${activeInputIndex === idx ? 'ring-2 ring-[#00D68F] bg-white dark:bg-[#1C1C1E]' : 'bg-white/60 dark:bg-[#1C1C1E]/60'} backdrop-blur-md transition-all shadow-sm`}>
                                         <Search size={16} className={`${textSec} ml-1`} />
                                         <input
                                             placeholder={
@@ -186,7 +187,7 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
                                                     ? "Enter destination or Plus Code"
                                                     : `Stop ${idx + 1}`
                                             }
-                                            className="bg-transparent outline-none flex-1 font-bold text-base h-8"
+                                            className="bg-transparent outline-none flex-1 font-bold text-base h-8 text-black dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                             value={searchQueries[idx] || ''}
                                             onChange={(e) => handleSearch(e.target.value, idx)}
                                             onFocus={() => setActiveInputIndex(idx)}
@@ -221,8 +222,8 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
                             </div>
                         ))}
 
-                        <div className="relative flex items-center gap-3 pl-0.5 pt-2">
-                            <div className="w-3.5 flex justify-center"><Plus size={18} className="text-[#00D68F]" /></div>
+                        <div className="relative flex items-center gap-3 pt-2">
+                            <div className="w-10 flex justify-center"><Plus size={18} className="text-[#00D68F]" /></div>
                             <button onClick={() => {
                                 addDestination();
                                 setSearchQueries([...searchQueries, '']);
@@ -233,7 +234,7 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
                 </div>
 
                 {/* Predictions Area */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50 dark:bg-black/20">
+                <div className="flex-1 overflow-y-auto px-4 py-4 bg-transparent">
                     {activeInputIndex !== null && predictions.length > 0 ? (
                         <div className="space-y-2">
                             {predictions.map((p: any) => (
@@ -267,11 +268,11 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
             </div>
 
             {/* Footer Action */}
-            <div className={`p-6 ${bgCard} pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)] border-t border-gray-100 dark:border-gray-800`}>
+            <div className={`p-6 bg-white/80 dark:bg-black/80 backdrop-blur-2xl pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t border-gray-100 dark:border-gray-800`}>
                 <button
                     onClick={handleConfirm}
                     disabled={!destinations.some(d => d.trim() !== '')}
-                    className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    className="w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 active:scale-[0.98] transition-transform"
                 >
                     Confirm Route
                 </button>
