@@ -142,7 +142,7 @@ const App = () => {
     }
 
     // Web needs interaction for permission, but let's try once if already granted
-    if (Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       startFCM();
     }
 
@@ -268,6 +268,10 @@ const App = () => {
         );
       } catch (err) {
         console.error("Geolocation error:", err);
+        // Fallback or silent fail to prevent app crash
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          // Maybe notify user once if they expect location features
+        }
       }
     };
 
@@ -437,46 +441,62 @@ const App = () => {
       const minTime = new Promise(resolve => setTimeout(resolve, 3500));
 
       const sessionCheck = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-          if (profile) {
-            setUser({
-              id: profile.id,
-              name: profile.full_name || '',
-              phone: profile.phone || '',
-              email: profile.email || '',
-              location: profile.location || 'Banjul, The Gambia',
-              photo: profile.avatar_url || null,
-              role: profile.role || 'customer',
-              rating: Number(profile.average_rating) || 5.0,
-              referralCode: profile.referral_code || '',
-              referralBalance: profile.referral_balance || 0,
-              last_lat: profile.last_lat,
-              last_lng: profile.last_lng
-            });
-            fetchFavorites(session.user.id);
-            fetchActivities(session.user.id);
-            subscribeToChanges(session.user.id);
-            initFCM(session.user.id);
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+            if (profile) {
+              setUser({
+                id: profile.id,
+                name: profile.full_name || '',
+                phone: profile.phone || '',
+                email: profile.email || '',
+                location: profile.location || 'Banjul, The Gambia',
+                photo: profile.avatar_url || null,
+                role: profile.role || 'customer',
+                rating: Number(profile.average_rating) || 5.0,
+                referralCode: profile.referral_code || '',
+                referralBalance: profile.referral_balance || 0,
+                last_lat: profile.last_lat,
+                last_lng: profile.last_lng
+              });
+              fetchFavorites(session.user.id);
+              fetchActivities(session.user.id);
+              subscribeToChanges(session.user.id);
 
-            // Enforce full_name for onboarding
-            if (!profile.full_name) {
-              setScreen('onboarding');
+              // Only init if API exists and not in a restricted environment that crashes
+              if (typeof Notification !== 'undefined') {
+                initFCM(session.user.id);
+              }
+
+              // Enforce full_name for onboarding
+              if (!profile.full_name) {
+                setScreen('onboarding');
+              } else {
+                setScreen('dashboard');
+              }
             } else {
-              setScreen('dashboard');
+              setScreen('onboarding');
             }
           } else {
             setScreen('onboarding');
+            if (typeof Notification !== 'undefined') {
+              initFCM();
+            }
           }
-        } else {
-          setScreen('onboarding');
-          initFCM();
+        } catch (err) {
+          console.error("Session check failed:", err);
+          setScreen('onboarding'); // Fallback to onboarding on error
         }
       };
 
-      await Promise.all([minTime, sessionCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
-      setIsLoading(false);
+      try {
+        await Promise.all([minTime, sessionCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
+      } catch (err) {
+        console.error("Initialization error:", err);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     const subscribeToChanges = (userId?: string) => {

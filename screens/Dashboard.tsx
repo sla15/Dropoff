@@ -126,7 +126,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         isGranted = perm.receive === 'granted';
         isDefault = perm.receive === 'prompt';
       } else {
-        const permission = (Notification as any)?.permission;
+        const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
         isGranted = permission === 'granted';
         isDefault = permission === 'default';
       }
