@@ -17,9 +17,10 @@ export const sendPushNotification = async (title: string, message: string, targe
             return;
         }
 
+        // Correct key mismatch: Edge function expects 'userIds'
         const { data, error } = await supabase.functions.invoke('send-fcm-notification', {
             body: {
-                user_ids: [finalUserId],
+                userIds: [finalUserId],
                 title,
                 message,
                 target
