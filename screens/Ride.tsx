@@ -96,7 +96,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>(['']);
+    const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>([null]);
     const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
@@ -444,14 +444,16 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         label: '1'
                     });
 
-                    // Store marker in ref to manage it later
+                    if (markersRef.current[0]) {
+                        markersRef.current[0].setMap(null);
+                    }
                     markersRef.current = [marker];
 
+                    // Save coordinate for booking
+                    setDestinationCoords([{ lat: loc.lat(), lng: loc.lng() }]);
+
                     // If we have prefilled distance, just draw the route visually
-                    // Don't recalculate to save API calls and use cached distance
-                    console.log("Checking prefilledDistance for logic:", prefilledDistance);
                     if (prefilledDistance) {
-                        console.log("Drawing route with cached distance, skipping Distance Matrix API call");
                         const directionsService = new (window as any).google.maps.DirectionsService();
                         directionsService.route({
                             origin: userLocation || { lat: 13.4432, lng: -16.5916 },
@@ -460,10 +462,16 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         }, (result: any, routeStatus: string) => {
                             if (routeStatus === 'OK') {
                                 directionsRenderer.setDirections(result);
+
+                                // Update coords from route legs for accuracy
+                                const route = result.routes[0];
+                                if (route && route.legs) {
+                                    const newCoords = [{ lat: route.legs[0].end_location.lat(), lng: route.legs[0].end_location.lng() }];
+                                    setDestinationCoords(newCoords);
+                                }
                             }
                         });
                     } else {
-                        // No cached distance, calculate it
                         calculateRouteAndPrice();
                     }
 
@@ -688,10 +696,20 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     let totalSeconds = 0;
                     const route = result.routes[0];
                     if (route && route.legs) {
-                        route.legs.forEach((leg: any) => {
+                        const newCoords = [...destinationCoords];
+                        route.legs.forEach((leg: any, i: number) => {
                             totalMeters += leg.distance.value;
                             totalSeconds += leg.duration.value;
+
+                            // Save coordinates for each destination/waypoint
+                            if (i < newCoords.length) {
+                                newCoords[i] = {
+                                    lat: leg.end_location.lat(),
+                                    lng: leg.end_location.lng()
+                                };
+                            }
                         });
+                        setDestinationCoords(newCoords);
                     }
                     const km = totalMeters / 1000;
                     const mins = totalSeconds / 60;
@@ -823,6 +841,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         markersRef.current[targetIdx].setMap(null);
                     }
                     markersRef.current[targetIdx] = marker;
+
+                    // Update coordinates for booking
+                    const newCoords = [...destinationCoords];
+                    newCoords[targetIdx] = { lat: latLng.lat(), lng: latLng.lng() };
+                    setDestinationCoords(newCoords);
+
                     triggerHaptic();
                 }
             });
