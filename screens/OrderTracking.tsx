@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2, X, Plus } from 'lucide-react';
 import { Theme, Screen, UserData, Activity } from '../types';
-import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, getInitialAvatar } from '../utils/helpers';
 import { GreenGlow } from '../components/GreenGlow';
 import { supabase } from '../supabaseClient';
 
@@ -36,6 +36,14 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     const [batchOrders, setBatchOrders] = useState<any[]>([]);
     const [driver, setDriver] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Review State
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [reviewBusiness, setReviewBusiness] = useState<{ id: string, name: string } | null>(null);
+    const [userRating, setUserRating] = useState(5);
+    const [userComment, setUserComment] = useState('');
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+    const [reviewedIds, setReviewedIds] = useState<string[]>([]);
 
     const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
     const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -100,7 +108,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
             if (activeBatchId) {
                 const { data: orders, error } = await supabase
                     .from('orders')
-                    .select('*')
+                    .select('*, businesses(name, image_url)')
                     .eq('batch_id', activeBatchId);
 
                 if (error) throw error;
@@ -110,10 +118,10 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                         await fetchDriver(orders[0].driver_id);
                     }
                 }
-            } else {
+            } else if (activeOrderId) {
                 const { data: order, error } = await supabase
                     .from('orders')
-                    .select('*')
+                    .select('*, businesses(name, image_url)')
                     .eq('id', activeOrderId)
                     .maybeSingle();
 
@@ -209,7 +217,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     console.error("Cancel Order Error:", err);
                     showAlert("Error", "Could not cancel order. Please try again.", "error");
                 } finally {
-                    setIsLoading(true);
+                    setIsLoading(false);
                 }
             },
             true,
@@ -227,6 +235,37 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     };
 
     const Config = statusConfig[status];
+
+    const handleSubmitReview = async () => {
+        if (!reviewBusiness || isSubmittingReview) return;
+        setIsSubmittingReview(true);
+        triggerHaptic();
+
+        try {
+            const { error } = await supabase
+                .from('business_reviews')
+                .insert({
+                    business_id: reviewBusiness.id,
+                    user_id: user.id,
+                    rating: userRating,
+                    comment: userComment
+                });
+
+            if (error) throw error;
+
+            setReviewedIds(prev => [...prev, reviewBusiness.id]);
+            setShowReviewModal(false);
+            setUserComment('');
+            setUserRating(5);
+            setReviewBusiness(null);
+            showAlert("Success", "Thank you for your review!", "success");
+        } catch (err: any) {
+            console.error("Review Submission Error:", err);
+            showAlert("Error", "Could not submit review. Please try again.", "error");
+        } finally {
+            setIsSubmittingReview(false);
+        }
+    };
 
     if (isLoading && !orderInfo) {
         return (
@@ -345,6 +384,64 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     </div>
                 </div>
 
+                {status === 'delivered' && (
+                    <div className={`${bgCard} mt-6 rounded-[28px] p-6 shadow-sm border-2 border-[#00D68F]/20 animate-scale-in`}>
+                        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <Star className="text-orange-400 fill-orange-400" size={20} />
+                            How was your experience?
+                        </h2>
+                        <div className="space-y-4">
+                            {activeBatchId ? (
+                                batchOrders.map((order, idx) => {
+                                    const biz = order.businesses;
+                                    const bizName = biz?.name || `Shop ${idx + 1}`;
+                                    const bizLogo = biz?.image_url || getInitialAvatar(bizName, 40);
+
+                                    return (
+                                        <div key={order.id} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-white/5">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                                                    <img src={bizLogo} className="w-full h-full object-cover" />
+                                                </div>
+                                                <p className="font-bold text-sm">{bizName}</p>
+                                            </div>
+                                            <button
+                                                disabled={reviewedIds.includes(order.business_id)}
+                                                onClick={() => {
+                                                    setReviewBusiness({ id: order.business_id, name: bizName });
+                                                    setShowReviewModal(true);
+                                                }}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold ${reviewedIds.includes(order.business_id) ? 'bg-gray-100 text-gray-400' : 'bg-[#00D68F] text-black active:scale-95'}`}
+                                            >
+                                                {reviewedIds.includes(order.business_id) ? 'Rated' : 'Rate Now'}
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
+                                            <img src={orderInfo?.businesses?.image_url || getInitialAvatar(orderInfo?.businesses?.name || 'Merchant', 40)} className="w-full h-full object-cover" />
+                                        </div>
+                                        <p className="font-bold text-sm">{orderInfo?.businesses?.name || 'Merchant'}</p>
+                                    </div>
+                                    <button
+                                        disabled={reviewedIds.includes(orderInfo?.business_id)}
+                                        onClick={() => {
+                                            setReviewBusiness({ id: orderInfo?.business_id, name: orderInfo?.businesses?.name || 'the merchant' });
+                                            setShowReviewModal(true);
+                                        }}
+                                        className={`px-6 py-2.5 rounded-xl text-xs font-bold ${reviewedIds.includes(orderInfo?.business_id) ? 'bg-gray-100 text-gray-400' : 'bg-[#00D68F] text-black active:scale-95'}`}
+                                    >
+                                        {reviewedIds.includes(orderInfo?.business_id) ? 'Rated' : 'Rate Merchant'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {driver ? (
                     <div className={`${bgCard} mt-6 rounded-[28px] p-6 shadow-sm border border-white/5`}>
                         <div className="flex items-center justify-between mb-4">
@@ -391,7 +488,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     </div>
                 )}
 
-                {orderInfo?.status === 'pending' && (
+                {(orderInfo?.status === 'pending' || orderInfo?.status === 'accepted') && (
                     <button
                         onClick={handleCancelOrder}
                         className="mt-8 w-full py-4 rounded-2xl border-2 border-red-500/20 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 active:bg-red-500/10 transition-all shadow-sm"
@@ -401,6 +498,52 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     </button>
                 )}
             </div>
+
+            {/* Review Modal */}
+            {showReviewModal && reviewBusiness && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}></div>
+                    <div className={`${theme === 'light' ? 'bg-white/80' : 'bg-[#1C1C1E]/80'} backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 relative z-10 animate-scale-in`}>
+                        <h2 className="text-2xl font-bold mb-2">Rate {reviewBusiness.name}</h2>
+                        <p className={`text-sm ${textSec} mb-6`}>How was your experience today?</p>
+
+                        <div className="flex justify-center gap-2 mb-8">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                    key={star}
+                                    onClick={() => { triggerHaptic(); setUserRating(star); }}
+                                    className={`transition-transform active:scale-90 ${userRating >= star ? 'text-orange-400' : 'text-gray-300 dark:text-gray-700'}`}
+                                >
+                                    <Star size={32} fill={userRating >= star ? "currentColor" : "none"} strokeWidth={2} />
+                                </button>
+                            ))}
+                        </div>
+
+                        <textarea
+                            value={userComment}
+                            onChange={(e) => setUserComment(e.target.value)}
+                            placeholder="Tell us what you loved or how we can improve..."
+                            className={`w-full h-32 p-4 rounded-2xl ${theme === 'light' ? 'bg-[#F2F2F7]/50 border border-white/40' : 'bg-white/10 border border-white/5'} backdrop-blur-md outline-none focus:ring-2 focus:ring-[#00D68F] mb-6 resize-none text-sm font-medium`}
+                        ></textarea>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowReviewModal(false)}
+                                className={`flex-1 py-4 rounded-2xl font-bold ${theme === 'light' ? 'bg-gray-100' : 'bg-white/5'} active:scale-95 transition-transform`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSubmitReview}
+                                disabled={isSubmittingReview}
+                                className="flex-1 py-4 bg-[#00D68F] text-black rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+                            >
+                                {isSubmittingReview ? <Loader2 size={20} className="animate-spin" /> : 'Submit'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

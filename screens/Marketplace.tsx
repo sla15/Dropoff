@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Search, Star, MapPin, Heart } from 'lucide-react';
 import { Theme, Screen, Business, Category, UserData } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
 
 interface Props {
    theme: Theme;
@@ -133,7 +133,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                   >
                      {/* Logo / Image on Left */}
                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800 border border-black/5 dark:border-white/5 relative">
-                        <img src={b.logo || b.image} className="w-full h-full object-cover" alt={b.name} />
+                        <img src={b.logo || b.image || getInitialAvatar(b.name, 64)} className="w-full h-full object-cover" alt={b.name} />
                         {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
                      </div>
 

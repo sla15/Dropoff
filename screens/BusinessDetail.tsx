@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2 } from 'lucide-react';
 import { Theme, Screen, Business, Product, CartItem } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 
 interface Props {
@@ -157,7 +157,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
             {/* Header Image & Back Button */}
             <div className="h-64 relative shrink-0">
-                <img src={selectedBusiness.image} className="w-full h-full object-cover" alt={selectedBusiness.name} />
+                <img src={selectedBusiness.image || getInitialAvatar(selectedBusiness.name, 400)} className="w-full h-full object-cover" alt={selectedBusiness.name} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
 
                 {/* Consistent Back Button Style */}

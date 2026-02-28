@@ -203,14 +203,19 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
             // Generate batch_id for multi-merchant orders
             const batchId = uniqueBusinessIds.length > 1 ? crypto.randomUUID() : null;
+            let firstOrderId: string | null = null;
 
             // 1. Split cart by merchant and create orders
             for (const [bizId, items] of Object.entries(groupedCart)) {
                 const bizSubtotal = items.reduce((acc, i) => acc + (i.price * i.quantity), 0);
 
-                // Split delivery fee proportionally based on subtotal
-                const merchantDeliveryShare = deliveryFee * (bizSubtotal / subtotal);
+                // Split delivery fee proportionally based on subtotal (with safety check)
+                const merchantDeliveryShare = subtotal > 0 ? deliveryFee * (bizSubtotal / subtotal) : 0;
                 const orderTotal = bizSubtotal + merchantDeliveryShare;
+
+                if (isNaN(orderTotal)) {
+                    throw new Error("Invalid order total calculation. Please check your cart items.");
+                }
 
                 const { data: orderData, error: orderError } = await supabase
                     .from('orders')
@@ -218,7 +223,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         customer_id: customerId,
                         business_id: bizId,
                         batch_id: batchId,
-                        total_amount: orderTotal,
+                        total_amount: Number(orderTotal.toFixed(2)),
                         status: 'pending',
                         delivery_instructions: deliveryNote,
                         delivery_address: deliveryLocation.address
@@ -226,8 +231,13 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     .select()
                     .single();
 
-                if (orderError) throw orderError;
-                if (!orderData) throw new Error("Could not create order. Please try again.");
+                if (orderError) {
+                    console.error("Order Insert Error Details:", orderError);
+                    throw new Error(`Order failed at ${merchants[bizId]?.name || 'Merchant'}: ${orderError.message}`);
+                }
+                if (!orderData) throw new Error("Could not create order row. Please try again.");
+
+                if (!firstOrderId) firstOrderId = orderData.id;
 
                 // 2. Insert Order Items
                 const orderItemsToInsert = items.map(item => ({
@@ -241,22 +251,27 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     .from('order_items')
                     .insert(orderItemsToInsert);
 
-                if (itemsError) throw itemsError;
-
-                // Track this order specifically for real-time tracking
-                setActiveOrderId(orderData.id);
+                if (itemsError) {
+                    console.error("Order Items Insert Error Details:", itemsError);
+                    throw new Error(`Items failed for ${merchants[bizId]?.name || 'Merchant'}: ${itemsError.message}`);
+                }
             }
 
+            // Track for real-time tracking
             if (batchId) {
                 setActiveBatchId(batchId);
+                setActiveOrderId(null); // Clear single order ID if using batch
+            } else if (firstOrderId) {
+                setActiveOrderId(firstOrderId);
+                setActiveBatchId(null);
             }
 
             // 3. Success
             setCart([]);
             navigate('order-tracking');
         } catch (err: any) {
-            console.error("Order Placement Error:", err);
-            showAlert("Order Failed", err.message, "error");
+            console.error("Order Placement Final Catch:", err);
+            showAlert("Order Failed", err.message || "An unexpected error occurred. Please try again.", "error");
         } finally {
             setIsSubmitting(false);
         }
