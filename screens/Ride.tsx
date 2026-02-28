@@ -96,6 +96,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>(['']);
     const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
@@ -732,8 +733,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         newDestinations[index] = value;
         setDestinations(newDestinations);
 
-        // If cleared, also clear the marker and route
+        // Clear associated coordinates if the value is cleared
         if (!value.trim()) {
+            const newCoords = [...destinationCoords];
+            newCoords[index] = null;
+            setDestinationCoords(newCoords);
+
             if (markersRef.current[index]) {
                 markersRef.current[index].setMap(null);
                 markersRef.current[index] = null;
@@ -746,12 +751,15 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     const addDestination = () => {
         setDestinations([...destinations, '']);
+        setDestinationCoords([...destinationCoords, null]);
     };
 
     const removeDestination = (index: number) => {
         if (destinations.length > 1) {
             const newDestinations = destinations.filter((_, i) => i !== index);
             setDestinations(newDestinations);
+            const newCoords = destinationCoords.filter((_, i) => i !== index);
+            setDestinationCoords(newCoords);
 
             // Manage markers ref
             if (markersRef.current[index]) {
@@ -912,6 +920,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 });
 
                 markersRef.current[targetIdx] = marker;
+
+                // Persist coordinates for booking
+                const newCoords = [...destinationCoords];
+                newCoords[targetIdx] = { lat: loc.lat(), lng: loc.lng() };
+                setDestinationCoords(newCoords);
             } else {
                 showAlert("Location Error", "We couldn't accurately find this place. Please try another search.", "error");
             }
@@ -981,6 +994,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 pickup_lat,
                 pickup_lng,
                 dropoff_address: destinations[destinations.length - 1],
+                dropoff_lat: destinationCoords[destinationCoords.length - 1]?.lat,
+                dropoff_lng: destinationCoords[destinationCoords.length - 1]?.lng,
                 price: calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice,
                 status: 'searching',
                 ride_type: rideType,
