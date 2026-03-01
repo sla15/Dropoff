@@ -39,11 +39,12 @@ interface Props {
     onCancel?: () => void
   ) => void;
   activeOrderId: string | null;
+  activeBatchId: string | null;
 }
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
@@ -168,40 +169,27 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           // 1. Remove from UI immediately
           setRecentActivities(prev => prev.filter(a => a.id !== activity.id));
 
-          // 2. Determine target ID (use reference_id if available, fallback to activity.id)
-          const targetId = activity.reference_id || activity.id;
-          const table = activity.type === 'ride' ? 'rides' : 'orders';
+          // 2. Update localStorage to match UI
+          const currentSaved = JSON.parse(localStorage.getItem('app_recent_activities') || '[]');
+          const updatedSaved = currentSaved.filter((a: any) => a.id !== activity.id);
+          localStorage.setItem('app_recent_activities', JSON.stringify(updatedSaved));
 
-          // 3. If it's a ride, attempt to delete from distance_cache first
-          if (activity.type === 'ride') {
-            const { data: ride } = await supabase
-              .from('rides')
-              .select('pickup_lat, pickup_lng, dropoff_lat, dropoff_lng')
-              .eq('id', targetId)
-              .maybeSingle();
-
-            if (ride) {
-              // Delete both direct and reverse cache entries
-              await supabase
-                .from('distance_cache')
-                .delete()
-                .or(`and(origin_lat.eq.${ride.pickup_lat},origin_lng.eq.${ride.pickup_lng},dest_lat.eq.${ride.dropoff_lat},dest_lng.eq.${ride.dropoff_lng}),and(origin_lat.eq.${ride.dropoff_lat},origin_lng.eq.${ride.dropoff_lng},dest_lat.eq.${ride.pickup_lat},dest_lng.eq.${ride.pickup_lng})`);
-            }
-          }
-
-          // 4. Delete from source table (rides/orders)
-          await supabase
-            .from(table)
-            .delete()
-            .eq('id', targetId);
-
-          // 5. Delete the activity record itself
-          await supabase
+          // 3. Delete from Supabase user_activities table ONLY
+          const { error } = await supabase
             .from('user_activities')
             .delete()
             .eq('id', activity.id);
 
-          console.log(`✅ ${activity.type} and associated data deleted.`);
+          if (error) {
+            // Revert UI and LocalStorage on error
+            setRecentActivities(prev => [...prev, activity].sort((a, b) =>
+              new Date(b.date).getTime() - new Date(a.date).getTime()
+            ));
+            localStorage.setItem('app_recent_activities', JSON.stringify(currentSaved));
+            throw error;
+          }
+
+          console.log(`✅ Activity log deleted.`);
         } catch (err) {
           console.error("Delete Activity Error:", err);
           showAlert("Error", "Something went wrong during deletion.", "error");
@@ -508,11 +496,18 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               {businesses.filter(b => favorites.includes(b.id)).slice(0, 5).map(b => (
                 <div
                   key={b.id}
-                  onClick={() => { triggerHaptic(); setSelectedBusiness(b); navigate('business-detail', true); }}
-                  className={`min-w-[170px] p-4 rounded-[28px] ${bgCard} shadow-sm cursor-pointer border border-gray-100 dark:border-white/5 hover:border-[#00D68F] active:scale-98 transition-all flex flex-col gap-3 group`}
+                  onClick={() => {
+                    if (b.isOpen) {
+                      triggerHaptic();
+                      setSelectedBusiness(b);
+                      navigate('business-detail', true);
+                    }
+                  }}
+                  className={`min-w-[170px] p-4 rounded-[28px] ${bgCard} shadow-sm border border-gray-100 dark:border-white/5 transition-all flex flex-col gap-3 group ${b.isOpen ? 'cursor-pointer hover:border-[#00D68F] active:scale-98' : 'opacity-50 grayscale cursor-not-allowed'}`}
                 >
                   <div className="w-full h-28 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
                     <img src={b.logo || b.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={b.name} />
+                    {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
                   </div>
                   <div className="px-1 text-center">
                     <div className="font-bold text-sm truncate">{b.name}</div>
@@ -695,7 +690,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
       )}
 
-      {activeOrderId && (
+      {(activeOrderId || activeBatchId) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] md:max-w-[400px] z-50">
           <button
             onClick={() => navigate('order-tracking')}

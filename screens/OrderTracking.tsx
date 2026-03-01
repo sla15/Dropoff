@@ -88,16 +88,19 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         if (activeBatchId && batchOrders.length > 0) {
             // Calculate aggregate status
             const statuses = batchOrders.map(o => o.status);
+            let aggregateStatus = 'pending';
 
             // Priority for global status
-            if (statuses.every(s => s === 'completed')) handleStatusUpdate(batchOrders[0]);
-            else if (statuses.some(s => s === 'delivering')) setStatus('picked-up');
-            else if (statuses.some(s => s === 'ready' || s === 'preparing')) setStatus('preparing');
-            else setStatus('pending');
+            if (statuses.every(s => s === 'completed')) aggregateStatus = 'completed';
+            else if (statuses.some(s => s === 'delivering')) aggregateStatus = 'delivering';
+            else if (statuses.some(s => s === 'ready' || s === 'preparing')) aggregateStatus = 'preparing';
 
             // Find an order that best represents the current driver context
             const activeOrder = batchOrders.find(o => ['delivering', 'ready', 'preparing'].includes(o.status)) || batchOrders[0];
-            setOrderInfo(activeOrder);
+
+            // Generate a synthetic order object to pass to handleStatusUpdate
+            // This ensures both the text status and the visual progress bar are updated
+            handleStatusUpdate({ ...activeOrder, status: aggregateStatus });
         }
     }, [batchOrders, activeBatchId]);
 
@@ -179,6 +182,9 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
             case 'cancelled':
                 showAlert("Order Cancelled", "This order has been cancelled.", "info");
                 setActiveOrderId(null);
+                setActiveBatchId(null);
+                localStorage.removeItem('active_order_id');
+                localStorage.removeItem('active_batch_id');
                 navigate('dashboard');
                 break;
         }

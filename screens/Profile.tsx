@@ -511,17 +511,22 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                                                     // Update local state first for immediate UI feedback
                                                                     setRecentActivities(prev => prev.filter(a => a.id !== item.id));
 
+                                                                    // Update localStorage to match
+                                                                    const currentSaved = JSON.parse(localStorage.getItem('app_recent_activities') || '[]');
+                                                                    const updatedSaved = currentSaved.filter((a: any) => a.id !== item.id);
+                                                                    localStorage.setItem('app_recent_activities', JSON.stringify(updatedSaved));
+
                                                                     // Delete from Supabase
-                                                                    const table = item.type === 'ride' ? 'rides' : 'orders';
-                                                                    const { error } = await supabase.from(table).delete().eq('id', item.id);
+                                                                    const { error } = await supabase.from('user_activities').delete().eq('id', item.id);
 
                                                                     if (error) {
-                                                                        console.error(`Error deleting ${item.type}:`, error);
-                                                                        showAlert("Delete Failed", `Failed to delete ${item.type} from history.`, "error");
-                                                                        // Revert local state on error
+                                                                        console.error(`Error deleting activity:`, error);
+                                                                        showAlert("Delete Failed", `Failed to delete activity from history.`, "error");
+                                                                        // Revert local state and localStorage on error
                                                                         setRecentActivities(prev => [...prev, item].sort((a, b) =>
                                                                             new Date(b.date).getTime() - new Date(a.date).getTime()
                                                                         ));
+                                                                        localStorage.setItem('app_recent_activities', JSON.stringify(currentSaved));
                                                                     }
                                                                 } catch (err) {
                                                                     console.error("Delete Activity Error:", err);
@@ -559,11 +564,23 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                     ) : (
                         <div className="space-y-4">
                             {businesses.filter(b => favorites.includes(b.id)).map(b => (
-                                <div key={b.id} onClick={() => navigate('business-detail')} className={`p-3 rounded-2xl ${inputBg} flex gap-4 cursor-pointer`}>
-                                    <img src={b.image} className="w-16 h-16 rounded-xl object-cover" />
-                                    <div className="flex-1 py-1">
-                                        <h4 className="font-bold">{b.name}</h4>
-                                        <p className={`text-xs ${textSec}`}>{b.category} • {b.distance}</p>
+                                <div
+                                    key={b.id}
+                                    onClick={() => {
+                                        if (b.isOpen) {
+                                            triggerHaptic();
+                                            navigate('business-detail');
+                                        }
+                                    }}
+                                    className={`p-3 rounded-2xl border border-transparent dark:border-white/5 shadow-sm ${inputBg} flex gap-4 transition-all duration-300 ${b.isOpen ? 'cursor-pointer active:scale-95' : 'opacity-50 grayscale cursor-not-allowed'}`}
+                                >
+                                    <div className="w-16 h-16 rounded-xl overflow-hidden relative shrink-0">
+                                        <img src={b.image} className="w-full h-full object-cover" alt={b.name} />
+                                        {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
+                                    </div>
+                                    <div className="flex-1 py-1 min-w-0">
+                                        <h4 className="font-bold truncate">{b.name}</h4>
+                                        <p className={`text-xs ${textSec} truncate`}>{b.category} • {b.distance}</p>
                                         <div className="flex items-center gap-1 mt-1 text-xs font-bold text-orange-500">
                                             <Star size={10} fill="currentColor" /> {b.rating}
                                         </div>

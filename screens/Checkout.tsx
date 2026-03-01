@@ -201,8 +201,8 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                 throw new Error(`The following businesses are currently closed: ${names}. Please remove their items from your cart to proceed.`);
             }
 
-            // Generate batch_id for multi-merchant orders
-            const batchId = uniqueBusinessIds.length > 1 ? crypto.randomUUID() : null;
+            // Generate batch_id for all orders (backend relies on this for merchant/driver visibility)
+            const batchId = crypto.randomUUID();
             let firstOrderId: string | null = null;
 
             // 1. Split cart by merchant and create orders

@@ -387,7 +387,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 .from('rides')
                 .select('*')
                 .eq('customer_id', session.user.id)
-                .in('status', ['accepted', 'arrived', 'in-progress']) // EXCLUDED 'searching'
+                .in('status', ['accepted', 'arrived', 'in-progress'])
+                .neq('type', 'MERCHANT_DELIVERY') // EXCLUDE store/merchant deliveries
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();

@@ -128,7 +128,12 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                filteredBusinesses.map(b => (
                   <div
                      key={b.id}
-                     onClick={() => { setSelectedBusiness(b); navigate('business-detail', true); }}
+                     onClick={() => {
+                        if (b.isOpen) {
+                           setSelectedBusiness(b);
+                           navigate('business-detail', true);
+                        }
+                     }}
                      className={`group ${bgCard} p-4 rounded-[24px] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border-b border-transparent dark:border-white/5 ${b.isOpen ? 'cursor-pointer active:scale-[0.98] hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,0,0,0.06)]' : 'opacity-50 grayscale cursor-not-allowed'} transition-all duration-300 flex items-center gap-4`}
                   >
                      {/* Logo / Image on Left */}

@@ -199,7 +199,16 @@ const App = () => {
   const [businesses, setBusinesses] = useState<Business[]>(INITIAL_BUSINESSES);
   const [categories, setCategories] = useState<Category[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
+  const [recentActivities, setRecentActivities] = useState<Activity[]>(() => {
+    try {
+      const saved = localStorage.getItem('app_recent_activities');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to parse activities from localStorage", e);
+      localStorage.removeItem('app_recent_activities');
+      return [];
+    }
+  });
 
   const showAlert = (
     title: string,
@@ -419,7 +428,7 @@ const App = () => {
         .limit(20);
 
       if (data && !error) {
-        setRecentActivities(data.map((a: any) => ({
+        const formattedActivities = data.map((a: any) => ({
           id: a.id,
           type: a.type,
           title: a.title,
@@ -429,7 +438,10 @@ const App = () => {
           created_at: a.created_at,
           status: a.status as 'completed' | 'cancelled',
           reference_id: a.reference_id
-        })));
+        }));
+
+        setRecentActivities(formattedActivities);
+        localStorage.setItem('app_recent_activities', JSON.stringify(formattedActivities));
       }
     } catch (err) { console.error("Activities Fetch Error:", err); }
   };
@@ -616,7 +628,29 @@ const App = () => {
   const renderScreen = () => {
     switch (screen) {
       case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
-      case 'dashboard': return <DashboardScreen user={user} theme={theme} navigate={navigate} toggleTheme={toggleTheme} setShowAssistant={setShowAssistant} favorites={favorites} businesses={businesses} recentActivities={recentActivities} setRecentActivities={setRecentActivities} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} setPrefilledDestination={setPrefilledDestination} setPrefilledTier={setPrefilledTier} setPrefilledDistance={setPrefilledDistance} setMarketSearchQuery={setMarketSearchQuery} settings={settings} showAlert={showAlert} activeOrderId={activeOrderId} />;
+      case 'dashboard': return <DashboardScreen
+        user={user}
+        theme={theme}
+        navigate={navigate}
+        toggleTheme={toggleTheme}
+        setShowAssistant={setShowAssistant}
+        favorites={favorites}
+        businesses={businesses}
+        recentActivities={recentActivities}
+        setRecentActivities={setRecentActivities}
+        setSelectedBusiness={setSelectedBusiness}
+        isScrolling={isScrolling}
+        isNavVisible={isNavVisible}
+        handleScroll={handleScroll}
+        setPrefilledDestination={setPrefilledDestination}
+        setPrefilledTier={setPrefilledTier}
+        setPrefilledDistance={setPrefilledDistance}
+        setMarketSearchQuery={setMarketSearchQuery}
+        settings={settings}
+        showAlert={showAlert}
+        activeOrderId={activeOrderId}
+        activeBatchId={activeBatchId}
+      />;
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
