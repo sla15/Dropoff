@@ -37,6 +37,7 @@ export interface Business {
   owner_id?: string;
   location: string;
   isOpen: boolean;
+  working_hours?: { start: string; end: string };
   distance: string;
   lat?: number;
   lng?: number;
@@ -115,5 +116,6 @@ export interface AppSettings {
   multiplier_economy: number;
   multiplier_premium: number;
   price_per_km: number;
+  price_per_stop: number;
   waiting_fee_per_min: number;
 }

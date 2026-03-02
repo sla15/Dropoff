@@ -139,7 +139,12 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                      {/* Logo / Image on Left */}
                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 dark:bg-gray-800 border border-black/5 dark:border-white/5 relative">
                         <img src={b.logo || b.image || getInitialAvatar(b.name, 64)} className="w-full h-full object-cover" alt={b.name} />
-                        {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
+                        {!b.isOpen && (
+                           <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[7px] font-bold text-white uppercase backdrop-blur-sm px-1 text-center">
+                              <div>Closed</div>
+                              {b.working_hours?.start && <div className="mt-0.5 opacity-80">Opens at {b.working_hours.start}</div>}
+                           </div>
+                        )}
                      </div>
 
                      {/* Content Middle */}
@@ -153,9 +158,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                            <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${b.rating >= 5.0 ? 'bg-[#00D68F]/10 text-[#00D68F]' : b.rating >= 3.8 ? 'bg-orange-500/10 text-orange-600' : 'bg-red-500/10 text-red-600'}`}>
                               <Star size={10} fill="currentColor" /> {b.rating}
                            </span>
-                           <span className={`flex items-center gap-1 ${textSec}`}>
-                              <MapPin size={10} /> {user.last_lat && user.last_lng && b.lat && b.lng ? `${getDistance(user.last_lat, user.last_lng, b.lat, b.lng).toFixed(1)} km` : b.distance}
-                           </span>
+
                         </div>
                      </div>
 

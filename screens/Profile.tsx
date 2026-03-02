@@ -576,7 +576,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                 >
                                     <div className="w-16 h-16 rounded-xl overflow-hidden relative shrink-0">
                                         <img src={b.image} className="w-full h-full object-cover" alt={b.name} />
-                                        {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
+                                        {!b.isOpen && (
+                                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[7px] font-bold text-white uppercase backdrop-blur-sm px-1 text-center">
+                                                <div>Closed</div>
+                                                {b.working_hours?.start && <div className="mt-0.5 opacity-80">Opens at {b.working_hours.start}</div>}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 py-1 min-w-0">
                                         <h4 className="font-bold truncate">{b.name}</h4>

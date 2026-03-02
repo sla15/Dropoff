@@ -380,6 +380,31 @@ const App = () => {
     } catch (err) { console.error("Settings Fetch Error:", err); }
   };
 
+  // Precise Business Hours Check
+  const isBusinessOpen = (workingHours: { start: string, end: string } | null, dbIsOpen: boolean) => {
+    if (!workingHours) return dbIsOpen;
+
+    try {
+      const now = new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+
+      const [startH, startM] = workingHours.start.split(':').map(Number);
+      const [endH, endM] = workingHours.end.split(':').map(Number);
+
+      const startTime = startH * 60 + startM;
+      const endTime = endH * 60 + endM;
+
+      // Handle cases where closing time is after midnight (e.g. 09:00 - 02:00)
+      if (endTime < startTime) {
+        return currentTime >= startTime || currentTime <= endTime;
+      }
+
+      return currentTime >= startTime && currentTime <= endTime;
+    } catch (e) {
+      return dbIsOpen;
+    }
+  };
+
   const fetchBusinesses = async () => {
     try {
       const { data, error } = await supabase.from('businesses').select(`*`);
@@ -396,7 +421,8 @@ const App = () => {
           logo: b.image_url || null,
           phone: '',
           location: b.location_address || '',
-          isOpen: b.is_open,
+          isOpen: isBusinessOpen(b.working_hours, b.is_open),
+          working_hours: b.working_hours,
           distance: '2.5 km',
           products: []
         })));
@@ -654,7 +680,7 @@ const App = () => {
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
-      case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} />;
+      case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
       case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
       default: return null;

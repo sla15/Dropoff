@@ -25,9 +25,11 @@ interface Props {
     ) => void;
     setActiveOrderId: (id: string | null) => void;
     setActiveBatchId: (id: string | null) => void;
+    activeOrderId: string | null;
+    activeBatchId: string | null;
 }
 
-export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId, setActiveBatchId }: Props) => {
+export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, settings, showAlert, setActiveOrderId, setActiveBatchId, activeOrderId, activeBatchId }: Props) => {
     const [merchants, setMerchants] = useState<Record<string, { name: string, phone: string, lat?: number, lng?: number }>>({});
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,13 +48,18 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const getDeliveryFee = () => {
         if (!settings) return 0;
         const minFee = Number(settings.min_delivery_fee);
-        if (deliveryDistance === null) return minFee;
+        const pricePerStop = Number(settings.price_per_stop || 0);
+
+        // Multi-stop addition: (N-1) * price_per_stop
+        const stopAddition = Math.max(0, uniqueBusinessIds.length - 1) * pricePerStop;
+
+        if (deliveryDistance === null) return minFee + stopAddition;
 
         const pricePerKm = Number(settings.price_per_km);
         const distanceKm = deliveryDistance / 1000;
         const calculatedFee = distanceKm * pricePerKm;
 
-        return Math.max(minFee, calculatedFee);
+        return Math.max(minFee, calculatedFee) + stopAddition;
     };
 
     const deliveryFee = getDeliveryFee();
@@ -178,6 +185,17 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
     const handlePlaceOrder = async () => {
         if (cart.length === 0 || isSubmitting) return;
+
+        // One-order-at-a-time restriction
+        if (activeOrderId || activeBatchId) {
+            showAlert(
+                "Order in Progress",
+                "You already have an active order. Please wait until your ongoing order is completed or cancelled before placing a new one.",
+                "info"
+            );
+            return;
+        }
+
         setIsSubmitting(true);
         triggerHaptic();
 
@@ -190,12 +208,33 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             // Verify all businesses are open
             const { data: bizData, error: bizError } = await supabase
                 .from('businesses')
-                .select('id, name, is_open')
+                .select('id, name, is_open, working_hours')
                 .in('id', uniqueBusinessIds);
 
             if (bizError) throw bizError;
 
-            const closedBusinesses = bizData?.filter(b => !b.is_open) || [];
+            const closedBusinesses = bizData?.filter(b => {
+                // Double check with client-side clock
+                if (b.is_open === false) return true;
+                if (!b.working_hours) return false;
+
+                try {
+                    const now = new Date();
+                    const currentTime = now.getHours() * 60 + now.getMinutes();
+                    const [startH, startM] = (b.working_hours as any).start.split(':').map(Number);
+                    const [endH, endM] = (b.working_hours as any).end.split(':').map(Number);
+                    const startTime = startH * 60 + startM;
+                    const endTime = endH * 60 + endM;
+
+                    if (endTime < startTime) {
+                        return !(currentTime >= startTime || currentTime <= endTime);
+                    }
+                    return !(currentTime >= startTime && currentTime <= endTime);
+                } catch (e) {
+                    return !b.is_open;
+                }
+            }) || [];
+
             if (closedBusinesses.length > 0) {
                 const names = closedBusinesses.map(b => b.name).join(", ");
                 throw new Error(`The following businesses are currently closed: ${names}. Please remove their items from your cart to proceed.`);

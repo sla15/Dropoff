@@ -435,7 +435,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
             <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
               <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.4)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Ride</h2>
+              <h2 className="text-2xl font-black text-white tracking-tight">Ride & Delivery</h2>
               <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
             </div>
           </div>
@@ -507,7 +507,12 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 >
                   <div className="w-full h-28 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
                     <img src={b.logo || b.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={b.name} />
-                    {!b.isOpen && <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs font-bold text-white uppercase backdrop-blur-sm">Closed</div>}
+                    {!b.isOpen && (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[10px] font-bold text-white uppercase backdrop-blur-sm px-2 text-center">
+                        <div>Closed</div>
+                        {b.working_hours?.start && <div className="mt-0.5 opacity-80 text-[8px]">Opens at {b.working_hours.start}</div>}
+                      </div>
+                    )}
                   </div>
                   <div className="px-1 text-center">
                     <div className="font-bold text-sm truncate">{b.name}</div>
@@ -600,7 +605,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
       {/* Save Location Drawer */}
       {showSaveDrawer && (
-        <div className="fixed inset-0 z-[100] flex flex-col justify-end animate-slide-in">
+        <div className="fixed inset-0 z-[1000] flex flex-col justify-end animate-slide-in">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSaveDrawer(false)}></div>
           <div className={`${bgCard} rounded-t-[32px] p-6 pb-safe relative z-10 transition-transform`}>
             <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-6"></div>
