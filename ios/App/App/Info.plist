@@ -27,13 +27,17 @@
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to securely track your ride and show drivers nearby.</string>
+	<string>Your location is used to show available drivers nearby, calculate accurate ETAs, and ensure safe ride tracking from pickup to dropoff.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need your location to track your ride progress even when the app is in the background.</string>
+	<string>Allowing background location ensures your ride or delivery continues to track accurately even if you switch apps or lock your screen.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Continuous location access ensures precise navigation, ETAs, and safety tracking throughout your journey, even when the app is in the background.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>We need camera access so you can capture your avatar profile picture.</string>
+	<string>Camera access is used to take a profile photo for driver and customer identification.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need photo library access so you can upload an avatar profile picture.</string>
+	<string>Photo library access allows you to select and upload a profile picture for your account.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow access to save your ride receipts or profile documentation to your photo library.</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
