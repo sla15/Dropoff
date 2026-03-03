@@ -291,10 +291,17 @@ const App = () => {
     };
   }, []);
 
-  // Sync with DB if session exists
+  // 🟢 Scalability Optimization: Throttled DB Updates
+  // We only sync the user's location to the database every 10 seconds max.
+  const lastUpdateRef = useRef(0);
+
   useEffect(() => {
     if (user.id && userLocation) {
+      const now = Date.now();
+      if (now - lastUpdateRef.current < 10000) return; // Throttle: 10 seconds
+
       const updateDB = async () => {
+        lastUpdateRef.current = now;
         await supabase
           .from('profiles')
           .update({

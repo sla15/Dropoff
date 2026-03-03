@@ -93,10 +93,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const sessionToken = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
     const driverMarkersRef = useRef<Map<string, any>>(new Map());
+    const lastEtaUpdateRef = useRef<number>(0);
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>([null]);
+    const [destinationCoords, setDestinationCoords] = useState<{ lat: number, lng: number }[]>([]);
     const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
@@ -535,19 +536,23 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     markersMap.set(d.id, marker);
                 }
 
-                // ETA Logic for assigned driver
+                // ETA Logic for assigned driver - Throttled to 30s to save cost
                 if (d.id === assignedDriverId && userLocation) {
                     setAssignedDriver(d);
-                    const service = new (window as any).google.maps.DistanceMatrixService();
-                    service.getDistanceMatrix({
-                        origins: [position],
-                        destinations: [userLocation],
-                        travelMode: (window as any).google.maps.TravelMode.DRIVING,
-                    }, (response: any, status: string) => {
-                        if (status === 'OK' && response.rows[0].elements[0].duration) {
-                            setEtaSeconds(response.rows[0].elements[0].duration.value);
-                        }
-                    });
+                    const now = Date.now();
+                    if (now - lastEtaUpdateRef.current > 30000) {
+                        lastEtaUpdateRef.current = now;
+                        const service = new (window as any).google.maps.DistanceMatrixService();
+                        service.getDistanceMatrix({
+                            origins: [position],
+                            destinations: [userLocation],
+                            travelMode: (window as any).google.maps.TravelMode.DRIVING,
+                        }, (response: any, status: string) => {
+                            if (status === 'OK' && response.rows[0].elements[0].duration) {
+                                setEtaSeconds(response.rows[0].elements[0].duration.value);
+                            }
+                        });
+                    }
                 }
             });
 
@@ -566,13 +571,34 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             if (data) refreshMarkers(data);
         };
 
+        // Initial fetch
         fetchDrivers();
+
+        // 🟢 Scalability Optimization: Granular & Throttled Subscriptions
+        // If a driver is assigned, we only listen to THAT driver.
+        // If unassigned, we listen to all but throttle the UI refreshes to save DB compute.
+        const filter = assignedDriverId ? `id=eq.${assignedDriverId}` : undefined;
+        let lastFetchTime = 0;
+        const THROTTLE_MS = 5000; // Only refresh all drivers every 5s max
 
         const channel = supabase
             .channel('driver-locations')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'drivers' }, async (payload) => {
-                fetchDrivers();
-            })
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'drivers', filter },
+                async (payload) => {
+                    const now = Date.now();
+
+                    if (assignedDriverId) {
+                        // Priority update for assigned driver (No throttle)
+                        fetchDrivers();
+                    } else if (now - lastFetchTime > THROTTLE_MS) {
+                        // Throttled update for general markers
+                        lastFetchTime = now;
+                        fetchDrivers();
+                    }
+                }
+            )
             .subscribe();
 
         return () => {
