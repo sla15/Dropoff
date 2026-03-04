@@ -97,7 +97,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [destinationCoords, setDestinationCoords] = useState<{ lat: number, lng: number }[]>([]);
+    const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>([]);
     const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
@@ -728,7 +728,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             totalMeters += leg.distance.value;
                             totalSeconds += leg.duration.value;
 
-                            // Save coordinates for each destination/waypoint
+                            // Save coordinates for the destination reached at the end of this leg
+                            // leg i ends at destination i
                             if (i < newCoords.length) {
                                 newCoords[i] = {
                                     lat: leg.end_location.lat(),
@@ -845,31 +846,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
                     updateDestination(targetIdx, address);
 
-                    // Visual pin
-                    const marker = new (window as any).google.maps.Marker({
-                        position: latLng,
-                        map: map,
-                        label: (targetIdx + 1).toString(),
-                        animation: (window as any).google.maps.Animation.DROP,
-                        cursor: 'pointer'
-                    });
-
-                    // Remove on click
-                    marker.addListener('click', () => {
-                        marker.setMap(null);
-                        const label = marker.getLabel();
-                        const currentIdx = typeof label === 'string' ? parseInt(label) - 1 : targetIdx;
-                        updateDestination(currentIdx, '');
-                        if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-                        triggerHaptic();
-                    });
-
-                    if (markersRef.current[targetIdx]) {
-                        markersRef.current[targetIdx].setMap(null);
-                    }
-                    markersRef.current[targetIdx] = marker;
-
-                    // Update coordinates for booking
+                    // Update coordinates - the centralized effect will handle the pin
                     const newCoords = [...destinationCoords];
                     newCoords[targetIdx] = { lat: latLng.lat(), lng: latLng.lng() };
                     setDestinationCoords(newCoords);
@@ -882,7 +859,48 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         return () => {
             (window as any).google.maps.event.removeListener(listener);
         };
-    }, [map, bookingStep, destinations, directionsRenderer]);
+    }, [map, bookingStep, destinations, destinationCoords]);
+
+    // 🟢 PIN SYNCHRONIZATION: Centralized Marker Core
+    useEffect(() => {
+        if (!map) return;
+
+        // Cleanup stale markers
+        markersRef.current.forEach((m, i) => {
+            if (!destinationCoords[i] && m) {
+                m.setMap(null);
+                markersRef.current[i] = null;
+            }
+        });
+
+        // Add/Update markers from coords
+        destinationCoords.forEach((coord, i) => {
+            if (!coord) return;
+
+            let marker = markersRef.current[i];
+            const position = { lat: coord.lat, lng: coord.lng };
+
+            if (marker) {
+                marker.setPosition(position);
+                marker.setLabel((i + 1).toString());
+            } else {
+                marker = new (window as any).google.maps.Marker({
+                    position,
+                    map,
+                    label: (i + 1).toString(),
+                    animation: (window as any).google.maps.Animation.DROP,
+                    cursor: 'pointer'
+                });
+
+                marker.addListener('click', () => {
+                    updateDestination(i, '');
+                    triggerHaptic();
+                });
+
+                markersRef.current[i] = marker;
+            }
+        });
+    }, [map, bookingStep, destinationCoords]);
 
     const handleSearch = (val: string, index: number) => {
         updateDestination(index, val);
@@ -923,10 +941,15 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 }
             }
 
+            const google = (window as any).google;
             autocompleteService.getPlacePredictions({
                 input: val,
                 sessionToken: sessionToken.current,
-                componentRestrictions: { country: 'gm' } // Restrict to Gambia
+                componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] }, // Prioritize Gambia and surrounding West African countries
+                locationBias: {
+                    center: { lat: 13.4432, lng: -15.3101 }, // Banjul, Gambia
+                    radius: 100000 // 100km covers the majority of Gambia
+                }
             }, (results: any) => {
                 setPredictions(results || []);
             });
@@ -943,36 +966,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         sessionToken.current = null;
 
-        const geocoder = new (window as any).google.maps.Geocoder();
-        // Use placeId for 100% accuracy as requested
         geocoder.geocode({ placeId: prediction.place_id }, (results: any, status: string) => {
             if (status === 'OK' && results[0] && map) {
                 const loc = results[0].geometry.location;
                 map.panTo(loc);
 
-                if (markersRef.current[targetIdx]) {
-                    markersRef.current[targetIdx].setMap(null);
-                }
-
-                const marker = new (window as any).google.maps.Marker({
-                    position: loc,
-                    map: map,
-                    label: (targetIdx + 1).toString(),
-                    cursor: 'pointer'
-                });
-
-                marker.addListener('click', () => {
-                    marker.setMap(null);
-                    const label = marker.getLabel();
-                    const currentIdx = typeof label === 'string' ? parseInt(label) - 1 : targetIdx;
-                    updateDestination(currentIdx, '');
-                    if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-                    triggerHaptic();
-                });
-
-                markersRef.current[targetIdx] = marker;
-
-                // Persist coordinates for booking
+                // Persist coordinates for booking - Centralized Effect will handle the pin
                 const newCoords = [...destinationCoords];
                 newCoords[targetIdx] = { lat: loc.lat(), lng: loc.lng() };
                 setDestinationCoords(newCoords);
@@ -1371,6 +1370,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         markersRef.current.forEach(m => m?.setMap(null));
         markersRef.current = [];
         setDestinations(['']);
+        setDestinationCoords([null]);
         setBookingStep('planning');
         setAssignedDriverId(null);
         setAssignedDriver(null);
@@ -1442,6 +1442,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             markersRef.current.forEach(m => m?.setMap(null));
             markersRef.current = [];
             setDestinations(['']);
+            setDestinationCoords([null]);
             setBookingStep('planning');
 
             navigate('dashboard');
@@ -1541,6 +1542,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     calculateRouteAndPrice={calculateRouteAndPrice}
                     setBookingStep={setBookingStep}
                     handleLocateMe={handleLocateMe}
+                    onSelectPrediction={selectPrediction}
                 />
             )}
 

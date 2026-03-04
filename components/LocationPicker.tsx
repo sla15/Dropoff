@@ -22,7 +22,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
     const [loading, setLoading] = useState(false);
     const [map, setMap] = useState<any>(null);
     const [marker, setMarker] = useState<any>(null);
-    const [sessionToken, setSessionToken] = useState<any>(null);
+    const sessionToken = useRef<any>(null);
     const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number } | null>(initialLocation || null);
     const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
 
@@ -117,9 +117,9 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
     const startNewSession = () => {
         const google = (window as any).google;
-        if (!sessionToken && google) {
-            setSessionToken(new google.maps.places.AutocompleteSessionToken());
-            console.log("Maps: Started new search session");
+        if (!sessionToken.current && google) {
+            sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+            console.log("Maps Picker: Started new search session");
         }
     };
 
@@ -146,18 +146,22 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
 
             // Start session if not exists
             if (!sessionToken.current) {
-                setSessionToken(new google.maps.places.AutocompleteSessionToken());
+                sessionToken.current = new google.maps.places.AutocompleteSessionToken();
             }
 
             const service = new google.maps.places.AutocompleteService();
             service.getPlacePredictions({
                 input: val,
-                sessionToken,
-                componentRestrictions: { country: 'gm' } // Restrict to Gambia
+                sessionToken: sessionToken.current,
+                componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] },
+                locationBias: {
+                    center: { lat: 13.4432, lng: -15.3101 },
+                    radius: 100000
+                }
             }, (preds: any) => {
                 setPredictions(preds || []);
             });
-        }, 500); // Increased debounce to 500ms
+        }, 500);
     };
 
     const selectPrediction = (pred: any) => {
@@ -177,7 +181,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
                 setPredictions([]);
 
                 // Discard session token after successful selection to save cost
-                setSessionToken(null);
+                sessionToken.current = null;
             }
         });
     };

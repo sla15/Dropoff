@@ -15,6 +15,7 @@ interface LocationSearchOverlayProps {
     calculateRouteAndPrice: () => Promise<boolean>;
     setBookingStep: (step: 'planning' | 'selecting') => void;
     handleLocateMe: (isInitial?: boolean, manualMap?: any) => Promise<void>;
+    onSelectPrediction?: (prediction: any) => void;
 }
 
 export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
@@ -28,7 +29,8 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
     userLocation,
     calculateRouteAndPrice,
     setBookingStep,
-    handleLocateMe
+    handleLocateMe,
+    onSelectPrediction
 }) => {
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(0);
     const [searchQueries, setSearchQueries] = useState<string[]>(destinations);
@@ -78,11 +80,11 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
             autocompleteService.current.getPlacePredictions({
                 input: val,
                 sessionToken: sessionToken.current,
-                components: 'country:gm', // Biased to The Gambia
-                locationBias: userLocation ? {
-                    center: { lat: userLocation.lat, lng: userLocation.lng },
-                    radius: 50000 // 50km
-                } : undefined
+                componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] },
+                locationBias: {
+                    center: { lat: 13.4432, lng: -15.3101 }, // Gambia (Centered near Banjul)
+                    radius: 100000 // 100km covers the whole of Gambia
+                }
             }, (results: any, status: string) => {
                 setIsSearching(false);
                 if (status === 'OK' && results) {
@@ -129,6 +131,11 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
         const google = (window as any).google;
         if (google) {
             sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+        }
+
+        // Call parent to handle geocoding & map markers
+        if (onSelectPrediction) {
+            onSelectPrediction(prediction);
         }
     };
 

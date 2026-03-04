@@ -284,7 +284,12 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       service.getPlacePredictions({
         input: val,
         sessionToken: sessionToken.current,
-        componentRestrictions: { country: 'gm' }
+        // Updated to national bias for Dashboard too
+        componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] },
+        locationBias: {
+          center: { lat: 13.4432, lng: -15.3101 },
+          radius: 100000
+        }
       }, (preds: any) => {
         setPredictions(preds || []);
       });

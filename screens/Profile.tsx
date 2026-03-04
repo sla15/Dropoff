@@ -661,13 +661,23 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                     try {
                                         const { data: { session } } = await supabase.auth.getSession();
                                         if (session?.user?.id) {
-                                            // Call Supabase Delete User RPC or Edge Function if configured,
-                                            // OR handle standard auth.admin deletion.
-                                            // Standard practice is to sign out and let a trigger handle it,
-                                            // or call a specific edge function for GDPR deletion.
-                                            const { error } = await supabase.rpc('delete_user_account');
+                                            const { data, error } = await supabase.rpc('delete_user_account');
+
                                             if (error) {
-                                                console.error("RPC failed, falling back to direct auth.admin deletion if available.", error);
+                                                console.error("RPC failed:", error);
+                                                throw error;
+                                            }
+
+                                            if (data && data.startsWith('DEBT_BLOCK:')) {
+                                                const debtAmount = data.split(':')[1];
+                                                showAlert(
+                                                    "Account Deletion Blocked",
+                                                    `You have an outstanding commission debt of D${debtAmount}. Please clear all balances before deleting your account.`,
+                                                    "error"
+                                                );
+                                                setLoading(false);
+                                                setShowDeleteModal(false);
+                                                return;
                                             }
                                         }
                                         await supabase.auth.signOut();
