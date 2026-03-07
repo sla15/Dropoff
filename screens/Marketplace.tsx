@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Star, MapPin, Heart } from 'lucide-react';
+import { Search, Star, MapPin, Heart, Phone } from 'lucide-react';
 import { Theme, Screen, Business, Category, UserData } from '../types';
 import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
 
@@ -158,7 +158,11 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                            <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${b.rating >= 5.0 ? 'bg-[#00D68F]/10 text-[#00D68F]' : b.rating >= 3.8 ? 'bg-orange-500/10 text-orange-600' : 'bg-red-500/10 text-red-600'}`}>
                               <Star size={10} fill="currentColor" /> {b.rating}
                            </span>
-
+                           {b.phone && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold bg-[#E5E5EA] border border-black/5 text-black dark:bg-[#2C2C2E] dark:border-white/5 dark:text-[#EBEBF5] px-2 py-0.5 rounded-md mt-1 shadow-sm">
+                                 <Phone size={10} /> {b.phone}
+                              </span>
+                           )}
                         </div>
                      </div>
 

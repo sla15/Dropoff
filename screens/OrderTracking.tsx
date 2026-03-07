@@ -5,6 +5,7 @@ import { Theme, Screen, UserData, Activity } from '../types';
 import { triggerHaptic, sendPushNotification, getInitialAvatar } from '../utils/helpers';
 import { GreenGlow } from '../components/GreenGlow';
 import { supabase } from '../supabaseClient';
+import { StarRating } from '../components/StarRating';
 
 interface Props {
     theme: Theme;
@@ -250,12 +251,12 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         try {
             const { error } = await supabase
                 .from('business_reviews')
-                .insert({
+                .upsert({
                     business_id: reviewBusiness.id,
                     user_id: user.id,
                     rating: userRating,
                     comment: userComment
-                });
+                }, { onConflict: 'user_id,business_id' });
 
             if (error) throw error;
 
@@ -513,16 +514,8 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                         <h2 className="text-2xl font-bold mb-2">Rate {reviewBusiness.name}</h2>
                         <p className={`text-sm ${textSec} mb-6`}>How was your experience today?</p>
 
-                        <div className="flex justify-center gap-2 mb-8">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                                <button
-                                    key={star}
-                                    onClick={() => { triggerHaptic(); setUserRating(star); }}
-                                    className={`transition-transform active:scale-90 ${userRating >= star ? 'text-orange-400' : 'text-gray-300 dark:text-gray-700'}`}
-                                >
-                                    <Star size={32} fill={userRating >= star ? "currentColor" : "none"} strokeWidth={2} />
-                                </button>
-                            ))}
+                        <div className="flex justify-center mb-8">
+                            <StarRating rating={userRating} setRating={setUserRating} size={36} />
                         </div>
 
                         <textarea

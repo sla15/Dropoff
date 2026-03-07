@@ -1137,6 +1137,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                                 setStatus('cancelled_by_driver'); // Internal status to clear UI
                                 setShowCancellationSummary(true);
                                 setIsMinimalRating(true); // Simplified rating for cancellations
+                                // Auto-return to dashboard after a short delay if needed, 
+                                // but typically the modal handles it. Let's ensure navigation.
+                                setTimeout(() => {
+                                    if (navigate) navigate('dashboard');
+                                }, 3000);
                             } else {
                                 // Full Cleanup for pre-acceptance cancellation
                                 if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
@@ -1147,7 +1152,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                                 setAssignedDriverId(null);
                                 setAssignedDriver(null);
                                 setStatus('idle');
-                                showAlert("Cancelled", "Your ride request was cancelled.", "info");
+                                showAlert("Ride Cancelled", "Your ride request was cancelled by the driver.", "info");
+                                navigate('dashboard');
                             }
                         }
                     }

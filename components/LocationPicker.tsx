@@ -205,7 +205,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
         try {
             if (Capacitor.isNativePlatform()) {
                 const permissions = await Geolocation.checkPermissions();
-                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-description') {
+                if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
                     await Geolocation.requestPermissions();
                 }
             }

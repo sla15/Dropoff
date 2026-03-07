@@ -18,6 +18,7 @@ interface Props {
     businesses: Business[];
     isScrolling: boolean;
     isNavVisible: boolean;
+    setIsNavVisible: (visible: boolean) => void;
     handleScroll: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
     showAlert: (
@@ -30,6 +31,8 @@ interface Props {
         cancelText?: string,
         onCancel?: () => void
     ) => void;
+    initialDrawer?: string;
+    clearInitialDrawer?: () => void;
 }
 
 type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
@@ -89,7 +92,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     };
 
     return (
-        <div className={`fixed inset-0 z-50 flex flex-col justify-end transition-opacity duration-500 ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`fixed inset-0 z-[100] flex flex-col justify-end transition-opacity duration-500 ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
             <div
                 ref={drawerRef}
@@ -123,9 +126,16 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
-export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, handleScroll, settings, showAlert }: Props) => {
+export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
+
+    useEffect(() => {
+        if (initialDrawer && initialDrawer !== 'none') {
+            setActiveDrawer(initialDrawer as DrawerType);
+            if (clearInitialDrawer) clearInitialDrawer();
+        }
+    }, [initialDrawer, clearInitialDrawer]);
 
     // Local state for editing profile
     const [editName, setEditName] = useState(user.name);
@@ -173,6 +183,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
     const openDrawer = (drawer: DrawerType) => {
         triggerHaptic();
+        setIsNavVisible(false);
         setActiveDrawer(drawer);
         setIsClosing(false);
     };
@@ -181,6 +192,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         setIsClosing(true);
         setTimeout(() => {
             setActiveDrawer('none');
+            setIsNavVisible(true);
             setIsClosing(false);
         }, 280); // Slightly less than CSS animation duration
     };
@@ -296,76 +308,76 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
             <div className="flex-1 overflow-y-auto pt-safe px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
                 <h1 className="text-3xl font-bold mb-6">Profile</h1>
-                <div className="flex items-center gap-4 mb-8">
-                    <div
-                        className={`w-20 h-20 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333]`}
-                        style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
-                    >
-                        {!user.photo && (
-                            <span className="text-[#00D68F] font-bold text-2xl">
-                                {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
-                            </span>
-                        )}
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black tracking-tight">{user.name || 'User'}</h2>
-                        <p className={`${textSec} text-sm font-medium`}>{user.phone}</p>
+                <div className="flex flex-col items-center justify-center mb-10 mt-2">
+                    <div className="relative mb-5">
+                        <div
+                            className={`w-32 h-32 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/10 dark:bg-[#00D68F]/20 flex items-center justify-center'} shadow-[0_8px_30px_rgba(0,214,143,0.15)] border-4 ${theme === 'light' ? 'border-white' : 'border-[#1C1C1E]'} relative z-10`}
+                            style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
+                        >
+                            {!user.photo && (
+                                <span className="text-[#00D68F] font-black text-5xl">
+                                    {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                                </span>
+                            )}
+                        </div>
 
-                        {/* Rating Score */}
+                        {/* Rating Score Badge */}
                         {settings.is_rating_enabled && (
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
-                                    user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
-                                        'bg-red-500/10 text-red-500'
-                                    }`}>
-                                    <Star size={12} fill="currentColor" />
-                                    <span className="text-xs font-black">{(user.rating || 5.0).toFixed(1)}</span>
+                            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20">
+                                <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full shadow-lg ${user.rating >= 4.5 ? 'bg-[#00D68F] text-black' :
+                                    user.rating >= 3.0 ? 'bg-orange-500 text-white' :
+                                        'bg-red-500 text-white'
+                                    } border-[3px] ${theme === 'light' ? 'border-white' : 'border-[#1C1C1E]'}`}>
+                                    <Star size={14} fill="currentColor" />
+                                    <span className="text-sm font-black tracking-tight">{(user.rating || 5.0).toFixed(1)}</span>
                                 </div>
-                                <span className={`text-[10px] font-medium ${textSec}`}>Rating</span>
                             </div>
                         )}
                     </div>
+
+                    <h2 className="text-3xl font-black tracking-tight text-center">{user.name || 'User'}</h2>
+                    <p className={`${textSec} font-medium text-center mt-1`}>{user.phone}</p>
                 </div>
 
-                <div className={`${bgCard} rounded-3xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.04)] dark:shadow-none dark:border dark:border-white/5`}>
-                    <button onClick={() => openDrawer('account')} className={`w-full flex items-center justify-between p-4 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-3 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-blue-50 text-blue-500 dark:bg-blue-500/10`}>
-                                <UserCog size={20} />
+                <div className={`${bgCard} rounded-[32px] overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)] dark:shadow-none dark:bg-white/[0.02] border border-gray-100/50 dark:border-white/5`}>
+                    <button onClick={() => openDrawer('account')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
+                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500 dark:bg-blue-500/10`}>
+                                <UserCog size={22} />
                             </div>
-                            <span className="font-bold">Account Settings</span>
+                            <span className="font-bold text-lg">Account Settings</span>
                         </div>
-                        <ChevronRight size={16} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
                     </button>
 
-                    <button onClick={() => openDrawer('history')} className={`w-full flex items-center justify-between p-4 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-3 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-orange-50 text-orange-500 dark:bg-orange-500/10`}>
-                                <History size={20} />
+                    <button onClick={() => openDrawer('history')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
+                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-orange-50 text-orange-500 dark:bg-orange-500/10`}>
+                                <History size={22} />
                             </div>
-                            <span className="font-bold">Ride & Order History</span>
+                            <span className="font-bold text-lg">Ride & Order History</span>
                         </div>
-                        <ChevronRight size={16} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
                     </button>
 
-                    <button onClick={() => openDrawer('favorites')} className={`w-full flex items-center justify-between p-4 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-3 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-red-50 text-red-500 dark:bg-red-500/10`}>
-                                <Heart size={20} />
+                    <button onClick={() => openDrawer('favorites')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
+                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-red-50 text-red-500 dark:bg-red-500/10`}>
+                                <Heart size={22} />
                             </div>
-                            <span className="font-bold">Favorites</span>
+                            <span className="font-bold text-lg">Favorites</span>
                         </div>
-                        <ChevronRight size={16} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
                     </button>
 
-                    <button onClick={() => openDrawer('support')} className={`w-full flex items-center justify-between p-4 active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-3 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-purple-50 text-purple-500 dark:bg-purple-500/10`}>
-                                <HelpCircle size={20} />
+                    <button onClick={() => openDrawer('support')} className={`w-full flex items-center justify-between p-5 active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
+                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-50 text-purple-500 dark:bg-purple-500/10`}>
+                                <HelpCircle size={22} />
                             </div>
-                            <span className="font-bold">Help & Support</span>
+                            <span className="font-bold text-lg">Help & Support</span>
                         </div>
-                        <ChevronRight size={16} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
                     </button>
                 </div>
             </div>

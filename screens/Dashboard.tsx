@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck } from 'lucide-react';
+import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck, Phone } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, SavedLocation, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
 
@@ -40,11 +40,13 @@ interface Props {
   ) => void;
   activeOrderId: string | null;
   activeBatchId: string | null;
+  setIsNavVisible: (visible: boolean) => void;
+  setProfileDrawerToOpen: (val: string) => void;
 }
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
@@ -77,6 +79,14 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     fetchLocations();
     implementQuietMode();
   }, []);
+
+  useEffect(() => {
+    if (showSaveDrawer || showMapPicker) {
+      setIsNavVisible(false);
+    } else {
+      setIsNavVisible(true);
+    }
+  }, [showSaveDrawer, showMapPicker, setIsNavVisible]);
 
   const implementQuietMode = async () => {
     try {
@@ -351,7 +361,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             {theme === 'light' ? <Sun size={20} className="text-orange-500" /> : <Moon size={20} className="text-[#00D68F]" />}
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mt-1">
           <div className="relative flex-1">
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${textSec}`} size={20} />
             <input
@@ -367,7 +377,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               onChange={(e) => searchMode === 'market' ? setSearchQuery(e.target.value) : handleMapSearch(e.target.value)}
               onKeyDown={handleSearch}
               placeholder={searchMode === 'market' ? "What to order?" : "Where to go?"}
-              className={`w-full h-14 pl-12 pr-12 rounded-[22px] ${theme === 'light' ? 'bg-white border-none shadow-[0_12px_40px_rgba(0,0,0,0.06)] focus:shadow-[0_12px_40px_rgba(0,214,143,0.15)] focus:ring-2 focus:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/60 border border-white/5 shadow-lg focus:ring-2 focus:ring-[#00D68F]/30'} backdrop-blur-xl font-bold outline-none text-base placeholder:opacity-50 transition-all cursor-text`}
+              className={`w-full h-14 pl-12 pr-12 rounded-[22px] ${theme === 'light' ? 'bg-[#F2F2F7] border-none shadow-none focus:bg-white focus:shadow-[0_8px_30px_rgba(0,214,143,0.12)] focus:ring-2 focus:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/80 border border-white/5 shadow-lg focus:ring-2 focus:ring-[#00D68F]/30'} font-bold outline-none text-base placeholder:opacity-50 transition-all cursor-text`}
             />
             {searchQuery && (
               <button
@@ -433,7 +443,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         )}
       </div>
 
-      <div className="flex-1 px-5 pt-2 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
+      <div className="flex-1 px-5 pt-4 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
         <div className="grid grid-cols-2 gap-6">
           <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
             <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
@@ -457,8 +467,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
 
         {/* 1. Saved Places Section (Top) */}
-        <div className="w-full">
-          <div className="flex justify-center mb-5">
+        <div className="w-full mt-4">
+          <div className="flex justify-center mb-6">
             <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Saved Places</h3>
           </div>
           <div className="flex justify-center gap-4 flex-wrap">
@@ -470,7 +480,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                   setPrefilledDestination(place.address);
                   navigate('ride');
                 }}
-                className={`w-[100px] h-[100px] p-2 rounded-[28px] ${bgCard} shadow-[0_8px_20px_rgba(0,0,0,0.06)] dark:shadow-none cursor-pointer border border-gray-100 dark:border-white/5 hover:border-[#00D68F] active:scale-95 transition-all flex flex-col items-center justify-center gap-2 group`}
+                className={`w-[100px] h-[100px] p-2 rounded-[28px] ${bgCard} shadow-[0_8px_20px_rgba(0,0,0,0.04)] dark:shadow-none cursor-pointer border border-gray-100 dark:border-white/5 hover:border-[#00D68F] active:scale-95 transition-all flex flex-col items-center justify-center gap-2 group`}
               >
                 <div className="text-3xl group-hover:scale-110 transition-transform">{place.emoji}</div>
                 <div className="text-center w-full">
@@ -493,11 +503,18 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
         {/* 2. Featured Favorites (Middle) - Limit 5 */}
         {favorites.length > 0 && (
-          <div className="w-full">
-            <div className="flex justify-center mb-5">
+          <div className="w-full mt-2">
+            <div className="flex flex-col items-center mb-5 relative px-4 text-center">
               <h3 className={`text-xl font-black ${textMain} tracking-tight`}>My Favorites</h3>
+              <button
+                onClick={() => { setProfileDrawerToOpen('favorites'); navigate('profile'); }}
+                className={`mt-2 text-xs font-bold text-[#00D68F] active:opacity-70 transition-colors flex items-center gap-1 bg-[#00D68F]/10 px-4 py-2 rounded-full hover:bg-[#00D68F]/20`}
+              >
+                See All <ArrowRight size={14} />
+              </button>
             </div>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 px-1">
+
+            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-6 px-2 -mx-2 snap-x">
               {businesses.filter(b => favorites.includes(b.id)).slice(0, 5).map(b => (
                 <div
                   key={b.id}
@@ -508,21 +525,39 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                       navigate('business-detail', true);
                     }
                   }}
-                  className={`min-w-[170px] p-4 rounded-[28px] ${bgCard} shadow-sm border border-gray-100 dark:border-white/5 transition-all flex flex-col gap-3 group ${b.isOpen ? 'cursor-pointer hover:border-[#00D68F] active:scale-98' : 'opacity-50 grayscale cursor-not-allowed'}`}
+                  className={`w-[260px] shrink-0 p-3 rounded-[32px] ${bgCard} shadow-[0_12px_30px_rgba(0,0,0,0.06)] dark:shadow-none border border-black/5 dark:border-white/5 transition-all flex flex-col gap-3 group snap-center ${b.isOpen ? 'cursor-pointer hover:border-[#00D68F]/50 hover:shadow-[0_16px_40px_rgba(0,214,143,0.1)] active:scale-95' : 'opacity-60 grayscale cursor-not-allowed'}`}
                 >
-                  <div className="w-full h-28 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
-                    <img src={b.logo || b.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={b.name} />
+                  <div className="w-full h-[140px] rounded-[24px] overflow-hidden bg-gray-100 dark:bg-gray-800 relative shadow-inner">
+                    <img
+                      src={b.logo || b.image}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
+                      alt={b.name}
+                    />
+
+                    {/* Gradient Overlay for Text Readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
                     {!b.isOpen && (
-                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[10px] font-bold text-white uppercase backdrop-blur-sm px-2 text-center">
-                        <div>Closed</div>
-                        {b.working_hours?.start && <div className="mt-0.5 opacity-80 text-[8px]">Opens at {b.working_hours.start}</div>}
+                      <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-xs font-black text-white uppercase backdrop-blur-md px-4 text-center">
+                        <div className="tracking-widest">Closed</div>
+                        {b.working_hours?.start && <div className="mt-1 opacity-80 text-[10px] tracking-normal capitalize">Opens at {b.working_hours.start}</div>}
                       </div>
                     )}
+
+                    {/* Floating Rating Badge (Optional inside image, or keep below) */}
+                    <div className="absolute top-3 right-3 bg-white/90 dark:bg-black/80 backdrop-blur-md px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm">
+                      <Star size={12} fill="currentColor" className={b.rating >= 4.5 ? 'text-[#00D68F]' : 'text-orange-400'} />
+                      <span className="text-xs font-bold text-black dark:text-white">{b.rating.toFixed(1)}</span>
+                    </div>
                   </div>
-                  <div className="px-1 text-center">
-                    <div className="font-bold text-sm truncate">{b.name}</div>
-                    <div className={`text-[10px] ${textSec} flex items-center justify-center gap-1 mt-1`}>
-                      <Star size={10} fill="currentColor" className={b.rating >= 4.5 ? 'text-[#00D68F]' : 'text-orange-400'} /> {b.rating} • {b.category}
+
+                  <div className="px-2 pb-1 relative">
+                    <div className="font-black text-base truncate tracking-tight">{b.name}</div>
+                    <div className={`text-xs ${textSec} font-medium mt-0.5 flex flex-col gap-0.5`}>
+                      <span className="truncate">{b.category}</span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold bg-[#E5E5EA] border border-black/5 text-black dark:bg-[#2C2C2E] dark:border-white/5 dark:text-[#EBEBF5] px-2 py-0.5 rounded-md mt-1 shadow-sm w-max">
+                        <Phone size={10} /> {b.phone}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -534,7 +569,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         <div className="mb-2 w-full">
           <div className="flex flex-col items-center mb-5 relative px-4 text-center">
             <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Recent Activities</h3>
-            <button onClick={() => navigate('profile')} className="mt-2 text-xs font-bold text-[#00D68F] flex items-center gap-1 bg-[#00D68F]/10 px-4 py-2 rounded-full hover:bg-[#00D68F]/20 transition-colors">
+            <button onClick={() => { setProfileDrawerToOpen('history'); navigate('profile'); }} className="mt-2 text-xs font-bold text-[#00D68F] flex items-center gap-1 bg-[#00D68F]/10 px-4 py-2 rounded-full hover:bg-[#00D68F]/20 transition-colors">
               View History <ArrowRight size={12} />
             </button>
           </div>

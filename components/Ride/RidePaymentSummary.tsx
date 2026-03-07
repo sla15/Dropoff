@@ -1,5 +1,6 @@
 import React from 'react';
-import { User, Star, Check } from 'lucide-react';
+import { User, Check } from 'lucide-react';
+import { StarRating } from '../StarRating';
 import { UserData } from '../../types';
 
 interface RidePaymentSummaryProps {
@@ -59,21 +60,8 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
                     <p className={`text-sm ${textSec} font-bold`}>How was your ride with {assignedDriver?.name}?</p>
                 </div>
 
-                <div className="flex justify-center gap-2 mb-8">
-                    {[1, 2, 3, 4, 5].map(s => (
-                        <button
-                            key={s}
-                            onClick={() => setRating(s)}
-                            className="transition-transform active:scale-90"
-                        >
-                            <Star
-                                size={32}
-                                fill={s <= rating ? "#FF9500" : "transparent"}
-                                className={s <= rating ? "text-[#FF9500]" : "text-gray-300 dark:text-gray-700"}
-                                strokeWidth={2}
-                            />
-                        </button>
-                    ))}
+                <div className="flex justify-center mb-8">
+                    <StarRating rating={rating} setRating={setRating} size={36} />
                 </div>
 
                 <div className={`p-4 rounded-xl ${inputBg} mb-6`}>

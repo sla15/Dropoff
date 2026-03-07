@@ -83,6 +83,7 @@ const App = () => {
   const [showAssistant, setShowAssistant] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
+  const [profileDrawerToOpen, setProfileDrawerToOpen] = useState<string>('none');
   const [isRideSearching, setIsRideSearching] = useState(false);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
@@ -426,7 +427,7 @@ const App = () => {
           deliveryTime: '30-45 min',
           image: b.image_url || null,
           logo: b.image_url || null,
-          phone: '',
+          phone: b.payment_phone || '',
           location: b.location_address || '',
           isOpen: isBusinessOpen(b.working_hours, b.is_open),
           working_hours: b.working_hours,
@@ -666,6 +667,7 @@ const App = () => {
         theme={theme}
         navigate={navigate}
         toggleTheme={toggleTheme}
+        setProfileDrawerToOpen={setProfileDrawerToOpen}
         setShowAssistant={setShowAssistant}
         favorites={favorites}
         businesses={businesses}
@@ -683,12 +685,13 @@ const App = () => {
         showAlert={showAlert}
         activeOrderId={activeOrderId}
         activeBatchId={activeBatchId}
+        setIsNavVisible={setIsNavVisible}
       />;
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
-      case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
+      case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
       default: return null;
     }
