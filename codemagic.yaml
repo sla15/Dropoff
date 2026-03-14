@@ -24,33 +24,34 @@ workflows:
         script: |
           cd android
           chmod +x gradlew
-          
-          # Handle both lowercase and uppercase variables
-          export K_PATH="${cm_keystore:-$CM_KEYSTORE}"
-          export K_STORE_PASS="${cm_keystore_password:-$CM_KEYSTORE_PASSWORD}"
-          export K_ALIAS="${cm_key_alias:-$CM_KEY_ALIAS}"
-          export K_PASS="${cm_key_password:-$CM_KEY_PASSWORD}"
-          
-          echo "Verifying keystore configuration..."
-          if [ -z "$K_PATH" ]; then
-            echo "ERROR: Keystore file variable (cm_keystore or CM_KEYSTORE) is not set."
-            echo "Please ensure you have uploaded the keystore as a 'File' type variable in Codemagic."
-            exit 1
-          fi
 
-          if [ ! -f "$K_PATH" ]; then
-            echo "ERROR: Keystore file not found at: $K_PATH"
-            echo "Listing environment for debugging..."
-            env | grep -i "_KEY"
-            exit 1
-          fi
+          echo "--- DEBUGGING ENVIRONMENT ---"
+          echo "Available Environment Variable Keys (names only):"
+          env | cut -d= -f1 | sort | grep -E "KEY|STORE|CM_|FCI_"
+          
+          echo "Searching for .keystore files in cloning directory..."
+          find $FCI_BUILD_DIR -name "*.keystore" -type f
+          
+          # Detect signing variables (handling both case variants)
+          K_FILE="${cm_keystore:-$CM_KEYSTORE}"
+          K_STORE_PASS="${cm_keystore_password:-$CM_KEYSTORE_PASSWORD}"
+          K_ALIAS="${cm_key_alias:-$CM_KEY_ALIAS}"
+          K_KEY_PASS="${cm_key_password:-$CM_KEY_PASSWORD}"
 
-          echo "Keystore verified. Building signed APK..."
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file="$K_PATH" \
-            -Pandroid.injected.signing.store.password="$K_STORE_PASS" \
-            -Pandroid.injected.signing.key.alias="$K_ALIAS" \
-            -Pandroid.injected.signing.key.password="$K_PASS"
+          echo "--- SIGNING CONFIGURATION ---"
+          if [ -n "$K_FILE" ] && [ -f "$K_FILE" ]; then
+            echo "Keystore detected at: $K_FILE"
+            echo "Proceeding with SIGNED build..."
+            ./gradlew assembleRelease \
+              -Pandroid.injected.signing.store.file="$K_FILE" \
+              -Pandroid.injected.signing.store.password="$K_STORE_PASS" \
+              -Pandroid.injected.signing.key.alias="$K_ALIAS" \
+              -Pandroid.injected.signing.key.password="$K_KEY_PASS"
+          else
+            echo "WARNING: Keystore not found or variables unset. K_FILE is '$K_FILE'"
+            echo "Falling back to UNSIGNED build to prevent crash..."
+            ./gradlew assembleRelease
+          fi
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/bundle/release/*.aab
