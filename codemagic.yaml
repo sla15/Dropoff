@@ -5,6 +5,7 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       node: 22
+      java: 21
       groups:
         - supabase_config   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
         - google_maps        # VITE_GOOGLE_MAPS_API_KEY
@@ -13,7 +14,7 @@ workflows:
         PACKAGE_NAME: "com.dropoffgambia.customer"
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: npm ci
       - name: Build web project
         script: npm run build
       - name: Sync Capacitor
@@ -40,7 +41,7 @@ workflows:
         - firebase_config
     scripts:
       - name: Install dependencies
-        script: npm install
+        script: npm ci
       - name: Build web project
         script: npm run build
       - name: Sync Capacitor
