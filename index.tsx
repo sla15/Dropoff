@@ -39,9 +39,7 @@ const App = () => {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem('ride_theme') || localStorage.getItem('app_theme');
     if (saved) return saved as Theme;
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-      return 'light';
-    }
+    // Force dark by default for the premium "dark by nature" experience
     return 'dark';
   });
 
@@ -72,7 +70,9 @@ const App = () => {
     if (isNative) {
       import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
         StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light });
-        StatusBar.setBackgroundColor({ color: theme === 'dark' ? '#000000' : '#F2F2F7' });
+        // Enable overlay to prevent "cut off" and allow CSS to handle packing with pt-safe
+        StatusBar.setOverlaysWebView({ overlay: true });
+        StatusBar.setBackgroundColor({ color: 'transparent' });
       }).catch(console.error);
     }
   }, [theme, isNative]);
@@ -132,33 +132,25 @@ const App = () => {
     const startFCM = async () => {
       if (hasTriggeredFCM.current) return;
       console.log("🚀 Proactive FCM Trigger for user:", user.id);
+      
+      // On Android/iOS, explicitly request permissions if needed
+      if (isNative) {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === 'prompt') {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        if (permStatus.receive !== 'granted') {
+          console.warn("⚠️ Push permissions not granted by user.");
+        }
+      }
+
       await initFCM(user.id);
       hasTriggeredFCM.current = true;
     };
 
-    // Native can init immediately on login
-    if (isNative) {
-      startFCM();
-      return;
-    }
-
-    // Web needs interaction for permission, but let's try once if already granted
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      startFCM();
-    }
-
-    const handleInteraction = () => {
-      startFCM();
-    };
-
-    window.addEventListener('click', handleInteraction, { once: true });
-    window.addEventListener('touchstart', handleInteraction, { once: true });
-    window.addEventListener('keydown', handleInteraction, { once: true });
-    return () => {
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-      window.removeEventListener('keydown', handleInteraction);
-    };
+    // Trigger on login/init
+    startFCM();
   }, [user.id, isNative]);
 
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {

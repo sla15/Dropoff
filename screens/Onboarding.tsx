@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
@@ -36,6 +37,41 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [photoFile, setPhotoFile] = useState<File | null>(null);
    const [homeLocation, setHomeLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
    const [showPicker, setShowPicker] = useState(false);
+   const [keyboardHeight, setKeyboardHeight] = useState(0);
+   const [vehicleIndex, setVehicleIndex] = useState(0);
+ 
+   const vehicles = [
+      { src: "/assets/black_luxury_side.png", alt: "Premium Car" },
+      { src: "/assets/white_yaris_side.png", alt: "Economic Car" },
+      { src: "/assets/scooter_side_view.png", alt: "Scooter" }
+   ];
+ 
+   useEffect(() => {
+      const interval = setInterval(() => {
+         setVehicleIndex((prev) => (prev + 1) % vehicles.length);
+      }, 5000);
+      return () => clearInterval(interval);
+   }, [vehicles.length]);
+
+   useEffect(() => {
+      let showListener: any;
+      let hideListener: any;
+
+      if (Capacitor.isNativePlatform()) {
+         Keyboard.addListener('keyboardWillShow', info => {
+            setKeyboardHeight(info.keyboardHeight);
+         }).then(l => showListener = l);
+
+         Keyboard.addListener('keyboardWillHide', () => {
+            setKeyboardHeight(0);
+         }).then(l => hideListener = l);
+
+         return () => {
+            if (showListener) showListener.remove();
+            if (hideListener) hideListener.remove();
+         };
+      }
+   }, []);
 
    const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -272,8 +308,20 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       try {
          if (Capacitor.isNativePlatform()) {
             const permissions = await Geolocation.checkPermissions();
+            console.log("📍 Location permission status:", permissions.location);
+            
+            if (permissions.location === 'denied') {
+               showAlert("Location Denied", "Please enable location permissions in your phone settings to use this feature.", "info");
+               setLoading(false);
+               return;
+            }
+            
             if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
-               await Geolocation.requestPermissions();
+               const request = await Geolocation.requestPermissions();
+               if (request.location !== 'granted') {
+                  setLoading(false);
+                  return;
+               }
             }
          }
 
@@ -314,60 +362,67 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 1) {
       return (
          <div className={`h-full w-full flex flex-col justify-between ${bgMain} ${textMain} p-6 pb-safe animate-scale-in overflow-hidden relative`}>
+            {/* Subtle SVG Background Pattern */}
+            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none">
+               <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1"/>
+                     </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#grid)" />
+               </svg>
+            </div>
 
-            {/* Animated Background Elements */}
-            <div className="absolute top-[-10%] right-[-30%] w-[500px] h-[500px] bg-[#00D68F]/10 rounded-full blur-[80px] animate-[pulse_4s_ease-in-out_infinite]"></div>
-            <div className="absolute bottom-[-10%] left-[-20%] w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[80px] animate-[pulse_5s_ease-in-out_infinite_1s]"></div>
-
-            <div className="flex-1 flex flex-col justify-end pb-10 z-10">
-               <div className="mb-12 relative w-full flex flex-col items-center">
-                  {/* Animated Logo */}
-                  <div className="w-[40vw] h-[40vw] max-w-[200px] max-h-[200px] flex items-center justify-center animate-[bounce_3s_infinite]">
-                     <img
-                        src="/assets/logo.png"
-                        alt="DROPOFF"
-                        className="w-full h-full object-contain"
-                     />
-                  </div>
-
-                  {/* Logo Text matching Splash Screen styling */}
-                  <div className="mt-[-2vw] overflow-hidden">
-                     <div className="flex items-center justify-center">
-                        <span className="text-[12vw] sm:text-7xl font-black tracking-tighter text-[#8E8E93]">
-                           DROP
-                        </span>
-                        <span className="text-[12vw] sm:text-7xl font-black tracking-tighter text-[#00D68F]">
-                           OFF
-                        </span>
-                     </div>
-                  </div>
-               </div>
-
-               <div className="space-y-6">
-                  <button
-                     onClick={() => { triggerHaptic(); setStep(2); }}
-                     className={`w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg active:scale-98 transition-all shadow-xl hover:shadow-[#00D68F]/30 hover:scale-[1.01]`}
-                  >
-                     Get Started
-                  </button>
-
-                  <p className={`text-xs ${textSec} text-center leading-relaxed px-2`}>
-                     By continuing, you have agreed to our{' '}
-                     <span
-                        onClick={() => window.open('https://superapp-hub.vercel.app/terms', '_blank')}
-                        className="text-[#00D68F] font-bold cursor-pointer hover:underline"
-                     >
-                        Terms of Services
-                     </span>
-                     {' '}and{' '}
-                     <span
-                        onClick={() => window.open('https://superapp-hub.vercel.app/privacy', '_blank')}
-                        className="text-[#00D68F] font-bold cursor-pointer hover:underline"
-                     >
-                        Policy
-                     </span>.
+            {/* Content Overlay */}
+            <div className="flex-1 flex flex-col justify-center z-10 pt-10">
+               <div className="mb-12">
+                  <p className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.0] mb-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                     The future <br />
+                     of <span className="text-[#00D68F]">movement.</span>
+                  </p>
+                  <p className="text-xl text-black font-bold max-w-[240px] leading-relaxed drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">
+                     Swift rides, smart deliveries. <br />
+                     All in one premium app.
                   </p>
                </div>
+            </div>
+
+            {/* Background Image (Animated Vehicle Carousel, >50% cut off on right) */}
+            <div className="absolute top-[50%] -right-[75%] w-[170%] h-auto z-0 pointer-events-none translate-y-[-50%] overflow-hidden">
+               <div className="relative w-full aspect-[2/1]">
+                  {/* Common Ground Shadow for all vehicles */}
+                  <div className="absolute bottom-[15%] left-[10%] w-[80%] h-[10%] bg-black/40 blur-[40px] rounded-[100%] transition-opacity duration-1000"></div>
+                  
+                  {vehicles.map((v, i) => (
+                     <img 
+                        key={v.src}
+                        src={v.src} 
+                        className={`absolute inset-0 w-full h-full object-contain transition-all duration-1000 ease-in-out
+                           ${i === vehicleIndex ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-20 scale-95 blur-sm'}
+                           ${i < vehicleIndex || (vehicleIndex === 0 && i === vehicles.length - 1) ? '-translate-x-20' : ''}
+                        `}
+                        alt={v.alt}
+                     />
+                  ))}
+               </div>
+            </div>
+
+            <div className="space-y-6 z-10">
+               <button
+                  onClick={() => { triggerHaptic(); setStep(2); }}
+                  className="w-full bg-[#00D68F] text-black py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all shadow-[0_15px_30px_rgba(0,214,143,0.3)] flex items-center justify-center gap-3 group"
+               >
+                  Get Started
+                  <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
+               </button>
+
+               <p className={`text-center text-[10px] leading-relaxed px-4 font-medium opacity-40`}>
+                  By continuing, you verify you are at least 18 and agree to our{' '}
+                  <span onClick={() => window.open('/terms', '_blank')} className="text-[#00D68F] underline cursor-pointer">Terms</span>
+                  {' & '}
+                  <span onClick={() => window.open('/privacy', '_blank')} className="text-[#00D68F] underline cursor-pointer">Privacy</span>.
+               </p>
             </div>
          </div>
       );
@@ -375,34 +430,44 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 2) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} p-6 pt-safe animate-slide-in`}>
-            <ArrowLeft onClick={() => setStep(1)} className="mb-4 cursor-pointer opacity-70" />
-            <ProgressBar currentStep={2} />
-
-            <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
-            <div className={`flex gap-3 pb-2 border-b-2 ${theme === 'light' ? 'border-black' : 'border-white'} mb-4`}>
-
-               <div className="font-semibold text-2xl flex items-center gap-2"><span>🇬🇲</span> +220</div>
-               <input
-                  type="tel" autoFocus placeholder="*** ****" value={phone}
-                  onChange={(e) => {
-                     const val = e.target.value.replace(/\D/g, '');
-                     // If it's longer than 7 digits and starts with 220, take the last 7
-                     if (val.length > 7 && val.startsWith('220')) {
-                        setPhone(val.slice(-7));
-                     } else {
-                        setPhone(val.slice(0, 7));
-                     }
-                  }}
-                  className={`flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700 ${theme === 'light' ? 'text-black' : 'text-white'}`}
-               />
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
+            <div className="pt-2 flex-1">
+               <ArrowLeft onClick={() => setStep(1)} className="mb-6 cursor-pointer opacity-70" />
+               <ProgressBar currentStep={2} />
+               
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
+               
+               <div className={`flex items-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full transition-colors`}>
+                  <div className="font-bold text-2xl flex items-center gap-2 shrink-0">
+                     <span>🇬🇲</span> +220
+                  </div>
+                  <input
+                     type="tel"
+                     autoFocus
+                     placeholder="### ####"
+                     value={phone}
+                     onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 7) setPhone(val);
+                     }}
+                     className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                  />
+               </div>
+               <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
             </div>
-            <p className={`text-sm ${textSec}`}>We'll text you a verification code.</p>
-            <div className="mt-auto pb-safe">
+            
+            <div 
+               className="mt-auto px-2"
+               style={{ 
+                  transform: `translateY(-${keyboardHeight}px)`,
+                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : '0'
+               }}
+            >
                <button
                   onClick={sendOTP}
                   disabled={phone.length < 3 || loading}
-                  className={`w-full bg-white text-black py-4 rounded-full font-semibold text-lg disabled:opacity-30 shadow-lg flex items-center justify-center`}
+                  className={`w-full ${phone.length >= 7 ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
                >
                   {loading ? <Loader2 className="animate-spin" /> : 'Continue'}
                </button>
@@ -413,47 +478,58 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 3) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} p-6 pt-safe animate-slide-in relative`}>
-            <ArrowLeft onClick={() => setStep(2)} className="mb-4 cursor-pointer opacity-70" />
-            <ProgressBar currentStep={3} />
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
+            <div>
+               <ArrowLeft onClick={() => setStep(2)} className="mb-4 cursor-pointer opacity-70" />
+               <ProgressBar currentStep={3} />
 
-            <h2 className="text-3xl font-bold tracking-tight mb-2">Enter code</h2>
-            <p className={`${textSec} mb-8`}>Sent to +220 {phone}</p>
-            <div className="flex items-center justify-center gap-3 mb-8 z-20 pointer-events-none">
-               <div className="flex gap-2">
-                  {[0, 1, 2].map((i) => (
-                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
-                        {otp[i] || ''}
-                     </div>
-                  ))}
-               </div>
-               <div className={`text-2xl font-bold opacity-30 ${textMain}`}>-</div>
-               <div className="flex gap-2">
-                  {[3, 4, 5].map((i) => (
-                     <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
-                        {otp[i] || ''}
-                     </div>
-                  ))}
+                <h2 className="text-3xl font-bold tracking-tight mb-2">Enter code</h2>
+               <p className={`${textSec} mb-10`}>Sent to +220 {phone}</p>
+               
+               <div className="flex items-center justify-center gap-3 mb-12 relative">
+                  <div className="flex gap-2">
+                     {[0, 1, 2].map((i) => (
+                        <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                           {otp[i] || ''}
+                        </div>
+                     ))}
+                  </div>
+                  <div className={`text-2xl font-bold opacity-30 ${textMain}`}>-</div>
+                  <div className="flex gap-2">
+                     {[3, 4, 5].map((i) => (
+                        <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                           {otp[i] || ''}
+                        </div>
+                     ))}
+                  </div>
+                  
+                  <input
+                     className="absolute inset-0 opacity-0 w-full h-full cursor-default caret-transparent"
+                     type="tel"
+                     pattern="[0-9]*"
+                     inputMode="numeric"
+                     value={otp}
+                     onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 6) setOtp(val);
+                     }}
+                     autoFocus
+                  />
                </div>
             </div>
-            <input
-               className="opacity-0 absolute inset-0 z-10 cursor-default"
-               type="tel"
-               pattern="[0-9]*"
-               inputMode="numeric"
-               value={otp}
-               onChange={(e) => {
-                  const val = e.target.value;
-                  if (val.length <= 6) setOtp(val);
-               }}
-               autoFocus
-            />
 
-            <div className="mt-auto pb-safe flex flex-col gap-4 z-30 relative">
+            <div 
+               className="mt-auto flex flex-col gap-4 px-2"
+               style={{ 
+                  transform: `translateY(-${keyboardHeight}px)`,
+                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : '0'
+               }}
+            >
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
-                  className={`w-full bg-[#00D68F] text-black py-4 rounded-full font-semibold text-lg disabled:opacity-30 shadow-lg flex items-center justify-center transition-transform active:scale-98`}
+                  className={`w-full ${otp.length === 6 ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
                >
                   {loading ? <Loader2 className="animate-spin" /> : 'Verify Code'}
                </button>
@@ -461,7 +537,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                <button
                   onClick={sendOTP}
                   disabled={loading}
-                  className="text-[#00D68F] font-medium text-sm text-center hover:underline disabled:opacity-50"
+                  className="text-[#00D68F] font-bold text-sm text-center hover:opacity-70 transition-opacity disabled:opacity-50"
                >
                   Resend Code
                </button>
@@ -472,7 +548,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 4) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} p-6 pt-safe animate-slide-in`}>
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
             <div className="flex items-center justify-between mb-4">
                <button onClick={() => setStep(3)}><ArrowLeft className={textMain} /></button>
             </div>
@@ -560,11 +636,18 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto pb-safe pt-6">
+            <div 
+               className="mt-auto pb-safe pt-6 px-2"
+               style={{ 
+                  transform: `translateY(-${keyboardHeight}px)`,
+                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : 'env(safe-area-inset-bottom)'
+               }}
+            >
                <button
                   onClick={handleCompleteProfile}
-                  disabled={loading}
-                  className={`w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-lg flex items-center justify-center gap-2`}
+                  disabled={loading || !name}
+                  className={`w-full ${name ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
                >
                   {loading ? <Loader2 className="animate-spin" /> : <>Next <ArrowRight size={20} /></>}
                </button>
@@ -575,7 +658,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 5) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} p-6 pt-safe animate-slide-in`}>
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
             <div className="flex items-center justify-between mb-4">
                <button onClick={() => setStep(4)}><ArrowLeft className={textMain} /></button>
             </div>

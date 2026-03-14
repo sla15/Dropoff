@@ -15,7 +15,10 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
     if (active === 'checkout' || active === 'business-detail' || active === 'order-tracking') return null;
 
     return (
-        <div className={`fixed bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isNavVisible ? 'nav-visible' : 'nav-hidden'}`}>
+        <div 
+            className={`fixed left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isNavVisible ? 'nav-visible' : 'nav-hidden'}`}
+            style={{ bottom: `calc(1.5rem + var(--safe-area-inset-bottom, 0px))` }}
+        >
             <div
                 className={`
           pointer-events-auto
