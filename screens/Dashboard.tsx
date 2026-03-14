@@ -132,8 +132,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
       const { Capacitor } = (window as any);
       if (Capacitor?.isNativePlatform()) {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
-        const perm = await PushNotifications.checkPermissions();
+        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+        const perm = await FirebaseMessaging.checkPermissions();
         isGranted = perm.receive === 'granted';
         isDefault = perm.receive === 'prompt';
       } else {

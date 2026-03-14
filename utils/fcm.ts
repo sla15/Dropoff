@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { PushNotifications } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from "../supabaseClient";
 import { CONFIG as APP_CONFIG } from "../config";
@@ -37,11 +38,11 @@ const initNativePush = async (userId?: string) => {
         console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
 
         // Check if we have permission first
-        let permStatus = await PushNotifications.checkPermissions();
+        let permStatus = await FirebaseMessaging.checkPermissions();
         
         if (permStatus.receive === 'prompt') {
             console.log("🔔 FCM: Requesting native push permissions...");
-            permStatus = await PushNotifications.requestPermissions();
+            permStatus = await FirebaseMessaging.requestPermissions();
         }
 
         if (permStatus.receive !== 'granted') {
@@ -49,54 +50,30 @@ const initNativePush = async (userId?: string) => {
             return;
         }
 
-        // ADD LISTENERS BEFORE REGISTERING
-        PushNotifications.addListener('registration', async (token) => {
-            console.log('✅ FCM: Native registration successful, token:', token.value);
+        FirebaseMessaging.addListener('tokenReceived', async (event) => {
+            console.log('✅ FCM: Native token received:', event.token);
             if (userId) {
-                await syncFCMTokenToSupabase(userId, token.value);
+                await syncFCMTokenToSupabase(userId, event.token);
             }
         });
 
-        PushNotifications.addListener('registrationError', (err) => {
-            console.error('❌ FCM: Native registration error:', err.error);
+        FirebaseMessaging.addListener('notificationReceived', (event) => {
+            console.log('🔔 FCM: Push received:', event.notification);
+            // Optionally handle foreground notifications here
         });
 
-        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-            console.log('🔔 FCM: Push received:', notification);
+        FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+            console.log('🔔 FCM: Push action performed:', event.notification);
         });
 
-        PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-            console.log('🔔 FCM: Push action performed:', notification);
-        });
-
-        // Create notification channels for Android
-        if (Capacitor.getPlatform() === 'android') {
-            // Default channel
-            await PushNotifications.createChannel({
-                id: 'default',
-                name: 'Default',
-                description: 'General notifications',
-                importance: 5, // High importance for banners
-                visibility: 1,
-                vibration: true
-            });
-
-            // Ride Requests channel (matches Edge Function)
-            await PushNotifications.createChannel({
-                id: 'ride_requests',
-                name: 'Ride Requests',
-                description: 'Notifications for ride and delivery requests',
-                importance: 5, // Max importance
-                visibility: 1,
-                vibration: true,
-                sound: 'cashregistersound'
-            });
-            console.log("📡 FCM: Android notification channels ('default', 'ride_requests') created");
+        // Try getting a token immediately
+        const { token } = await FirebaseMessaging.getToken();
+        if (token && userId) {
+            console.log('✅ FCM: Native token retrieved directly:', token);
+            await syncFCMTokenToSupabase(userId, token);
         }
-
-
-        await PushNotifications.register();
-        console.log("📡 FCM: PushNotifications.register() invoked successfully");
+        
+        console.log("📡 FCM: FirebaseMessaging initialized successfully");
 
     } catch (err) {
         console.error("❌ FCM: Native init error:", err);

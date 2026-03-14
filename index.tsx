@@ -146,10 +146,10 @@ const App = () => {
       console.log("🚀 FCM: First time on dashboard, requesting permissions...");
       
       if (isNative) {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
-        let permStatus = await PushNotifications.checkPermissions();
+        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+        let permStatus = await FirebaseMessaging.checkPermissions();
         if (permStatus.receive === 'prompt') {
-          permStatus = await PushNotifications.requestPermissions();
+          permStatus = await FirebaseMessaging.requestPermissions();
         }
       }
 
