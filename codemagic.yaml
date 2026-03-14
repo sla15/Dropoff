@@ -29,14 +29,11 @@ workflows:
           echo "Available Environment Variable Keys (names only):"
           env | cut -d= -f1 | sort | grep -E "KEY|STORE|CM_|FCI_"
           
-          echo "Searching for .keystore files in cloning directory..."
-          find $FCI_BUILD_DIR -name "*.keystore" -type f
-          
-          # Detect signing variables (handling both case variants)
-          K_FILE="${cm_keystore:-$CM_KEYSTORE}"
-          K_STORE_PASS="${cm_keystore_password:-$CM_KEYSTORE_PASSWORD}"
-          K_ALIAS="${cm_key_alias:-$CM_KEY_ALIAS}"
-          K_KEY_PASS="${cm_key_password:-$CM_KEY_PASSWORD}"
+          # Detect signing variables automatically set by the Code Signing tab
+          K_FILE="$CM_KEYSTORE_PATH"
+          K_STORE_PASS="$CM_KEYSTORE_PASSWORD"
+          K_ALIAS="$CM_KEY_ALIAS"
+          K_KEY_PASS="$CM_KEY_PASSWORD"
 
           echo "--- SIGNING CONFIGURATION ---"
           if [ -n "$K_FILE" ] && [ -f "$K_FILE" ]; then
@@ -51,6 +48,7 @@ workflows:
             echo "FATAL ERROR: Keystore not found or variables unset."
             echo "K_FILE value: '$K_FILE'"
             echo "Stopping build as requested: Signed APK required."
+            echo "Please ensure you have configured Android code signing in the Code signing tab."
             exit 1
           fi
     artifacts:
