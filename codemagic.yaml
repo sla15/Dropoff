@@ -48,9 +48,10 @@ workflows:
               -Pandroid.injected.signing.key.alias="$K_ALIAS" \
               -Pandroid.injected.signing.key.password="$K_KEY_PASS"
           else
-            echo "WARNING: Keystore not found or variables unset. K_FILE is '$K_FILE'"
-            echo "Falling back to UNSIGNED build to prevent crash..."
-            ./gradlew assembleRelease
+            echo "FATAL ERROR: Keystore not found or variables unset."
+            echo "K_FILE value: '$K_FILE'"
+            echo "Stopping build as requested: Signed APK required."
+            exit 1
           fi
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
