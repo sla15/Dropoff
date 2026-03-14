@@ -530,72 +530,15 @@ const App = () => {
     finally { setIsActivitiesLoading(false); }
   };
 
-  // --- 4. INITIALIZATION ---
+  // --- 4. INITIALIZATION & AUTH HANDLER ---
   useEffect(() => {
-    const initializeApp = async () => {
-      setIsLoading(true);
-      const minTime = new Promise(resolve => setTimeout(resolve, 3500));
-
-      const sessionCheck = async () => {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-            if (profile) {
-              setUser({
-                id: profile.id,
-                name: profile.full_name || '',
-                phone: profile.phone || '',
-                email: profile.email || '',
-                location: profile.location || 'Banjul, The Gambia',
-                photo: profile.avatar_url || null,
-                role: profile.role || 'customer',
-                rating: Number(profile.average_rating) || 5.0,
-                referralCode: profile.referral_code || '',
-                referralBalance: profile.referral_balance || 0,
-                last_lat: profile.last_lat,
-                last_lng: profile.last_lng
-              });
-              
-              // explicitly set loading to true before fetching
-              setIsFavoritesLoading(true);
-              setIsActivitiesLoading(true);
-              fetchFavorites(session.user.id);
-              fetchActivities(session.user.id);
-              subscribeToChanges(session.user.id);
-
-              // Remove direct initFCM call here; let the useEffect handle it
-              // to respect the location prompt sequence.
-
-              // Enforce full_name for onboarding
-              if (!profile.full_name) {
-                setScreen('onboarding');
-              } else {
-                setScreen('dashboard');
-              }
-            } else {
-              setScreen('onboarding');
-            }
-          } else {
-            setScreen('onboarding');
-            // Remove direct initFCM call here; guest mode shouldn't prompt push immediately anyway
-          }
-        } catch (err) {
-          console.error("Session check failed:", err);
-          setScreen('onboarding'); // Fallback to onboarding on error
-        }
-      };
-
-      try {
-        await Promise.all([minTime, sessionCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
-      } catch (err) {
-        console.error("Initialization error:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    let authListener: any = null;
+    let appStateListener: any = null;
+    let realtimeChannel: any = null;
 
     const subscribeToChanges = (userId?: string) => {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      
       const channel = supabase.channel('app-changes');
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchSettings());
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'business_categories' }, () => fetchCategories());
@@ -604,7 +547,6 @@ const App = () => {
 
       if (userId) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_activities', filter: `user_id=eq.${userId}` }, () => fetchActivities(userId));
-
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, (payload) => {
           const p = payload.new as any;
           setUser(prev => ({
@@ -621,57 +563,104 @@ const App = () => {
           }));
         });
       }
-      channel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime connected');
-        }
-        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          console.log('⚠️ Realtime connection lost. Reconnecting in 5s...');
-          supabase.removeChannel(channel);
-          setTimeout(() => {
-            if (userId) subscribeToChanges(userId);
-          }, 5000);
-        }
-      });
-      return channel;
+      
+      channel.subscribe();
+      realtimeChannel = channel;
     };
 
-    // --- APP LIFECYCLE HANDLERS ---
-    let appStateListener: any = null;
-    try {
-      if (Capacitor.isNativePlatform()) {
-        appStateListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-          console.log('📱 App state changed. Is active:', isActive);
+    const handleUserAuthenticated = async (session: any) => {
+      try {
+        const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+        if (profile) {
+          setUser({
+            id: profile.id,
+            name: profile.full_name || '',
+            phone: profile.phone || '',
+            email: profile.email || '',
+            location: profile.location || 'Banjul, The Gambia',
+            photo: profile.avatar_url || null,
+            role: profile.role || 'customer',
+            rating: Number(profile.average_rating) || 5.0,
+            referralCode: profile.referral_code || '',
+            referralBalance: profile.referral_balance || 0,
+            last_lat: profile.last_lat,
+            last_lng: profile.last_lng
+          });
+          
+          setIsFavoritesLoading(true);
+          setIsActivitiesLoading(true);
+          fetchFavorites(session.user.id);
+          fetchActivities(session.user.id);
+          subscribeToChanges(session.user.id);
+          
+          // Re-init Push Notifications whenever user is authenticated
+          initFCM(session.user.id);
+
+          if (!profile.full_name || !profile.phone) {
+            setScreen('onboarding');
+          } else {
+            setScreen('dashboard');
+          }
+        } else {
+          setScreen('onboarding');
+        }
+      } catch (err) {
+        console.error("Auth sync error:", err);
+      }
+    };
+
+    const initializeApp = async () => {
+      setIsLoading(true);
+      const minTime = new Promise(resolve => setTimeout(resolve, 3500));
+      const safetyTimeout = new Promise(resolve => setTimeout(resolve, 8000));
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log(`🔔 Auth Event: ${event}`);
+        if (session) {
+          handleUserAuthenticated(session);
+        } else {
+          setScreen('onboarding');
+        }
+      });
+      authListener = subscription;
+
+      // Initial session check
+      const initialCheck = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) await handleUserAuthenticated(session);
+        else setScreen('onboarding');
+      };
+
+      try {
+        await Promise.race([
+          Promise.all([minTime, initialCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]),
+          safetyTimeout
+        ]);
+      } catch (err) {
+        console.error("Init failed:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Lifecycle listener
+    if (Capacitor.isNativePlatform()) {
+      import('@capacitor/app').then(({ App: CapApp }) => {
+        CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            // When coming back to foreground, ensure session is still valid
             supabase.auth.getSession().then(({ data: { session } }) => {
-              if (session) {
-                console.log('✅ Session validated on resume');
-                fetchSettings();
-                if (userRef.current.id) {
-                  fetchActivities(userRef.current.id);
-                }
-              } else {
-                console.warn('⚠️ Session lost on resume, redirecting to onboarding');
-                setScreen('onboarding');
-              }
-            }).catch(err => {
-              console.error('❌ Lifecycle session check failed:', err);
-              setScreen('onboarding');
+              if (session) handleUserAuthenticated(session);
             });
           }
         });
-      }
-    } catch (err) {
-      console.error('❌ Failed to set up app state listener:', err);
+      });
     }
 
     initializeApp();
 
     return () => {
-      if (appStateListener) {
-        appStateListener.remove();
-      }
+      if (authListener) authListener.unsubscribe();
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     };
   }, []);
 
