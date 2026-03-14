@@ -381,7 +381,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                      The future <br />
                      of <span className="text-[#00D68F]">movement.</span>
                   </p>
-                  <p className="text-xl text-black font-bold max-w-[240px] leading-relaxed drop-shadow-[0_1px_2px_rgba(255,255,255,0.5)]">
+                  <p className={`text-xl ${theme === 'dark' ? 'text-white' : 'text-black'} font-bold max-w-[240px] leading-relaxed drop-shadow-[0_1px_2px_rgba(255,255,255,0.2)]`}>
                      Swift rides, smart deliveries. <br />
                      All in one premium app.
                   </p>
@@ -431,39 +431,35 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 2) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-            <div className="pt-2 flex-1">
-               <ArrowLeft onClick={() => setStep(1)} className="mb-6 cursor-pointer opacity-70" />
-               <ProgressBar currentStep={2} />
-               
-                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
-               
-               <div className={`flex items-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full transition-colors`}>
-                  <div className="font-bold text-2xl flex items-center gap-2 shrink-0">
-                     <span>🇬🇲</span> +220
+            <div className="flex-1 flex flex-col justify-center items-center text-center">
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-8">
+                     <ProgressBar currentStep={2} />
                   </div>
-                  <input
-                     type="tel"
-                     autoFocus
-                     placeholder="### ####"
-                     value={phone}
-                     onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        if (val.length <= 7) setPhone(val);
-                     }}
-                     className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
-                  />
+                  
+                  <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
+                  
+                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[280px] mx-auto transition-colors`}>
+                     <div className="font-bold text-2xl flex items-center gap-2 shrink-0">
+                        <span>🇬🇲</span> +220
+                     </div>
+                     <input
+                        type="tel"
+                        autoFocus
+                        placeholder="### ####"
+                        value={phone}
+                        onChange={(e) => {
+                           const val = e.target.value.replace(/\D/g, '');
+                           if (val.length <= 7) setPhone(val);
+                        }}
+                        className={`w-36 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                     />
+                  </div>
+                  <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
                </div>
-               <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
             </div>
             
-            <div 
-               className="mt-auto px-2"
-               style={{ 
-                  transform: `translateY(-${keyboardHeight}px)`,
-                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : '0'
-               }}
-            >
+            <div className="mt-auto px-2 pb-safe">
                <button
                   onClick={sendOTP}
                   disabled={phone.length < 3 || loading}
@@ -479,53 +475,49 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 3) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-            <div>
-               <ArrowLeft onClick={() => setStep(2)} className="mb-4 cursor-pointer opacity-70" />
-               <ProgressBar currentStep={3} />
+            <div className="flex-1 flex flex-col justify-center items-center text-center">
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-10">
+                    <ProgressBar currentStep={3} />
+                  </div>
 
-                <h2 className="text-3xl font-bold tracking-tight mb-2">Enter code</h2>
-               <p className={`${textSec} mb-10`}>Sent to +220 {phone}</p>
-               
-               <div className="flex items-center justify-center gap-3 mb-12 relative">
-                  <div className="flex gap-2">
-                     {[0, 1, 2].map((i) => (
-                        <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
-                           {otp[i] || ''}
-                        </div>
-                     ))}
-                  </div>
-                  <div className={`text-2xl font-bold opacity-30 ${textMain}`}>-</div>
-                  <div className="flex gap-2">
-                     {[3, 4, 5].map((i) => (
-                        <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
-                           {otp[i] || ''}
-                        </div>
-                     ))}
-                  </div>
+                  <h2 className="text-3xl font-bold tracking-tight mb-3">Enter code</h2>
+                  <p className={`${textSec} mb-12`}>Sent to +220 {phone}</p>
                   
-                  <input
-                     className="absolute inset-0 opacity-0 w-full h-full cursor-default caret-transparent"
-                     type="tel"
-                     pattern="[0-9]*"
-                     inputMode="numeric"
-                     value={otp}
-                     onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        if (val.length <= 6) setOtp(val);
-                     }}
-                     autoFocus
-                  />
+                  <div className="flex items-center justify-center gap-3 mb-10 relative">
+                     <div className="flex gap-2">
+                        {[0, 1, 2].map((i) => (
+                           <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                              {otp[i] || ''}
+                           </div>
+                        ))}
+                     </div>
+                     <div className={`text-2xl font-bold opacity-30 ${textMain}`}>-</div>
+                     <div className="flex gap-2">
+                        {[3, 4, 5].map((i) => (
+                           <div key={i} className={`w-12 h-16 rounded-2xl border ${theme === 'light' ? 'bg-white/50 border-black/10' : 'bg-[#1C1C1E]/50 border-white/10'} backdrop-blur-md shadow-sm flex items-center justify-center text-3xl font-bold transition-all duration-200 ${otp[i] ? 'border-[#00D68F] shadow-[0_0_15px_rgba(0,214,143,0.2)]' : ''}`}>
+                              {otp[i] || ''}
+                           </div>
+                        ))}
+                     </div>
+                     
+                     <input
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-default caret-transparent"
+                        type="tel"
+                        pattern="[0-9]*"
+                        inputMode="numeric"
+                        value={otp}
+                        onChange={(e) => {
+                           const val = e.target.value.replace(/\D/g, '');
+                           if (val.length <= 6) setOtp(val);
+                        }}
+                        autoFocus
+                     />
+                  </div>
                </div>
             </div>
 
-            <div 
-               className="mt-auto flex flex-col gap-4 px-2"
-               style={{ 
-                  transform: `translateY(-${keyboardHeight}px)`,
-                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : '0'
-               }}
-            >
+            <div className="mt-auto flex flex-col gap-4 px-2 pb-safe">
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -549,101 +541,85 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 4) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="flex items-center justify-between mb-4">
-               <button onClick={() => setStep(3)}><ArrowLeft className={textMain} /></button>
-            </div>
+            <div className="flex-1 flex flex-col justify-center items-center">
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-6">
+                     <ProgressBar currentStep={4} />
+                  </div>
 
-            <ProgressBar currentStep={4} />
+                  <div className="text-center mb-6">
+                     <h1 className="text-2xl font-bold mb-2">Let's get to know you</h1>
+                     <p className={`${textSec} text-xs px-4`}>Add your details so drivers and sellers can identify you.</p>
+                  </div>
 
-            <div className="text-center mb-8">
-               <h1 className="text-3xl font-bold mb-3">Let's get to know you</h1>
-               <p className={`${textSec} text-sm px-4`}>Add your details so drivers and sellers can identify you.</p>
-            </div>
-
-            <div className="flex justify-center mb-10">
-               <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  accept="image/*"
-               />
-               <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-28 h-28 rounded-full ${inputBg} flex items-center justify-center relative cursor-pointer overflow-hidden bg-cover bg-center`}
-                  style={photo ? { backgroundImage: `url(${photo})` } : {}}
-               >
-                  {!photo && (
-                     <div className="text-center">
-                        <span className={`text-xs font-bold ${textSec} opacity-40 uppercase tracking-widest`}>Add Photo</span>
+                  <div className="flex justify-center mb-6">
+                     <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
+                     <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`w-24 h-24 rounded-full ${inputBg} flex items-center justify-center relative cursor-pointer overflow-hidden bg-cover bg-center`}
+                        style={photo ? { backgroundImage: `url(${photo})` } : {}}
+                     >
+                        {!photo && <span className={`text-[10px] font-bold ${textSec} opacity-40 uppercase tracking-widest`}>Add Photo</span>}
+                        <div className="absolute bottom-0 right-0 bg-[#00D68F] w-7 h-7 rounded-full flex items-center justify-center border-2 border-white dark:border-black shadow-sm z-10">
+                           <Camera size={12} className="text-black" />
+                        </div>
                      </div>
-                  )}
-                  <div className="absolute bottom-0 right-0 bg-[#00D68F] w-9 h-9 rounded-full flex items-center justify-center border-4 border-[#F2F2F7] dark:border-black shadow-sm z-10">
-                     <Camera size={14} className="text-black" />
+                  </div>
+
+                  <div className="space-y-4 w-full px-2">
+                     <div>
+                        <div className="flex items-center gap-1 mb-1.5">
+                           <label className={`text-xs font-bold ${textSec}`}>Full Name</label>
+                           <span className="text-[#00D68F]">*</span>
+                        </div>
+                        <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
+                           <Briefcase size={18} className={textSec} />
+                           <input
+                              placeholder="e.g. Buba Camara"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              className="flex-1 bg-transparent outline-none font-medium text-sm"
+                           />
+                        </div>
+                     </div>
+
+                     <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                           <label className={`text-xs font-bold ${textSec}`}>Email Address</label>
+                           <span className={`text-[9px] ${inputBg} px-1.5 py-0.5 rounded text-gray-500`}>Optional</span>
+                        </div>
+                        <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
+                           <Mail size={18} className={textSec} />
+                           <input
+                              placeholder="name@example.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              className="flex-1 bg-transparent outline-none font-medium text-sm"
+                           />
+                        </div>
+                     </div>
+
+                     <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                           <label className={`text-xs font-bold ${textSec}`}>Referral Code</label>
+                           <span className={`text-[9px] ${inputBg} px-1.5 py-0.5 rounded text-gray-500`}>Optional</span>
+                        </div>
+                        <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
+                           <Gift size={18} className={textSec} />
+                           <input
+                              placeholder="e.g. ALEX2025"
+                              value={referralInput}
+                              onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                              maxLength={10}
+                              className="flex-1 bg-transparent outline-none font-medium uppercase tracking-widest text-sm placeholder:normal-case placeholder:tracking-normal"
+                           />
+                        </div>
+                     </div>
                   </div>
                </div>
             </div>
 
-            <div className="space-y-6">
-               <div>
-                  <div className="flex items-center gap-1 mb-2">
-                     <label className={`text-sm font-bold ${textSec}`}>Full Name</label>
-                     <span className="text-[#00D68F]">*</span>
-                  </div>
-                  <div className={`flex items-center gap-3 p-4 rounded-xl ${inputBg}`}>
-                     <Briefcase size={20} className={textSec} />
-                     <input
-                        placeholder="e.g. Buba Camara"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        className="flex-1 bg-transparent outline-none font-medium"
-                     />
-                  </div>
-               </div>
-
-               <div>
-                  <div className="flex items-center justify-between mb-2">
-                     <label className={`text-sm font-bold ${textSec}`}>Email Address</label>
-                     <span className={`text-[10px] ${inputBg} px-2 py-0.5 rounded text-gray-500`}>Optional</span>
-                  </div>
-                  <div className={`flex items-center gap-3 p-4 rounded-xl ${inputBg}`}>
-                     <Mail size={20} className={textSec} />
-                     <input
-                        placeholder="name@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="flex-1 bg-transparent outline-none font-medium"
-                     />
-                  </div>
-               </div>
-
-               <div>
-                  <div className="flex items-center justify-between mb-2">
-                     <label className={`text-sm font-bold ${textSec}`}>Referral Code</label>
-                     <span className={`text-[10px] ${inputBg} px-2 py-0.5 rounded text-gray-500`}>Optional</span>
-                  </div>
-                  <div className={`flex items-center gap-3 p-4 rounded-xl ${inputBg}`}>
-                     <Gift size={20} className={textSec} />
-                     <input
-                        placeholder="e.g. ALEX2025"
-                        value={referralInput}
-                        onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                        maxLength={10}
-                        className="flex-1 bg-transparent outline-none font-medium uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal"
-                     />
-                  </div>
-               </div>
-            </div>
-
-            <div 
-               className="mt-auto pb-safe pt-6 px-2"
-               style={{ 
-                  transform: `translateY(-${keyboardHeight}px)`,
-                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  paddingBottom: keyboardHeight > 0 ? '0.5rem' : 'env(safe-area-inset-bottom)'
-               }}
-            >
+            <div className="mt-auto pb-safe pt-6 px-2">
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}
@@ -659,35 +635,37 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 5) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="flex items-center justify-between mb-4">
-               <button onClick={() => setStep(4)}><ArrowLeft className={textMain} /></button>
-            </div>
-
-            <ProgressBar currentStep={5} />
-
-            <div className="text-center mb-8">
-               <h1 className="text-3xl font-bold mb-3">Where is Home?</h1>
-               <p className={`${textSec} text-sm px-4`}>This will be your primary pickup and delivery spot.</p>
-            </div>
-
-            <div className="flex-1 flex flex-col justify-center gap-6">
-               <div className={`p-8 rounded-[32px] ${inputBg} flex flex-col items-center gap-4 text-center border-2 border-transparent hover:border-[#00D68F] transition-all cursor-pointer shadow-sm`} onClick={detectLocation}>
-                  <div className="w-16 h-16 bg-[#00D68F]/20 rounded-full flex items-center justify-center text-[#00D68F]">
-                     <Locate size={32} />
+            <div className="flex-1 flex flex-col justify-center items-center text-center">
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-8">
+                     <ProgressBar currentStep={5} />
                   </div>
-                  <div>
-                     <h3 className="font-bold text-lg">Use Current Location</h3>
-                     <p className={`text-xs ${textSec}`}>Detect via GPS (Fastest)</p>
-                  </div>
-               </div>
 
-               <div className={`p-8 rounded-[32px] ${inputBg} flex flex-col items-center gap-4 text-center border-2 border-transparent hover:border-[#00D68F] transition-all cursor-pointer shadow-sm`} onClick={() => setShowPicker(true)}>
-                  <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500">
-                     <MapPin size={32} />
+                  <div className="text-center mb-10">
+                     <h1 className="text-3xl font-bold mb-3">Where is Home?</h1>
+                     <p className={`${textSec} text-sm px-4`}>This will be your primary pickup and delivery spot.</p>
                   </div>
-                  <div>
-                     <h3 className="font-bold text-lg">Set Manually</h3>
-                     <p className={`text-xs ${textSec}`}>Search or Pin on Map</p>
+
+                  <div className="flex flex-col gap-6 w-full">
+                     <div className={`p-8 rounded-[32px] ${inputBg} flex flex-col items-center gap-4 text-center border-2 border-transparent active:border-[#00D68F] transition-all cursor-pointer shadow-sm`} onClick={detectLocation}>
+                        <div className="w-16 h-16 bg-[#00D68F]/20 rounded-full flex items-center justify-center text-[#00D68F]">
+                           <Locate size={32} />
+                        </div>
+                        <div>
+                           <h3 className="font-bold text-lg">Use Current Location</h3>
+                           <p className={`text-xs ${textSec}`}>Detect via GPS (Fastest)</p>
+                        </div>
+                     </div>
+
+                     <div className={`p-8 rounded-[32px] ${inputBg} flex flex-col items-center gap-4 text-center border-2 border-transparent active:border-[#00D68F] transition-all cursor-pointer shadow-sm`} onClick={() => setShowPicker(true)}>
+                        <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500">
+                           <MapPin size={32} />
+                        </div>
+                        <div>
+                           <h3 className="font-bold text-lg">Set Manually</h3>
+                           <p className={`text-xs ${textSec}`}>Search or Pin on Map</p>
+                        </div>
+                     </div>
                   </div>
                </div>
             </div>

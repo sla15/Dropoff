@@ -35,14 +35,10 @@ const initNativePush = async (userId?: string) => {
     try {
         console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
 
-        let permStatus = await PushNotifications.checkPermissions();
-
-        if (permStatus.receive === 'prompt') {
-            permStatus = await PushNotifications.requestPermissions();
-        }
-
+        // Check if we have permission first
+        const permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive !== 'granted') {
-            console.warn("⚠️ FCM: Native notification permission not granted");
+            console.warn("⚠️ FCM: Native notification permission not granted. Skipping registration.");
             return;
         }
 

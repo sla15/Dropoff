@@ -127,31 +127,38 @@ const App = () => {
   const hasTriggeredFCM = useRef(false);
 
   useEffect(() => {
-    if (!user.id) return;
+    // Only prompt for push notifications once the user reaches the dashboard
+    if (!user.id || screen !== 'dashboard') return;
 
     const startFCM = async () => {
       if (hasTriggeredFCM.current) return;
-      console.log("🚀 Proactive FCM Trigger for user:", user.id);
       
-      // On Android/iOS, explicitly request permissions if needed
+      const promptedBefore = localStorage.getItem('fcm_prompted');
+      if (promptedBefore) {
+        // If already prompted, we still init FCM (to refresh token) but skip permission request
+        console.log("🚀 FCM: Already prompted before, refreshing token...");
+        await initFCM(user.id);
+        hasTriggeredFCM.current = true;
+        return;
+      }
+
+      console.log("🚀 FCM: First time on dashboard, requesting permissions...");
+      
       if (isNative) {
         const { PushNotifications } = await import('@capacitor/push-notifications');
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === 'prompt') {
           permStatus = await PushNotifications.requestPermissions();
         }
-        if (permStatus.receive !== 'granted') {
-          console.warn("⚠️ Push permissions not granted by user.");
-        }
       }
 
       await initFCM(user.id);
+      localStorage.setItem('fcm_prompted', 'true');
       hasTriggeredFCM.current = true;
     };
 
-    // Trigger on login/init
     startFCM();
-  }, [user.id, isNative]);
+  }, [user.id, isNative, screen]);
 
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
     return localStorage.getItem('active_order_id');
@@ -237,11 +244,15 @@ const App = () => {
 
     const startWatching = async () => {
       try {
-        if (Capacitor.isNativePlatform()) {
+        // Prevent permission spam: only ask if we haven't asked in this session
+        const promptedLocation = sessionStorage.getItem('location_prompted');
+
+        if (Capacitor.isNativePlatform() && !promptedLocation) {
           const permissions = await Geolocation.checkPermissions();
           if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
             await Geolocation.requestPermissions();
           }
+          sessionStorage.setItem('location_prompted', 'true');
         }
 
         watchId = await Geolocation.watchPosition(
@@ -249,7 +260,6 @@ const App = () => {
           (pos) => {
             if (!pos) return;
             const { latitude, longitude } = pos.coords;
-            console.log("📍 Location updated:", latitude, longitude);
             setUserLocation({ lat: latitude, lng: longitude });
 
             setUser(prev => ({
@@ -270,10 +280,6 @@ const App = () => {
         );
       } catch (err) {
         console.error("Geolocation error:", err);
-        // Fallback or silent fail to prevent app crash
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          // Maybe notify user once if they expect location features
-        }
       }
     };
 
