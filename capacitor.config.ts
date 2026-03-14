@@ -17,10 +17,13 @@ const config: CapacitorConfig = {
       androidScaleType: "CENTER_CROP"
     },
     Keyboard: {
-      resize: "body",
-      style: "DARK",
+      resize: "Body",
+      style: "Dark",
       resizeOnFullScreen: true,
-    }
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   }
 };
 

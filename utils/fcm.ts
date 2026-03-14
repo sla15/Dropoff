@@ -22,6 +22,7 @@ export const initFCM = async (userId?: string) => {
         }
 
         if (isNative) {
+            console.log("🔔 FCM: Initializing Native Push for User:", userId || 'Guest');
             await initNativePush(userId);
         } else {
             await initWebPush(userId);
@@ -62,7 +63,22 @@ const initNativePush = async (userId?: string) => {
             console.log('🔔 FCM: Push action performed:', notification);
         });
 
+        // Create notification channel for Android
+        if (Capacitor.getPlatform() === 'android') {
+            await PushNotifications.createChannel({
+                id: 'fcm_default_channel',
+                name: 'Default',
+                description: 'General notifications',
+                importance: 5, // High importance for banners
+                visibility: 1,
+                vibration: true
+            });
+            console.log("📡 FCM: Android notification channel created");
+        }
+
+
         await PushNotifications.register();
+        console.log("📡 FCM: PushNotifications.register() invoked successfully");
 
     } catch (err) {
         console.error("❌ FCM: Native init error:", err);

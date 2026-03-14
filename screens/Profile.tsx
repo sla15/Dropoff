@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 
@@ -33,6 +33,7 @@ interface Props {
     ) => void;
     initialDrawer?: string;
     clearInitialDrawer?: () => void;
+    handleLogout: () => Promise<void>;
 }
 
 type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
@@ -126,7 +127,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
-export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer }: Props) => {
+export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer, handleLogout }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
 
@@ -471,10 +472,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
 
                         <button
-                            onClick={async () => {
-                                await supabase.auth.signOut();
-                                setScreen('onboarding');
-                            }}
+                            onClick={handleLogout}
                             className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform"
                         >
                             <LogOut size={20} /> Log Out
@@ -645,6 +643,25 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                 <p className={`text-xs ${textSec}`}>Send us a message</p>
                             </div>
                         </a>
+
+                        {/* Debugging Tools */}
+                        <div className={`mt-6 p-4 rounded-2xl border border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-gray-700'}`}>
+                            <p className={`text-[10px] font-bold uppercase tracking-widest ${textSec} mb-3`}>Developer Tools</p>
+                            <button
+                                onClick={() => {
+                                    triggerHaptic();
+                                    sendPushNotification(
+                                        "Test Notification ⚡",
+                                        "If you see this, push notifications are working correctly on your device!",
+                                        'customer'
+                                    );
+                                    showAlert("Test Sent", "A test push notification has been triggered. Check your notifications.", "success");
+                                }}
+                                className="w-full py-3 rounded-xl bg-[#00D68F]/10 text-[#00D68F] font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
+                            >
+                                <MessageSquare size={16} /> Test Push Notification
+                            </button>
+                        </div>
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
                         <p>Version 1.0.5 (Build 202)</p>
@@ -692,8 +709,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                                 return;
                                             }
                                         }
-                                        await supabase.auth.signOut();
-                                        setScreen('onboarding');
+                                        await handleLogout();
                                     } catch (err: any) {
                                         console.error("Failed to delete account:", err);
                                         showAlert("Deletion Failed", "Could not delete your account. Please contact support.", "error");

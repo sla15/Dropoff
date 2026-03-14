@@ -23,7 +23,8 @@ export const sendPushNotification = async (title: string, message: string, targe
                 userIds: [finalUserId],
                 title,
                 message,
-                target
+                target,
+                android_channel_id: 'fcm_default_channel'
             }
         });
 

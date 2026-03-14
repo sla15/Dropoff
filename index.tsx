@@ -444,6 +444,46 @@ const App = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleLogout = async () => {
+    try {
+      console.log("📂 Performing complete app data purge...");
+      // 1. Supabase SignOut
+      await supabase.auth.signOut();
+      
+      // 2. Clear Local State
+      setUser({
+        id: '', name: '', phone: '', email: '', location: 'Banjul, The Gambia',
+        photo: '', role: 'customer', rating: 5.0, referralCode: '', referralBalance: 0
+      });
+      setRecentActivities([]);
+      setFavorites([]);
+      setCart([]);
+      setActiveOrderId(null);
+      setActiveBatchId(null);
+
+      // 3. Clear Storage
+      const keysToClear = [
+        'app_recent_activities',
+        'app_cart',
+        'fcm_prompted',
+        'active_order_id',
+        'active_batch_id',
+        'pending_gift_card'
+      ];
+      keysToClear.forEach(key => localStorage.removeItem(key));
+      
+      // 4. Reset Navigation
+      setScreen('onboarding');
+      setHistory([]);
+      
+      console.log("✅ App data purged successfully.");
+    } catch (err) {
+      console.error("❌ Logout failed:", err);
+      // Fallback
+      setScreen('onboarding');
+    }
+  };
+
   const fetchFavorites = async (userId: string) => {
     try {
       const { data, error } = await supabase.from('user_favorite_businesses').select('business_id').eq('user_id', userId);
@@ -587,27 +627,32 @@ const App = () => {
 
     // --- APP LIFECYCLE HANDLERS ---
     let appStateListener: any = null;
-    if (Capacitor.isNativePlatform()) {
-      appStateListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-        console.log('📱 App state changed. Is active:', isActive);
-        if (isActive) {
-          // When coming back to foreground, ensure session is still valid
-          // This prevents the "blank white canvas" if the state/auth was purged
-          supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-              console.log('✅ Session validated on resume');
-              // Force a shallow re-fetch of settings/profile to ensure state is alive
-              fetchSettings();
-              if (userRef.current.id) {
-                fetchActivities(userRef.current.id);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        appStateListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+          console.log('📱 App state changed. Is active:', isActive);
+          if (isActive) {
+            // When coming back to foreground, ensure session is still valid
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (session) {
+                console.log('✅ Session validated on resume');
+                fetchSettings();
+                if (userRef.current.id) {
+                  fetchActivities(userRef.current.id);
+                }
+              } else {
+                console.warn('⚠️ Session lost on resume, redirecting to onboarding');
+                setScreen('onboarding');
               }
-            } else {
-              console.warn('⚠️ Session lost on resume, redirecting to onboarding');
+            }).catch(err => {
+              console.error('❌ Lifecycle session check failed:', err);
               setScreen('onboarding');
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.error('❌ Failed to set up app state listener:', err);
     }
 
     initializeApp();
@@ -699,6 +744,7 @@ const App = () => {
 
   const renderScreen = () => {
     switch (screen) {
+      case 'splash': return <SplashScreen theme={theme} />;
       case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
       case 'dashboard': return <DashboardScreen
         user={user}
@@ -729,7 +775,7 @@ const App = () => {
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
-      case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} />;
+      case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} handleLogout={handleLogout} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
       default: return null;
     }
