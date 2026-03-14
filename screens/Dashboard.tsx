@@ -42,11 +42,14 @@ interface Props {
   activeBatchId: string | null;
   setIsNavVisible: (visible: boolean) => void;
   setProfileDrawerToOpen: (val: string) => void;
+  isActivitiesLoading: boolean;
+  isFavoritesLoading: boolean;
+  locationPromptDone: boolean;
 }
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen, isActivitiesLoading, isFavoritesLoading, locationPromptDone }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
@@ -162,10 +165,10 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       }
     };
 
-    if (user.id) {
+    if (user.id && locationPromptDone) {
       checkNotificationStatus();
     }
-  }, [user.id, user.role]);
+  }, [user.id, user.role, locationPromptDone]);
 
   const handleDeleteActivity = async (activity: Activity, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -515,7 +518,11 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             </div>
 
             <div className="flex gap-4 overflow-x-auto no-scrollbar pb-6 px-2 -mx-2 snap-x">
-              {businesses.filter(b => favorites.includes(b.id)).slice(0, 5).map(b => (
+              {isFavoritesLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className={`w-[260px] h-[220px] shrink-0 p-3 rounded-[32px] ${theme === 'light' ? 'bg-gray-200' : 'bg-[#2C2C2E]'} animate-pulse snap-center border border-black/5 dark:border-white/5`} />
+                ))
+              ) : businesses.filter(b => favorites.includes(b.id)).slice(0, 5).map(b => (
                 <div
                   key={b.id}
                   onClick={() => {
@@ -574,7 +581,11 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             </button>
           </div>
           <div className="space-y-4 px-2">
-            {recentActivities.slice(0, 7).map(activity => (
+            {isActivitiesLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className={`w-full h-20 rounded-[24px] ${theme === 'light' ? 'bg-gray-200' : 'bg-[#2C2C2E]'} animate-pulse`} />
+              ))
+            ) : recentActivities.slice(0, 7).map(activity => (
 
               <div
                 key={activity.id}
@@ -636,7 +647,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 </div>
               </div>
             ))}
-            {recentActivities.length === 0 && (
+            {!isActivitiesLoading && recentActivities.length === 0 && (
               <div className={`py-2 text-center text-[10px] ${textSec} opacity-40 font-medium`}>No recently completed activities.</div>
             )}
           </div>

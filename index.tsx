@@ -108,6 +108,10 @@ const App = () => {
     type: 'info'
   });
 
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
+  const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
+  const [locationPromptDone, setLocationPromptDone] = useState(false);
+
   // 👤 User State (At the top to prevent ReferenceErrors)
   const [user, setUser] = useState<UserData>({
     id: '',
@@ -128,8 +132,8 @@ const App = () => {
   const hasTriggeredFCM = useRef(false);
 
   useEffect(() => {
-    // Only prompt for push notifications once the user reaches the dashboard
-    if (!user.id || screen !== 'dashboard') return;
+    // Only prompt for push notifications once the user reaches the dashboard and location is done
+    if (!user.id || screen !== 'dashboard' || !locationPromptDone) return;
 
     const startFCM = async () => {
       if (hasTriggeredFCM.current) return;
@@ -255,6 +259,9 @@ const App = () => {
           }
           sessionStorage.setItem('location_prompted', 'true');
         }
+        
+        // Mark location prompt as done so FCM can proceed
+        setLocationPromptDone(true);
 
         watchId = await Geolocation.watchPosition(
           { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
@@ -485,13 +492,16 @@ const App = () => {
   };
 
   const fetchFavorites = async (userId: string) => {
+    setIsFavoritesLoading(true);
     try {
       const { data, error } = await supabase.from('user_favorite_businesses').select('business_id').eq('user_id', userId);
       if (data && !error) setFavorites(data.map(f => f.business_id));
     } catch (err) { console.error(err); }
+    finally { setIsFavoritesLoading(false); }
   };
 
   const fetchActivities = async (userId: string) => {
+    setIsActivitiesLoading(true);
     try {
       const { data, error } = await supabase
         .from('user_activities')
@@ -517,6 +527,7 @@ const App = () => {
         localStorage.setItem('app_recent_activities', JSON.stringify(formattedActivities));
       }
     } catch (err) { console.error("Activities Fetch Error:", err); }
+    finally { setIsActivitiesLoading(false); }
   };
 
   // --- 4. INITIALIZATION ---
@@ -770,6 +781,9 @@ const App = () => {
         activeOrderId={activeOrderId}
         activeBatchId={activeBatchId}
         setIsNavVisible={setIsNavVisible}
+        isActivitiesLoading={isActivitiesLoading}
+        isFavoritesLoading={isFavoritesLoading}
+        locationPromptDone={locationPromptDone}
       />;
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
