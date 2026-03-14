@@ -37,8 +37,33 @@ const initNativePush = async (userId?: string) => {
     try {
         console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
 
-        // Check if we have permission first
+        // 1. Create Channels for Android 8.0+
+        if (Capacitor.getPlatform() === 'android') {
+            await FirebaseMessaging.createChannel({
+                id: 'ride_requests',
+                name: 'Ride & Order Requests',
+                description: 'Critical alerts for new rides and order updates',
+                importance: 5, // Importance.HIGH
+                visibility: 1, // Visibility.PUBLIC
+                vibration: true,
+                lights: true,
+                lightColor: '#00E39A'
+            });
+
+            await FirebaseMessaging.createChannel({
+                id: 'default',
+                name: 'General Notifications',
+                description: 'Updates and general information',
+                importance: 3, // Importance.DEFAULT
+                visibility: 1,
+                vibration: true
+            });
+            console.log("✅ FCM: Android Channels created");
+        }
+
+        // 2. Check Permissions
         let permStatus = await FirebaseMessaging.checkPermissions();
+        console.log("🔔 FCM: Permission Status:", permStatus.receive);
         
         if (permStatus.receive === 'prompt') {
             console.log("🔔 FCM: Requesting native push permissions...");
@@ -46,34 +71,40 @@ const initNativePush = async (userId?: string) => {
         }
 
         if (permStatus.receive !== 'granted') {
-            console.warn("⚠️ FCM: Native notification permission NOT granted. User might have declined.");
+            console.warn("⚠️ FCM: Native notification permission NOT granted. Status:", permStatus.receive);
             return;
         }
 
+        // 3. Register Listeners
+        await FirebaseMessaging.removeAllListeners();
+
         FirebaseMessaging.addListener('tokenReceived', async (event) => {
-            console.log('✅ FCM: Native token received:', event.token);
+            console.log('✅ FCM: Native token received event:', event.token);
             if (userId) {
                 await syncFCMTokenToSupabase(userId, event.token);
             }
         });
 
         FirebaseMessaging.addListener('notificationReceived', (event) => {
-            console.log('🔔 FCM: Push received:', event.notification);
-            // Optionally handle foreground notifications here
+            console.log('🔔 FCM: Foreground push received:', event.notification);
         });
 
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Push action performed:', event.notification);
         });
 
-        // Try getting a token immediately
+        // 4. Register for remote notifications and get token
+        console.log("📡 FCM: Registering for remote notifications...");
+        
         const { token } = await FirebaseMessaging.getToken();
-        if (token && userId) {
-            console.log('✅ FCM: Native token retrieved directly:', token);
-            await syncFCMTokenToSupabase(userId, token);
+        if (token) {
+            console.log('✅ FCM: Token retrieved:', token);
+            if (userId) {
+                await syncFCMTokenToSupabase(userId, token);
+            }
         }
         
-        console.log("📡 FCM: FirebaseMessaging initialized successfully");
+        console.log("📡 FCM: FirebaseMessaging initialization complete");
 
     } catch (err) {
         console.error("❌ FCM: Native init error:", err);
@@ -140,9 +171,15 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
         if (!userId || !token) return;
 
-        console.log(`📡 FCM: Overwriting token for user ${userId}...`);
+        // Prevent redundant syncs
+        const lastSync = localStorage.getItem('last_fcm_sync');
+        if (lastSync === token) {
+            console.log('📡 FCM: Token already synced recently.');
+            return;
+        }
 
-        // Overwrite the single token in profiles table as requested
+        console.log(`📡 FCM: Syncing token for user ${userId}...`);
+
         const { error } = await supabase
             .from('profiles')
             .update({
@@ -154,7 +191,8 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
         if (error) {
             console.error('❌ FCM: Failed to sync token to Supabase:', error);
         } else {
-            console.log('✅ FCM: Token overwritten successfully (Single device strategy)');
+            console.log('✅ FCM: Token synced successfully');
+            localStorage.setItem('last_fcm_sync', token);
         }
     } catch (err) {
         console.error('❌ FCM: Sync exception:', err);

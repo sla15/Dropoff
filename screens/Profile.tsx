@@ -1,10 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
+import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera as CameraIcon, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
+
 import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
+import { Capacitor } from '@capacitor/core';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+
 
 interface Props {
     theme: Theme;
@@ -144,7 +148,8 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
     const [editEmail, setEditEmail] = useState(user.email);
     const [editLocation, setEditLocation] = useState(user.location || '');
     const [loading, setLoading] = useState(false);
-    const [photoFile, setPhotoFile] = useState<File | null>(null);
+    const [photoFile, setPhotoFile] = useState<File | Blob | null>(null);
+
 
     // Image Upload Ref
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,15 +229,19 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             // 1. Upload new photo if selected
             if (photoFile) {
                 console.log("Uploading Profile Photo...");
-                const fileExt = photoFile.name.split('.').pop();
+                const isBlob = !(photoFile instanceof File);
+                const fileExt = isBlob ? 'jpg' : (photoFile as File).name.split('.').pop();
                 const fileName = `${userId}-${Math.random()}.${fileExt}`;
                 const filePath = `user-avatars/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('avatars')
-                    .upload(filePath, photoFile);
+                    .upload(filePath, photoFile, {
+                        contentType: isBlob ? 'image/jpeg' : undefined
+                    });
 
                 if (uploadError) throw uploadError;
+
 
                 const { data: { publicUrl } } = supabase.storage
                     .from('avatars')
@@ -293,17 +302,38 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         }
     };
 
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setPhotoFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setUser({ ...user, photo: reader.result as string });
-            };
-            reader.readAsDataURL(file);
+    const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement> | null) => {
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const image = await Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: true,
+                    resultType: CameraResultType.Uri,
+                    source: CameraSource.Prompt // Ask: Camera or Photos
+                });
+
+                if (image.webPath) {
+                    const response = await fetch(image.webPath);
+                    const blob = await response.blob();
+                    setPhotoFile(blob);
+                    setUser({ ...user, photo: image.webPath });
+                }
+            } catch (err) {
+                console.warn("Camera/Gallery cancelled or failed:", err);
+            }
+        } else if (event) {
+            const file = event.target.files?.[0];
+            if (file) {
+                setPhotoFile(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setUser({ ...user, photo: reader.result as string });
+                };
+                reader.readAsDataURL(file);
+            }
         }
     };
+
 
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
@@ -400,16 +430,24 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             <div
                                 className={`w-24 h-24 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#333] relative cursor-pointer`}
                                 style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
-                                onClick={() => fileInputRef.current?.click()}
+                                onClick={() => {
+                                    if (Capacitor.isNativePlatform()) {
+                                        handleImageUpload(null);
+                                    } else {
+                                        fileInputRef.current?.click();
+                                    }
+                                }}
                             >
+
                                 {!user.photo && (
                                     <span className="text-[#00D68F] font-bold text-3xl">
                                         {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
                                     </span>
                                 )}
                                 <div className="absolute bottom-0 right-0 bg-[#00D68F] p-1.5 rounded-full border-2 border-white dark:border-black cursor-pointer shadow-sm">
-                                    <Camera size={14} className="text-black" />
+                                    <CameraIcon size={14} className="text-black" />
                                 </div>
+
                             </div>
                         </div>
 
@@ -614,35 +652,36 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             {activeDrawer === 'support' && (
                 <Drawer title="Help & Support" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard}>
                     <div className="grid grid-cols-1 gap-4">
-                        <a href="tel:+2201234567" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
+                        <a href="tel:+2203888888" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
                             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
                                 <Phone size={24} />
                             </div>
                             <div>
                                 <h3 className="font-bold text-lg">Call Us</h3>
-                                <p className={`text-xs ${textSec}`}>Speak to our support team</p>
+                                <p className={`text-xs ${textSec}`}>+220 3888888</p>
                             </div>
                         </a>
 
-                        <a href="https://wa.me/2201234567" target="_blank" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
+                        <a href="https://wa.me/2203888888" target="_blank" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
                             <div className="w-12 h-12 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366]">
                                 <MessageSquare size={24} />
                             </div>
                             <div>
                                 <h3 className="font-bold text-lg">WhatsApp</h3>
-                                <p className={`text-xs ${textSec}`}>Chat with us instantly</p>
+                                <p className={`text-xs ${textSec}`}>+220 3888888</p>
                             </div>
                         </a>
 
-                        <a href="mailto:support@dropoff.gm" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
+                        <a href="mailto:dropoffgm@gmail.com" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
                             <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
                                 <Mail size={24} />
                             </div>
                             <div>
                                 <h3 className="font-bold text-lg">Email Us</h3>
-                                <p className={`text-xs ${textSec}`}>Send us a message</p>
+                                <p className={`text-xs ${textSec}`}>dropoffgm@gmail.com</p>
                             </div>
                         </a>
+
 
                         {/* Debugging Tools */}
                         <div className={`mt-6 p-4 rounded-2xl border border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-gray-700'}`}>
