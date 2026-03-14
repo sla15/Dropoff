@@ -36,8 +36,15 @@ workflows:
           K_KEY_PASS="$CM_KEY_PASSWORD"
 
           echo "--- SIGNING CONFIGURATION ---"
-          if [ -n "$K_FILE" ] && [ -f "$K_FILE" ]; then
-            echo "Keystore detected at: $K_FILE"
+          if [ -n "$CM_KEYSTORE_BASE64" ]; then
+            echo "Base64 Keystore detected. Decoding..."
+            echo $CM_KEYSTORE_BASE64 | base64 --decode > /tmp/keystore.jks
+            K_FILE="/tmp/keystore.jks"
+            K_STORE_PASS="$CM_KEYSTORE_PASSWORD"
+            K_ALIAS="$CM_KEY_ALIAS"
+            K_KEY_PASS="$CM_KEY_PASSWORD"
+            
+            echo "Keystore decoded successfully at: $K_FILE"
             echo "Proceeding with SIGNED build..."
             ./gradlew assembleRelease \
               -Pandroid.injected.signing.store.file="$K_FILE" \
@@ -45,10 +52,8 @@ workflows:
               -Pandroid.injected.signing.key.alias="$K_ALIAS" \
               -Pandroid.injected.signing.key.password="$K_KEY_PASS"
           else
-            echo "FATAL ERROR: Keystore not found or variables unset."
-            echo "K_FILE value: '$K_FILE'"
-            echo "Stopping build as requested: Signed APK required."
-            echo "Please ensure you have configured Android code signing in the Code signing tab."
+            echo "FATAL ERROR: CM_KEYSTORE_BASE64 is empty or not set."
+            echo "Please ensure you have added CM_KEYSTORE_BASE64 as a string variable in Codemagic."
             exit 1
           fi
     artifacts:
