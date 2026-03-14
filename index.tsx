@@ -29,6 +29,7 @@ import { triggerHaptic, sendPushNotification } from './utils/helpers';
 
 // --- API INITIALIZATION ---
 import { initFCM } from './utils/fcm';
+import { App as CapacitorApp } from '@capacitor/app';
 // --- END API INITIALIZATION ---
 
 // Google Maps initialization is handled in index.html to ensure the callback is available before the script loads.
@@ -584,8 +585,47 @@ const App = () => {
       return channel;
     };
 
+    // --- APP LIFECYCLE HANDLERS ---
+    let appStateListener: any = null;
+    if (Capacitor.isNativePlatform()) {
+      appStateListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        console.log('📱 App state changed. Is active:', isActive);
+        if (isActive) {
+          // When coming back to foreground, ensure session is still valid
+          // This prevents the "blank white canvas" if the state/auth was purged
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+              console.log('✅ Session validated on resume');
+              // Force a shallow re-fetch of settings/profile to ensure state is alive
+              fetchSettings();
+              if (userRef.current.id) {
+                fetchActivities(userRef.current.id);
+              }
+            } else {
+              console.warn('⚠️ Session lost on resume, redirecting to onboarding');
+              setScreen('onboarding');
+            }
+          });
+        }
+      });
+    }
+
     initializeApp();
+
+    return () => {
+      if (appStateListener) {
+        appStateListener.remove();
+      }
+    };
   }, []);
+
+  // --- Real-time Local Persistence ---
+  useEffect(() => {
+    if (recentActivities.length > 0) {
+      console.log('💾 Saving recent activities to localStorage');
+      localStorage.setItem('app_recent_activities', JSON.stringify(recentActivities));
+    }
+  }, [recentActivities]);
 
 
   const navigate = (scr: Screen, addToHistory = false) => {

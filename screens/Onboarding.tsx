@@ -4,7 +4,7 @@ import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -251,7 +251,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                      referee_id: userId,
                      status: 'pending'
                   });
-                  console.log("Referral Linked!");
+               console.log("Referral Linked!");
+                  // Persistent storage for checkout
+                  localStorage.setItem('pending_gift_card', referralInput.toUpperCase());
                } else {
                   console.warn("Invalid Referral Code ignored.");
                }
@@ -294,6 +296,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          if (error) throw error;
 
          setUser(prev => ({ ...prev, location: locData.address }));
+         
+         // FINAL ONBOARDING SUCCESS PUSH
+         sendPushNotification("Welcome to Dropoff! 🚀", `Hi ${name.split(' ')[0]}, thanks for joining us! Your journey starts here.`);
+         
          navigate('dashboard');
       } catch (err: any) {
          console.error("Save Location Error:", err);

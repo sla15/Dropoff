@@ -1119,6 +1119,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             }
                         } else if (updatedRide.status === 'arrived') {
                             setStatus('arrived');
+                            sendPush("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
                             triggerHaptic();
                         } else if (updatedRide.status === 'in-progress') {
                             setStatus('in-progress');
@@ -1126,6 +1127,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         } else if (updatedRide.status === 'completed') {
                             isSubscriptionActive = false;
                             if (currentSubscription) currentSubscription.unsubscribe();
+                            sendPush("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
                             completeTrip();
                         } else if (updatedRide.status === 'cancelled') {
                             isSubscriptionActive = false;

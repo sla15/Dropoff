@@ -167,10 +167,38 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
 
         switch (s) {
             case 'pending': newStatus = 'pending'; newProgress = 25; break;
-            case 'accepted': newStatus = 'pending'; newProgress = 35; break;
-            case 'preparing': newStatus = 'preparing'; newProgress = 50; break;
-            case 'ready': newStatus = 'preparing'; newProgress = 65; break;
-            case 'delivering': newStatus = 'picked-up'; newProgress = 85; break;
+            case 'accepted': 
+                newStatus = 'pending'; 
+                newProgress = 35; 
+                if (orderInfo?.status !== 'accepted') {
+                    sendPushNotification("DROPOFF: Order Accepted", "The merchant has accepted your order!");
+                    triggerHaptic();
+                }
+                break;
+            case 'preparing': 
+                newStatus = 'preparing'; 
+                newProgress = 50; 
+                if (orderInfo?.status !== 'preparing') {
+                    sendPushNotification("DROPOFF: Preparing Order", "The merchant is now preparing your items.");
+                    triggerHaptic();
+                }
+                break;
+            case 'ready': 
+                newStatus = 'preparing'; 
+                newProgress = 65; 
+                if (orderInfo?.status !== 'ready') {
+                    sendPushNotification("DROPOFF: Ready for Pickup", "Your order is ready and waiting for the driver!");
+                    triggerHaptic();
+                }
+                break;
+            case 'delivering': 
+                newStatus = 'picked-up'; 
+                newProgress = 85; 
+                if (orderInfo?.status !== 'delivering') {
+                    sendPushNotification("DROPOFF: Out for Delivery", "Your driver has picked up your order and is on the way!");
+                    triggerHaptic();
+                }
+                break;
             case 'completed':
                 newStatus = 'delivered';
                 newProgress = 100;
