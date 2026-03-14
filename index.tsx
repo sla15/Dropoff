@@ -165,6 +165,19 @@ const App = () => {
     startFCM();
   }, [user.id, isNative, screen]);
 
+  // Foreground Notification Listener
+  useEffect(() => {
+    const handleForegroundPush = (e: any) => {
+      const { title, body } = e.detail;
+      showAlert(title || "Notification", body || "", "info");
+      triggerHaptic();
+    };
+
+    window.addEventListener('foreground_notification', handleForegroundPush);
+    return () => window.removeEventListener('foreground_notification', handleForegroundPush);
+  }, []);
+
+
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
     return localStorage.getItem('active_order_id');
   });
@@ -599,8 +612,11 @@ const App = () => {
           if (!profile.full_name || !profile.phone) {
             setScreen('onboarding');
           } else {
-            setScreen('dashboard');
+            // Only force navigation to dashboard if we are coming from Splash or Onboarding
+            // This prevents kicking the user out of Profile/Ride screens on app resume (e.g. after camera)
+            setScreen(prev => (prev === 'splash' || prev === 'onboarding') ? 'dashboard' : prev);
           }
+
         } else {
           setScreen('onboarding');
         }
@@ -614,21 +630,29 @@ const App = () => {
       const minTime = new Promise(resolve => setTimeout(resolve, 3500));
       const safetyTimeout = new Promise(resolve => setTimeout(resolve, 8000));
 
+      // Use a flag to ensure we only proceed once
+      let hasDeterminedDest = false;
+
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log(`🔔 Auth Event: ${event}`);
         if (session) {
-          handleUserAuthenticated(session);
+          await handleUserAuthenticated(session);
         } else {
           setScreen('onboarding');
         }
+        hasDeterminedDest = true;
       });
       authListener = subscription;
 
       // Initial session check
       const initialCheck = async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) await handleUserAuthenticated(session);
-        else setScreen('onboarding');
+        if (session) {
+          await handleUserAuthenticated(session);
+        } else {
+          setScreen('onboarding');
+        }
+        hasDeterminedDest = true;
       };
 
       try {
@@ -636,25 +660,40 @@ const App = () => {
           Promise.all([minTime, initialCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]),
           safetyTimeout
         ]);
+
+        // Final safety guard: ensure navigation happened
+        if (!hasDeterminedDest) {
+            console.warn("⚠️ Init: Navigation fallback triggered");
+            setScreen('onboarding');
+        }
       } catch (err) {
         console.error("Init failed:", err);
       } finally {
+        // Only drop splash once we are SURE a screen is ready
         setIsLoading(false);
       }
     };
 
-    // Lifecycle listener
+
+    // Lifecycle listener - Removed redundant navigation reset
     if (Capacitor.isNativePlatform()) {
       import('@capacitor/app').then(({ App: CapApp }) => {
         CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
+            console.log("📱 App Resumed: Checking session...");
+            // Silent check, don't force screen reset
             supabase.auth.getSession().then(({ data: { session } }) => {
-              if (session) handleUserAuthenticated(session);
+              if (session) {
+                // Just sync data, don't reset navigation
+                const { data: profile } = supabase.from('profiles').select('id, full_name').eq('id', session.user.id).maybeSingle() as any;
+                if (profile) subscribeToChanges(session.user.id);
+              }
             });
           }
         });
       });
     }
+
 
     initializeApp();
 
@@ -741,9 +780,9 @@ const App = () => {
       if (!error) setFavorites(prev => [...prev, bizId]);
     }
   };
-
   const renderScreen = () => {
-    switch (screen) {
+    switch (screen || 'splash') {
+
       case 'splash': return <SplashScreen theme={theme} />;
       case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
       case 'dashboard': return <DashboardScreen
@@ -780,8 +819,9 @@ const App = () => {
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
       case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} handleLogout={handleLogout} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
-      default: return null;
+      default: return <SplashScreen theme={theme} />;
     }
+
   };
 
   return (

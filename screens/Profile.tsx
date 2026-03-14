@@ -237,8 +237,10 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 const { error: uploadError } = await supabase.storage
                     .from('avatars')
                     .upload(filePath, photoFile, {
-                        contentType: isBlob ? 'image/jpeg' : undefined
+                        contentType: isBlob ? 'image/jpeg' : undefined,
+                        upsert: true
                     });
+
 
                 if (uploadError) throw uploadError;
 
@@ -662,7 +664,11 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         </a>
 
-                        <a href="https://wa.me/2203888888" target="_blank" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
+                        <a 
+                            href="whatsapp://send?phone=+2203888888&text=Hello%20Dropoff%20Support,%20I%20need%20assistance%20with..." 
+                            target="_blank" 
+                            className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}
+                        >
                             <div className="w-12 h-12 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366]">
                                 <MessageSquare size={24} />
                             </div>
@@ -671,6 +677,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                 <p className={`text-xs ${textSec}`}>+220 3888888</p>
                             </div>
                         </a>
+
 
                         <a href="mailto:dropoffgm@gmail.com" className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}>
                             <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">

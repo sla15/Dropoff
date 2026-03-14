@@ -87,7 +87,17 @@ const initNativePush = async (userId?: string) => {
 
         FirebaseMessaging.addListener('notificationReceived', (event) => {
             console.log('🔔 FCM: Foreground push received:', event.notification);
+            
+            // Show a foreground alert/banner since the OS won't show it if the app is active
+            if (event.notification) {
+                const { title, body } = event.notification;
+                // Dispatch a custom event so the UI can catch it and show a premium toast/alert
+                window.dispatchEvent(new CustomEvent('foreground_notification', {
+                    detail: { title, body }
+                }));
+            }
         });
+
 
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Push action performed:', event.notification);
