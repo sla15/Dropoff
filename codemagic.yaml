@@ -24,11 +24,33 @@ workflows:
         script: |
           cd android
           chmod +x gradlew
+          
+          # Handle both lowercase and uppercase variables
+          export K_PATH="${cm_keystore:-$CM_KEYSTORE}"
+          export K_STORE_PASS="${cm_keystore_password:-$CM_KEYSTORE_PASSWORD}"
+          export K_ALIAS="${cm_key_alias:-$CM_KEY_ALIAS}"
+          export K_PASS="${cm_key_password:-$CM_KEY_PASSWORD}"
+          
+          echo "Verifying keystore configuration..."
+          if [ -z "$K_PATH" ]; then
+            echo "ERROR: Keystore file variable (cm_keystore or CM_KEYSTORE) is not set."
+            echo "Please ensure you have uploaded the keystore as a 'File' type variable in Codemagic."
+            exit 1
+          fi
+
+          if [ ! -f "$K_PATH" ]; then
+            echo "ERROR: Keystore file not found at: $K_PATH"
+            echo "Listing environment for debugging..."
+            env | grep -i "_KEY"
+            exit 1
+          fi
+
+          echo "Keystore verified. Building signed APK..."
           ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=$cm_keystore \
-            -Pandroid.injected.signing.store.password=$cm_keystore_password \
-            -Pandroid.injected.signing.key.alias=$cm_key_alias \
-            -Pandroid.injected.signing.key.password=$cm_key_password
+            -Pandroid.injected.signing.store.file="$K_PATH" \
+            -Pandroid.injected.signing.store.password="$K_STORE_PASS" \
+            -Pandroid.injected.signing.key.alias="$K_ALIAS" \
+            -Pandroid.injected.signing.key.password="$K_PASS"
     artifacts:
       - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/bundle/release/*.aab
