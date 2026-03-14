@@ -1,4 +1,4 @@
-package com.userapp.mobile;
+package com.dropoffgambia.customer;
 
 import com.getcapacitor.BridgeActivity;
 
