@@ -17,8 +17,8 @@ const config: CapacitorConfig = {
       androidScaleType: "CENTER_CROP"
     },
     Keyboard: {
-      resize: "Body",
-      style: "Dark",
+      resize: 'body' as any,
+      style: 'dark' as any,
       resizeOnFullScreen: true,
     },
     PushNotifications: {

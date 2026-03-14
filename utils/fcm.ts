@@ -37,9 +37,15 @@ const initNativePush = async (userId?: string) => {
         console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
 
         // Check if we have permission first
-        const permStatus = await PushNotifications.checkPermissions();
+        let permStatus = await PushNotifications.checkPermissions();
+        
+        if (permStatus.receive === 'prompt') {
+            console.log("🔔 FCM: Requesting native push permissions...");
+            permStatus = await PushNotifications.requestPermissions();
+        }
+
         if (permStatus.receive !== 'granted') {
-            console.warn("⚠️ FCM: Native notification permission not granted. Skipping registration.");
+            console.warn("⚠️ FCM: Native notification permission NOT granted. User might have declined.");
             return;
         }
 
@@ -63,17 +69,29 @@ const initNativePush = async (userId?: string) => {
             console.log('🔔 FCM: Push action performed:', notification);
         });
 
-        // Create notification channel for Android
+        // Create notification channels for Android
         if (Capacitor.getPlatform() === 'android') {
+            // Default channel
             await PushNotifications.createChannel({
-                id: 'fcm_default_channel',
+                id: 'default',
                 name: 'Default',
                 description: 'General notifications',
                 importance: 5, // High importance for banners
                 visibility: 1,
                 vibration: true
             });
-            console.log("📡 FCM: Android notification channel created");
+
+            // Ride Requests channel (matches Edge Function)
+            await PushNotifications.createChannel({
+                id: 'ride_requests',
+                name: 'Ride Requests',
+                description: 'Notifications for ride and delivery requests',
+                importance: 5, // Max importance
+                visibility: 1,
+                vibration: true,
+                sound: 'cashregistersound'
+            });
+            console.log("📡 FCM: Android notification channels ('default', 'ride_requests') created");
         }
 
 
