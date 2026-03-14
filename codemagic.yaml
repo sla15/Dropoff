@@ -46,7 +46,8 @@ workflows:
             
             echo "Keystore decoded successfully at: $K_FILE"
             echo "Proceeding with SIGNED build..."
-            ./gradlew assembleRelease \
+            # Build both APK (for manual testing) and AAB (for Play Store)
+            ./gradlew assembleRelease bundleRelease \
               -Pandroid.injected.signing.store.file="$K_FILE" \
               -Pandroid.injected.signing.store.password="$K_STORE_PASS" \
               -Pandroid.injected.signing.key.alias="$K_ALIAS" \
