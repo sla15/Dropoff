@@ -88,7 +88,7 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
                             </div>
                             <div className="text-right">
                                 <div className="text-[10px] font-bold uppercase tracking-widest opacity-50 mb-0.5">Plate</div>
-                                <div className={`font-mono font-bold text-lg bg-white dark:bg-[#2C2C2E] px-2.5 py-1.5 rounded-lg border border-black/10 dark:border-white/20 ${theme === 'light' ? 'text-black' : 'text-white shadow-[0_4px_12px_rgba(0,0,0,0.5)]'}`}>
+                                <div className={`font-mono font-bold text-lg bg-[#2C2C2E] text-white px-2.5 py-1.5 rounded-lg border border-white/20 shadow-[0_4px_12px_rgba(0,0,0,0.5)]`}>
                                     {assignedDriver?.vehicle_plate || 'BJL ....'}
                                 </div>
                             </div>

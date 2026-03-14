@@ -169,6 +169,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             if (!profile.full_name) {
                setStep(4);
             } else {
+               localStorage.removeItem('fcm_prompted');
                navigate('dashboard');
             }
          } else {

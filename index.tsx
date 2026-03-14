@@ -260,7 +260,7 @@ const App = () => {
           sessionStorage.setItem('location_prompted', 'true');
         }
         
-        // Mark location prompt as done so FCM can proceed
+        // Mark location prompt as done so FCM can proceed immediately after
         setLocationPromptDone(true);
 
         watchId = await Geolocation.watchPosition(
@@ -556,14 +556,16 @@ const App = () => {
                 last_lat: profile.last_lat,
                 last_lng: profile.last_lng
               });
+              
+              // explicitly set loading to true before fetching
+              setIsFavoritesLoading(true);
+              setIsActivitiesLoading(true);
               fetchFavorites(session.user.id);
               fetchActivities(session.user.id);
               subscribeToChanges(session.user.id);
 
-              // Only init if API exists and not in a restricted environment that crashes
-              if (typeof Notification !== 'undefined') {
-                initFCM(session.user.id);
-              }
+              // Remove direct initFCM call here; let the useEffect handle it
+              // to respect the location prompt sequence.
 
               // Enforce full_name for onboarding
               if (!profile.full_name) {
@@ -576,9 +578,7 @@ const App = () => {
             }
           } else {
             setScreen('onboarding');
-            if (typeof Notification !== 'undefined') {
-              initFCM();
-            }
+            // Remove direct initFCM call here; guest mode shouldn't prompt push immediately anyway
           }
         } catch (err) {
           console.error("Session check failed:", err);
