@@ -295,24 +295,26 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
             });
 
             console.log("Profile updated successfully!");
+            setLoading(false);
             closeDrawer();
         } catch (err: any) {
             console.error("Failed to update profile:", err);
-            showAlert("Update Failed", err.message, "error");
-        } finally {
             setLoading(false);
+            showAlert("Update Failed", err.message, "error");
         }
     };
+
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement> | null) => {
         if (Capacitor.isNativePlatform()) {
             try {
                 const image = await Camera.getPhoto({
                     quality: 90,
-                    allowEditing: true,
+                    allowEditing: false,
                     resultType: CameraResultType.Uri,
                     source: CameraSource.Prompt // Ask: Camera or Photos
                 });
+
 
                 if (image.webPath) {
                     const response = await fetch(image.webPath);

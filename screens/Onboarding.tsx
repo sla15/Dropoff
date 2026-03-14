@@ -368,9 +368,15 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 1) {
       return (
-         <div className={`h-full w-full flex flex-col justify-between ${bgMain} ${textMain} p-6 pb-safe animate-scale-in overflow-hidden relative`}>
-            {/* Subtle SVG Background Pattern */}
-            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none">
+         <div className={`h-full w-full flex flex-col justify-between ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]'} ${textMain} p-6 pb-safe overflow-hidden relative selection:bg-[#00D68F]/30`}>
+            {/* Dynamic Background Glows */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+               <div className={`absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full blur-[100px] transition-opacity duration-1000 ${theme === 'light' ? 'bg-[#00D68F]/20' : 'bg-[#00D68F]/10'}`}></div>
+               <div className={`absolute top-[40%] -right-[20%] w-[80vw] h-[80vw] rounded-full blur-[120px] transition-opacity duration-1000 ${theme === 'light' ? 'bg-[#00A06A]/20' : 'bg-[#00D68F]/10'}`}></div>
+            </div>
+
+            {/* Subtle Grid Pattern */}
+            <div className={`absolute inset-0 z-0 ${theme === 'light' ? 'opacity-[0.03]' : 'opacity-[0.05]'} pointer-events-none`}>
                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -382,55 +388,85 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             </div>
 
             {/* Content Overlay */}
-            <div className="flex-1 flex flex-col justify-center z-10 pt-10">
-               <div className="mb-12">
-                  <p className="text-5xl sm:text-7xl font-bold tracking-tight leading-[1.0] mb-6 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            <div className="flex-1 flex flex-col justify-center z-10 pt-16 relative">
+               <div className="mb-16">
+                  <p className="text-[3.8rem] leading-[1.05] sm:text-[4.5rem] sm:leading-[1.05] font-black tracking-tighter mb-5 drop-shadow-xl relative z-10 pt-8 mt-8">
                      The future <br />
-                     of <span className="text-[#00D68F]">movement.</span>
+                     of <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D68F] to-[#00A06A]" style={{ filter: 'drop-shadow(0 0 10px rgba(0,214,143,0.4))' }}>movement.</span>
                   </p>
-                  <p className={`text-xl ${theme === 'dark' ? 'text-white' : 'text-black'} font-bold max-w-[240px] leading-relaxed drop-shadow-[0_1px_2px_rgba(255,255,255,0.2)]`}>
+                  
+                  {/* Accent line */}
+                  <div className="w-12 h-1.5 rounded-full bg-gradient-to-r from-[#00D68F] to-[#00A06A] mb-7 shadow-[0_0_10px_rgba(0,214,143,0.5)]"></div>
+                  
+                  <p className={`text-[19px] sm:text-2xl font-semibold max-w-[280px] leading-snug tracking-tight ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                      Swift rides, smart deliveries. <br />
                      All in one premium app.
                   </p>
                </div>
             </div>
 
-            {/* Background Image (Animated Vehicle Carousel, >50% cut off on right) */}
-            <div className="absolute top-[50%] -right-[75%] w-[170%] h-auto z-0 pointer-events-none translate-y-[-50%] overflow-hidden">
+            {/* Background Image (Animated Vehicle Carousel) */}
+            <div className="absolute top-[48%] -right-[65%] w-[160%] h-auto z-0 pointer-events-none translate-y-[-50%] overflow-hidden">
                <div className="relative w-full aspect-[2/1]">
                   {/* Common Ground Shadow for all vehicles */}
-                  <div className="absolute bottom-[15%] left-[10%] w-[80%] h-[10%] bg-black/40 blur-[40px] rounded-[100%] transition-opacity duration-1000"></div>
+                  <div className="absolute bottom-[20%] left-[15%] w-[70%] h-[12%] bg-black/60 blur-[35px] rounded-[100%] transition-opacity duration-1000"></div>
                   
-                  {vehicles.map((v, i) => (
-                     <img 
-                        key={v.src}
-                        src={v.src} 
-                        className={`absolute inset-0 w-full h-full object-contain transition-all duration-1000 ease-in-out
-                           ${i === vehicleIndex ? 'opacity-100 translate-x-0 scale-100' : 'opacity-0 translate-x-20 scale-95 blur-sm'}
-                           ${i < vehicleIndex || (vehicleIndex === 0 && i === vehicles.length - 1) ? '-translate-x-20' : ''}
-                        `}
-                        alt={v.alt}
-                     />
-                  ))}
+                  {vehicles.map((v, i) => {
+                     const isActive = i === vehicleIndex;
+                     const isPrev = i === (vehicleIndex - 1 + vehicles.length) % vehicles.length;
+                     const slideClass = isActive 
+                        ? 'opacity-100 translate-x-0 scale-100 z-10' 
+                        : isPrev 
+                           ? 'opacity-0 -translate-x-[40%] scale-95 blur-md z-0'
+                           : 'opacity-0 translate-x-[40%] scale-95 blur-md z-0';
+
+                     return (
+                        <div 
+                           key={v.src}
+                           className={`absolute inset-0 w-full h-full transition-all duration-[1200ms] ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-center ${slideClass}`}
+                        >
+                           <img 
+                              src={v.src} 
+                              className="w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.5)]"
+                              style={{ 
+                                 transform: isActive ? 'translateY(-8px)' : 'translateY(8px)', 
+                                 transition: 'transform 2.5s ease-in-out' 
+                              }}
+                              alt={v.alt}
+                           />
+                        </div>
+                     );
+                  })}
                </div>
             </div>
 
-            <div className="space-y-6 z-10">
+            <div className="space-y-6 z-10 w-full relative">
                <button
                   onClick={() => { triggerHaptic(); setStep(2); }}
-                  className="w-full bg-[#00D68F] text-black py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all shadow-[0_15px_30px_rgba(0,214,143,0.3)] flex items-center justify-center gap-3 group"
+                  className="group relative overflow-hidden w-full bg-[#00D68F] text-black py-4.5 rounded-[24px] font-black text-[19px] tracking-tight active:scale-[0.97] transition-all shadow-[0_15px_35px_rgba(0,214,143,0.35)] flex items-center justify-center gap-3"
                >
-                  Get Started
-                  <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
+                  <span className="relative z-10">Get Started</span>
+                  <ArrowRight size={22} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1.5" />
+                  <div className="sweep-animation absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[-20deg]"></div>
                </button>
 
-               <p className={`text-center text-[10px] leading-relaxed px-4 font-medium opacity-40`}>
+               <p className={`text-center text-[12px] leading-relaxed px-6 font-semibold ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
                   By continuing, you verify you are at least 18 and agree to our{' '}
-                  <span onClick={() => window.open('/terms', '_blank')} className="text-[#00D68F] underline cursor-pointer">Terms</span>
+                  <span onClick={() => window.open('/terms', '_blank')} className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30">Terms</span>
                   {' & '}
-                  <span onClick={() => window.open('/privacy', '_blank')} className="text-[#00D68F] underline cursor-pointer">Privacy</span>.
+                  <span onClick={() => window.open('/privacy', '_blank')} className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30">Privacy</span>.
                </p>
             </div>
+
+            <style dangerouslySetInnerHTML={{__html: `
+               .group:hover .sweep-animation {
+                  animation: shimmer 1.5s infinite;
+               }
+               @keyframes shimmer {
+                  0% { transform: translateX(-150%) skewX(-20deg); }
+                  100% { transform: translateX(150%) skewX(-20deg); }
+               }
+            `}} />
          </div>
       );
    }
