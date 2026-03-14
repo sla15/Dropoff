@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
-      node: 20
+      node: 22
       groups:
         - supabase_config   # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
         - google_maps        # VITE_GOOGLE_MAPS_API_KEY
@@ -31,7 +31,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
-      node: 20
+      node: 22
       xcode: latest
       groups:
         - supabase_config
