@@ -637,19 +637,32 @@ const App = () => {
         console.log(`🔔 Auth Event: ${event}`);
         if (session) {
           await handleUserAuthenticated(session);
-        } else {
+          hasDeterminedDest = true;
+        } else if (hasDeterminedDest && event === 'SIGNED_OUT') {
+          // Only show onboarding if we explicitly signed out or truly have no session after initialization
           setScreen('onboarding');
         }
-        hasDeterminedDest = true;
       });
       authListener = subscription;
 
       // Initial session check
       const initialCheck = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await handleUserAuthenticated(session);
-        } else {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await handleUserAuthenticated(session);
+          } else {
+            // Give onAuthStateChange a moment to find a persisted session
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const { data: { session: retrySession } } = await supabase.auth.getSession();
+            if (retrySession) {
+              await handleUserAuthenticated(retrySession);
+            } else {
+              setScreen('onboarding');
+            }
+          }
+        } catch (err) {
+          console.error("Auth session check error:", err);
           setScreen('onboarding');
         }
         hasDeterminedDest = true;
@@ -675,20 +688,31 @@ const App = () => {
     };
 
 
-    // Lifecycle listener - Removed redundant navigation reset
     if (Capacitor.isNativePlatform()) {
       import('@capacitor/app').then(({ App: CapApp }) => {
         CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            console.log("📱 App Resumed: Checking session...");
-            // Silent check, don't force screen reset
+            console.log("📱 App Resumed: refreshing session and real-time...");
             supabase.auth.getSession().then(({ data: { session } }) => {
               if (session) {
-                // Just sync data, don't reset navigation
-                const { data: profile } = supabase.from('profiles').select('id, full_name').eq('id', session.user.id).maybeSingle() as any;
-                if (profile) subscribeToChanges(session.user.id);
+                // Ensure real-time is re-authenticated with the current token
+                supabase.realtime.setAuth(session.access_token);
+                
+                // Re-sync data and re-subscribe
+                const userId = session.user.id;
+                supabase.from('profiles').select('id, full_name').eq('id', userId).maybeSingle().then(({ data: profile }) => {
+                  if (profile) {
+                    subscribeToChanges(userId);
+                    // Also refresh FCM token sync just in case
+                    import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
+                  }
+                });
+              } else {
+                console.warn("📱 App Resumed: No active session found.");
               }
             });
+          } else {
+            console.log("📱 App Paused: Backgrounding connection...");
           }
         });
       });

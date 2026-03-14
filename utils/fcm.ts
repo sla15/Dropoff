@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
-import { PushNotifications } from '@capacitor/push-notifications';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from "../supabaseClient";
@@ -181,14 +180,16 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
         if (!userId || !token) return;
 
-        // Prevent redundant syncs
-        const lastSync = localStorage.getItem('last_fcm_sync');
-        if (lastSync === token) {
-            console.log('📡 FCM: Token already synced recently.');
+        // Prevent redundant syncs only if it's the SAME user and SAME token
+        const lastSyncToken = localStorage.getItem('last_fcm_sync_token');
+        const lastSyncUser = localStorage.getItem('last_fcm_sync_user');
+        
+        if (lastSyncToken === token && lastSyncUser === userId) {
+            console.log('📡 FCM: Token already synced for this user.');
             return;
         }
 
-        console.log(`📡 FCM: Syncing token for user ${userId}...`);
+        console.log(`📡 FCM: Syncing token [${token.substring(0, 10)}...] for user ${userId}...`);
 
         const { error } = await supabase
             .from('profiles')
@@ -201,8 +202,9 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
         if (error) {
             console.error('❌ FCM: Failed to sync token to Supabase:', error);
         } else {
-            console.log('✅ FCM: Token synced successfully');
-            localStorage.setItem('last_fcm_sync', token);
+            console.log('✅ FCM: Token synced successfully to Supabase');
+            localStorage.setItem('last_fcm_sync_token', token);
+            localStorage.setItem('last_fcm_sync_user', userId);
         }
     } catch (err) {
         console.error('❌ FCM: Sync exception:', err);
