@@ -55,65 +55,43 @@ const initNativePush = async (userId?: string) => {
                 description: 'Updates and general information',
                 importance: 3, // Importance.DEFAULT
                 visibility: 1,
-                vibration: true
             });
             console.log("✅ FCM: Android Channels created");
         }
 
-        // 2. Check Permissions
+        // 2. Check/Request Permissions
         let permStatus = await FirebaseMessaging.checkPermissions();
-        console.log("🔔 FCM: Permission Status:", permStatus.receive);
-        
         if (permStatus.receive === 'prompt') {
-            console.log("🔔 FCM: Requesting native push permissions...");
             permStatus = await FirebaseMessaging.requestPermissions();
         }
 
         if (permStatus.receive !== 'granted') {
-            console.warn("⚠️ FCM: Native notification permission NOT granted. Status:", permStatus.receive);
+            console.warn("⚠️ FCM: Push permission not granted:", permStatus.receive);
             return;
         }
 
         // 3. Register Listeners
         await FirebaseMessaging.removeAllListeners();
 
-        FirebaseMessaging.addListener('tokenReceived', async (event) => {
-            console.log('✅ FCM: Native token received event:', event.token);
-            if (userId) {
-                await syncFCMTokenToSupabase(userId, event.token);
-            }
-        });
-
         FirebaseMessaging.addListener('notificationReceived', (event) => {
             console.log('🔔 FCM: Foreground push received:', event.notification);
-            
-            // Show a foreground alert/banner since the OS won't show it if the app is active
-            if (event.notification) {
-                const { title, body } = event.notification;
-                // Dispatch a custom event so the UI can catch it and show a premium toast/alert
-                window.dispatchEvent(new CustomEvent('foreground_notification', {
-                    detail: { title, body }
-                }));
-            }
         });
-
 
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Push action performed:', event.notification);
         });
 
         // 4. Register for remote notifications and get token
-        console.log("📡 FCM: Registering for remote notifications...");
-        
-        const { token } = await FirebaseMessaging.getToken();
-        if (token) {
-            console.log('✅ FCM: Token retrieved:', token);
+        console.log("📡 FCM: Getting token...");
+        const result = await FirebaseMessaging.getToken();
+        if (result.token) {
+            console.log('✅ FCM: Token retrieved:', result.token);
             if (userId) {
-                await syncFCMTokenToSupabase(userId, token);
+                await syncFCMTokenToSupabase(userId, result.token);
             }
         }
         
-        console.log("📡 FCM: FirebaseMessaging initialization complete");
+        console.log("📡 FCM: Native initialization complete");
 
     } catch (err) {
         console.error("❌ FCM: Native init error:", err);

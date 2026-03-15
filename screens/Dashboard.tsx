@@ -6,7 +6,6 @@ import { triggerHaptic } from '../utils/helpers';
 
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
-import { NotificationPrompt } from '../components/NotificationPrompt';
 import { initFCM } from '../utils/fcm';
 
 interface Props {
@@ -76,7 +75,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
   const EMOJIS = ['🏠', '💼', '🏋️', '🏫', '🌳', '🛍️', '🍽️', '🎾'];
   const LABELS = ['Home', 'Work', 'Gym', 'School', 'Park', 'Mall', 'Restaurant', 'Club'];
-  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     fetchLocations();
@@ -126,49 +124,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     }
   };
 
-  useEffect(() => {
-    const checkNotificationStatus = async () => {
-      if (!user.id) return;
-
-      let isGranted = false;
-      let isDefault = false;
-
-      const { Capacitor } = (window as any);
-      if (Capacitor?.isNativePlatform()) {
-        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
-        const perm = await FirebaseMessaging.checkPermissions();
-        isGranted = perm.receive === 'granted';
-        isDefault = perm.receive === 'prompt';
-      } else {
-        const permission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
-        isGranted = permission === 'granted';
-        isDefault = permission === 'default';
-      }
-
-      const hasPromptedThisSession = sessionStorage.getItem('notif_prompt_seen');
-
-      if (isDefault && !hasPromptedThisSession) {
-        console.log('🔔 Dashboard: User needs a notification prompt (permission is prompt/default)');
-        setTimeout(() => setShowNotificationPrompt(true), 3000);
-      } else if (isGranted) {
-        // If already granted but maybe no ID in DB, try to sync
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('fcm_token')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (!profile?.fcm_token) {
-          console.log('🔔 Dashboard: Permission granted but no FCM token in DB, syncing...');
-          await initFCM(user.id);
-        }
-      }
-    };
-
-    if (user.id && locationPromptDone) {
-      checkNotificationStatus();
-    }
-  }, [user.id, user.role, locationPromptDone]);
 
   const handleDeleteActivity = async (activity: Activity, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -766,14 +721,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
       )}
 
-      <NotificationPrompt
-        isOpen={showNotificationPrompt}
-        onClose={() => {
-          setShowNotificationPrompt(false);
-          sessionStorage.setItem('notif_prompt_seen', 'true');
-        }}
-        theme={theme}
-      />
     </div>
   );
 };

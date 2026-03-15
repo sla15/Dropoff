@@ -11,10 +11,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      backgroundColor: "#000000",
-      showSpinner: false,
-      androidScaleType: "CENTER_CROP"
+      launchShowDuration: 0,
     },
     Keyboard: {
       resize: 'body' as any,

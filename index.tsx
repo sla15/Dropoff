@@ -674,15 +674,15 @@ const App = () => {
           safetyTimeout
         ]);
 
-        // Final safety guard: ensure navigation happened
         if (!hasDeterminedDest) {
-            console.warn("⚠️ Init: Navigation fallback triggered");
-            setScreen('onboarding');
+          console.warn("⚠️ Init: Navigation fallback triggered");
+          setScreen('onboarding');
         }
       } catch (err) {
         console.error("Init failed:", err);
+        // Safety fallback to prevent white screen/crashes
+        setScreen('onboarding');
       } finally {
-        // Only drop splash once we are SURE a screen is ready
         setIsLoading(false);
       }
     };
@@ -690,29 +690,37 @@ const App = () => {
 
     if (Capacitor.isNativePlatform()) {
       import('@capacitor/app').then(({ App: CapApp }) => {
+        // 1. App State Change Listener (Resume/Background)
         CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
             console.log("📱 App Resumed: refreshing session and real-time...");
+            
+            // Aggressive Reconnection Logic
             supabase.auth.getSession().then(({ data: { session } }) => {
               if (session) {
-                // Ensure real-time is re-authenticated with the current token
-                supabase.realtime.setAuth(session.access_token);
+                // Refresh real-time aggressively
+                try {
+                  supabase.realtime.disconnect();
+                  supabase.realtime.connect();
+                  supabase.realtime.setAuth(session.access_token);
+                  console.log("📱 Real-time: Explicitly re-connected and re-authenticated");
+                } catch (rtErr) {
+                  console.error("📱 Real-time reconnection error:", rtErr);
+                }
                 
-                // Re-sync data and re-subscribe
                 const userId = session.user.id;
                 supabase.from('profiles').select('id, full_name').eq('id', userId).maybeSingle().then(({ data: profile }) => {
                   if (profile) {
                     subscribeToChanges(userId);
-                    // Also refresh FCM token sync just in case
                     import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
                   }
                 });
               } else {
                 console.warn("📱 App Resumed: No active session found.");
               }
+            }).catch(err => {
+              console.error("📱 App Resume session check failed:", err);
             });
-          } else {
-            console.log("📱 App Paused: Backgrounding connection...");
           }
         });
       });
@@ -726,6 +734,31 @@ const App = () => {
       if (realtimeChannel) supabase.removeChannel(realtimeChannel);
     };
   }, []);
+
+  // Native Back Button Hook
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let backListener: any;
+    import('@capacitor/app').then(({ App: CapApp }) => {
+      CapApp.addListener('backButton', () => {
+        console.log("📱 Native Back Button Pressed, current screen:", screen);
+        
+        // Prevent exiting the app if on main screens
+        if (screen === 'dashboard' || screen === 'onboarding' || screen === 'marketplace') {
+          // You might want to minimize the app instead
+          // CapApp.exitApp(); 
+          return;
+        }
+        
+        goBack();
+      }).then(l => backListener = l);
+    });
+
+    return () => {
+      if (backListener) backListener.remove();
+    };
+  }, [screen, history]); // Re-register or update if screen changes if needed, but goBack handles history
 
   // --- Real-time Local Persistence ---
   useEffect(() => {
