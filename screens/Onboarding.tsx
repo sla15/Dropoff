@@ -8,6 +8,7 @@ import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
+import { logError } from '../utils/logger';
 
 interface Props {
    theme: Theme;
@@ -132,49 +133,85 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       setLoading(true);
       triggerHaptic();
 
-      const fullPhone = `+220${phone}`;
-      const tokenToVerify = tokenOverride || otp;
+      try {
+         const fullPhone = `+220${phone}`;
+         const tokenToVerify = tokenOverride || otp;
 
-      const { data, error } = await supabase.auth.verifyOtp({
-         phone: fullPhone,
-         token: tokenToVerify,
-         type: 'sms'
-      });
+         console.log("📡 OTP: Verifying for", fullPhone);
+         const { data, error } = await supabase.auth.verifyOtp({
+            phone: fullPhone,
+            token: tokenToVerify,
+            type: 'sms'
+         });
 
-      setLoading(false);
+         // Specialized Logging for User's Test Number
+         if (phone === '2725142') {
+            console.log("📊 DEBUG [2725142] OTP result:", { error, success: !!data.session });
+            if (error) {
+               logError(`OTP Verification Failed for 2725142: ${error.message}`, { phone: fullPhone, errorCode: error.status });
+            }
+         }
 
-      if (error) {
-         console.error("Verification Error:", error);
-         showAlert("Error", error.message, "error");
-      } else if (data.session) {
-         console.log("Verified Session:", data.session);
+         if (error) {
+            setLoading(false);
+            console.error("Verification Error:", error);
+            const errorMessage = error.message.includes("Expired") ? "OTP expired. Please request a new one." : error.message;
+            showAlert("Error", errorMessage, "error");
+            return;
+         }
 
-         // Check if profile exists
-         const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.session.user.id)
-            .maybeSingle();
+         if (data.session) {
+            console.log("✅ OTP: Verified session created");
 
-         if (profile) {
-            setUser({
-               name: profile.full_name || '',
-               phone: profile.phone || '',
-               email: profile.email || '',
-               location: profile.location || 'Banjul, The Gambia',
-               photo: profile.avatar_url || null,
-               rating: Number(profile.average_rating) || 5.0
-            });
+            // Check if profile exists
+            const { data: profile, error: profileError } = await supabase
+               .from('profiles')
+               .select('*')
+               .eq('id', data.session.user.id)
+               .maybeSingle();
 
-            if (!profile.full_name) {
-               setStep(4);
+            if (profileError) {
+               console.error("Profile Fetch Error:", profileError);
+               logError(profileError, { context: 'onboarding_verifyOTP_profileFetch' });
+               // Fallback: assume profile might be missing rather than error blocking the user
+            }
+
+            if (profile) {
+               console.log("👤 Profile: Found existing profile", profile.full_name);
+               setUser({
+                  id: profile.id,
+                  name: profile.full_name || '',
+                  phone: profile.phone || '',
+                  email: profile.email || '',
+                  location: profile.location || 'Banjul, The Gambia',
+                  photo: profile.avatar_url || null,
+                  role: profile.role || 'customer',
+                  rating: Number(profile.average_rating) || 5.0,
+                  referralCode: profile.referral_code || '',
+                  referralBalance: profile.referral_balance || 0
+               });
+
+               if (!profile.full_name) {
+                  setStep(4);
+               } else {
+                  console.log("👤 Profile: Forwarding to Dashboard");
+                  localStorage.removeItem('fcm_prompted');
+                  navigate('dashboard');
+               }
             } else {
-               localStorage.removeItem('fcm_prompted');
-               navigate('dashboard');
+               console.log("👤 Profile: No profile found, heading to setup step");
+               setStep(4);
             }
          } else {
-            setStep(4);
+            setLoading(false);
+            showAlert("Session Error", "Could not create session. Please try again.", "error");
          }
+      } catch (err: any) {
+         console.error("OTP System Error:", err);
+         logError(err, { context: 'onboarding_verifyOTP_catch' });
+         showAlert("Error", "A system error occurred. Please try again.", "error");
+      } finally {
+         setLoading(false);
       }
    };
 

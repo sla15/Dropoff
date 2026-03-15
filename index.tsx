@@ -33,11 +33,17 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { Loader2, WifiOff, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { logError, setupGlobalErrorHandlers } from './utils/logger';
 // --- END API INITIALIZATION ---
 
 // Google Maps initialization is handled in index.html to ensure the callback is available before the script loads.
 const App = () => {
   const isNative = Capacitor.isNativePlatform();
+
+  // 🛡️ Global Error Catching
+  useEffect(() => {
+    setupGlobalErrorHandlers();
+  }, []);
 
   // 🌓 Theme Management (Apple-style)
   const [theme, setThemeState] = useState<Theme>(() => {
@@ -82,7 +88,6 @@ const App = () => {
   }, [theme, isNative]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSlowConnection, setIsSlowConnection] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [screen, setScreenState] = useState<Screen>('splash');
   const screenRef = useRef<Screen>('splash');
@@ -601,11 +606,12 @@ const App = () => {
 
     const handleUserAuthenticated = async (session: any) => {
       try {
+        if (!session?.user?.id) return false;
         console.log("👤 Syncing profile for user:", session.user.id);
+        
         const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
         
         if (error) {
-          const { logError } = require('./utils/logger');
           logError(error, { context: 'handleUserAuthenticated_fetch_profile' });
         }
 
@@ -639,6 +645,7 @@ const App = () => {
             setScreen('onboarding');
           } else {
             console.log("👤 Profile complete, heading to dashboard");
+            // Only move to dashboard if we are currently "trapped" in Splash or Onboarding
             setScreen(prev => (prev === 'splash' || prev === 'onboarding') ? 'dashboard' : prev);
           }
           return true; // Success
@@ -649,7 +656,6 @@ const App = () => {
         }
       } catch (err) {
         console.error("Auth sync error:", err);
-        const { logError } = require('./utils/logger');
         logError(err instanceof Error ? err : new Error(String(err)), { context: 'handleUserAuthenticated_catch' });
         return false;
       }
@@ -683,40 +689,52 @@ const App = () => {
 
       const runInit = async () => {
         try {
-          console.log("🚀 Init: Data parallel fetch...");
-          await Promise.allSettled([fetchSettings(), fetchBusinesses(), fetchCategories()]);
-
+          console.log("🚀 Init: Start...");
+          
+          // 1. Critical Session Check - FIRST priority
           console.log("🚀 Init: Session check...");
+          let currentSession = null;
           const { data: { session }, error: sessionError } = await supabase.auth.getSession();
           
           if (sessionError) {
-             const { logError } = require('./utils/logger');
              logError(sessionError, { context: 'initializeApp_getSession' });
           }
 
           if (session) {
-            const success = await handleUserAuthenticated(session);
-            if (success) hasDeterminedDest = true;
+            console.log("🚀 Init: Session found immediately");
+            currentSession = session;
           } else {
-            console.log("🚀 Init: Retrying for slow storage...");
-            let retrySession = null;
-            for (let i = 0; i < 4; i++) {
+            console.log("🚀 Init: No immediate session, retrying for slow storage...");
+            // Higher patience for mobile storage adapters
+            for (let i = 0; i < 10; i++) {
               await new Promise(r => setTimeout(r, 600));
               const { data: { session: s } } = await supabase.auth.getSession();
-              if (s) { retrySession = s; break; }
-            }
-
-            if (retrySession) {
-              const success = await handleUserAuthenticated(retrySession);
-              if (success) hasDeterminedDest = true;
-            } else {
-              setScreen('onboarding');
-              hasDeterminedDest = true;
+              if (s) {
+                console.log("🚀 Init: Session recovered on retry", i + 1);
+                currentSession = s; 
+                break; 
+              }
             }
           }
+
+          // 2. Determine Destination based on Session
+          if (currentSession) {
+            const success = await handleUserAuthenticated(currentSession);
+            if (success) hasDeterminedDest = true;
+          } else {
+            console.log("🚀 Init: No session recovered, heading to onboarding");
+            setScreen('onboarding');
+            hasDeterminedDest = true;
+          }
+
+          // 3. Parallel Background Data Fetch (Non-blocking for Destination)
+          console.log("🚀 Init: Data parallel fetch...");
+          Promise.allSettled([fetchSettings(), fetchBusinesses(), fetchCategories()]).then(results => {
+             console.log("🚀 Init: Background data sync complete");
+          });
+
         } catch (err) {
           console.error("🚀 Init Critical Failure:", err);
-          const { logError } = require('./utils/logger');
           logError(err instanceof Error ? err : new Error(String(err)), { context: 'initializeApp_runInit' });
           setScreen('onboarding');
           hasDeterminedDest = true;
@@ -726,20 +744,10 @@ const App = () => {
       try {
         const initPromise = runInit();
         
-        // If init takes more than 10 seconds, show the "Slow Connection" modal
-        const slowTimeout = setTimeout(() => {
-          if (!hasDeterminedDest) {
-            console.warn("🐌 Init: Connection seems slow...");
-            setIsSlowConnection(true);
-          }
-        }, 12000);
-
         await Promise.race([
           Promise.all([minTime, initPromise]),
           safetyTimeout
         ]);
-
-        clearTimeout(slowTimeout);
 
         if (!hasDeterminedDest) {
           console.warn("⚠️ Init: Navigation fallback triggered");
@@ -989,26 +997,20 @@ const App = () => {
       </div>
       {showAssistant && <SmartAssistant onClose={() => setShowAssistant(false)} theme={theme} />}
 
-      {/* Connectivity Modal (Slow or Offline) */}
-      {(isOffline || isSlowConnection) && (
+      {/* Connectivity Modal (Offline Only) */}
+      {isOffline && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md px-6 animate-fade-in">
           <div className={`${theme === 'dark' ? 'bg-[#1C1C1E] border-white/10' : 'bg-white border-black/5'} border w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl animate-scale-in`}>
-            <div className={`mx-auto w-20 h-20 mb-6 rounded-full flex items-center justify-center ${isOffline ? 'bg-red-500/10' : 'bg-[#00E39A]/10'}`}>
-              {isOffline ? (
-                <WifiOff className="w-10 h-10 text-red-500" />
-              ) : (
-                <AlertTriangle className="w-10 h-10 text-[#00E39A]" />
-              )}
+            <div className={`mx-auto w-20 h-20 mb-6 rounded-full flex items-center justify-center bg-red-500/10`}>
+              <WifiOff className="w-10 h-10 text-red-500" />
             </div>
             
             <h2 className={`text-2xl font-bold mb-3 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-              {isOffline ? 'You are Offline' : 'Slow Connection'}
+              You are Offline
             </h2>
             
             <p className={`text-sm mb-8 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              {isOffline 
-                ? 'Please check your internet connection to continue using Dropoff.' 
-                : 'The app is taking longer than usual to load. Would you like to try refreshing?'}
+              Please check your internet connection to continue using Dropoff.
             </p>
 
             <button
@@ -1018,15 +1020,6 @@ const App = () => {
               <RefreshCcw className="w-5 h-5" />
               Refresh App
             </button>
-            
-            {!isOffline && (
-              <button
-                onClick={() => setIsSlowConnection(false)}
-                className={`w-full h-14 mt-3 rounded-2xl font-semibold text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
-              >
-                Wait a bit longer
-              </button>
-            )}
           </div>
         </div>
       )}
