@@ -20,6 +20,7 @@ let package = Package(
         .package(name: "CapacitorFilesystem", path: "..\..\..\node_modules\@capacitor\filesystem"),
         .package(name: "CapacitorGeolocation", path: "..\..\..\node_modules\@capacitor\geolocation"),
         .package(name: "CapacitorKeyboard", path: "..\..\..\node_modules\@capacitor\keyboard"),
+        .package(name: "CapacitorPreferences", path: "..\..\..\node_modules\@capacitor\preferences"),
         .package(name: "CapacitorSplashScreen", path: "..\..\..\node_modules\@capacitor\splash-screen"),
         .package(name: "CapacitorStatusBar", path: "..\..\..\node_modules\@capacitor\status-bar")
     ],
@@ -37,6 +38,7 @@ let package = Package(
                 .product(name: "CapacitorFilesystem", package: "CapacitorFilesystem"),
                 .product(name: "CapacitorGeolocation", package: "CapacitorGeolocation"),
                 .product(name: "CapacitorKeyboard", package: "CapacitorKeyboard"),
+                .product(name: "CapacitorPreferences", package: "CapacitorPreferences"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar")
             ]

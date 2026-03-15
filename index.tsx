@@ -79,7 +79,20 @@ const App = () => {
   }, [theme, isNative]);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreenState] = useState<Screen>('splash');
+  const screenRef = useRef<Screen>('splash');
+  const setScreen = (scr: Screen | ((prev: Screen) => Screen)) => {
+    if (typeof scr === 'function') {
+      setScreenState(prev => {
+        const next = scr(prev);
+        screenRef.current = next;
+        return next;
+      });
+    } else {
+      setScreenState(scr);
+      screenRef.current = scr;
+    }
+  };
   const [history, setHistory] = useState<Screen[]>([]);
   const [showAssistant, setShowAssistant] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
@@ -634,13 +647,34 @@ const App = () => {
       let hasDeterminedDest = false;
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log(`🔔 Auth Event: ${event}`);
-        if (session) {
+        console.log("🔐 Auth Change Event:", event, session ? "Session active" : "No session");
+        
+        if (event === 'SIGNED_IN' && session) {
+          import('@capacitor/preferences').then(({ Preferences }) => {
+            Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
+          });
           await handleUserAuthenticated(session);
-          hasDeterminedDest = true;
-        } else if (hasDeterminedDest && event === 'SIGNED_OUT') {
-          // Only show onboarding if we explicitly signed out or truly have no session after initialization
+        } else if (event === 'SIGNED_OUT') {
+          import('@capacitor/preferences').then(({ Preferences }) => {
+            Preferences.remove({ key: 'has_ever_logged_in' });
+          });
           setScreen('onboarding');
+          setHistory([]);
+          setUser({
+            id: '',
+            name: '',
+            phone: '',
+            email: '',
+            location: 'Banjul, The Gambia',
+            photo: '',
+            role: 'customer',
+            rating: 5.0,
+            referralCode: '',
+            referralBalance: 0
+          });
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          console.log("🔐 Auth: Token Refreshed");
+          supabase.realtime.setAuth(session.access_token);
         }
       });
       authListener = subscription;
@@ -648,24 +682,51 @@ const App = () => {
       // Initial session check
       const initialCheck = async () => {
         try {
+          // 1. First, check if there's any session in the storage adapter
           const { data: { session } } = await supabase.auth.getSession();
+          
           if (session) {
+            console.log("🚀 Init: Session found immediately");
             await handleUserAuthenticated(session);
-          } else {
-            // Give onAuthStateChange a moment to find a persisted session
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            hasDeterminedDest = true;
+            return;
+          }
+
+          // 2. If no session immediately, wait a bit longer for the storage adapter to resolve
+          // This is crucial for native platforms where Preferences might be slightly slower to load
+          console.log("🚀 Init: No session yet, waiting for adapter...");
+          for (let i = 0; i < 5; i++) {
+            await new Promise(resolve => setTimeout(resolve, 300));
             const { data: { session: retrySession } } = await supabase.auth.getSession();
             if (retrySession) {
+              console.log("🚀 Init: Session found on retry", i + 1);
               await handleUserAuthenticated(retrySession);
-            } else {
-              setScreen('onboarding');
+              hasDeterminedDest = true;
+              return;
             }
+          }
+
+          // 3. Last stand: check if we've ever logged in before on this device
+          const { Preferences } = await import('@capacitor/preferences');
+          const { value: hasLoggedInBefore } = await Preferences.get({ key: 'has_ever_logged_in' });
+          
+          if (!hasLoggedInBefore) {
+            console.log("🚀 Init: First time user detected");
+            setScreen('onboarding');
+            hasDeterminedDest = true;
+          } else {
+            // User HAS logged in before but session is missing - 
+            // maybe it expired? We'll still go to onboarding but with a 'renew' context 
+            // or just stay on onboarding. For now, onboarding is the fallback.
+            console.warn("🚀 Init: User has logged in before, but session is missing.");
+            setScreen('onboarding');
+            hasDeterminedDest = true;
           }
         } catch (err) {
           console.error("Auth session check error:", err);
           setScreen('onboarding');
+          hasDeterminedDest = true;
         }
-        hasDeterminedDest = true;
       };
 
       try {
@@ -693,30 +754,34 @@ const App = () => {
         // 1. App State Change Listener (Resume/Background)
         CapApp.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            console.log("📱 App Resumed: refreshing session and real-time...");
-            
-            // Aggressive Reconnection Logic
+            // Aggressive Reconnection Logic (Uber-like)
             supabase.auth.getSession().then(({ data: { session } }) => {
               if (session) {
-                // Refresh real-time aggressively
+                console.log("📱 App Resumed: refreshing session...");
+                
+                // 1. Force WebSocket reconnection
                 try {
                   supabase.realtime.disconnect();
                   supabase.realtime.connect();
                   supabase.realtime.setAuth(session.access_token);
-                  console.log("📱 Real-time: Explicitly re-connected and re-authenticated");
+                  console.log("📱 Real-time: Connection refreshed and authenticated");
                 } catch (rtErr) {
                   console.error("📱 Real-time reconnection error:", rtErr);
                 }
                 
+                // 2. Re-subscribe to user-specific channels
                 const userId = session.user.id;
-                supabase.from('profiles').select('id, full_name').eq('id', userId).maybeSingle().then(({ data: profile }) => {
-                  if (profile) {
-                    subscribeToChanges(userId);
-                    import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
-                  }
-                });
+                subscribeToChanges(userId);
+                
+                // 3. Re-sync FCM
+                import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
               } else {
-                console.warn("📱 App Resumed: No active session found.");
+                console.warn("📱 App Resumed: No active session. Checking for reload...");
+                // If we thought we were logged in but now have no session, reload the app
+                // to trigger a fresh initializeApp flow
+                if (screenRef.current !== 'onboarding' && screenRef.current !== 'splash') {
+                   // window.location.reload(); 
+                }
               }
             }).catch(err => {
               console.error("📱 App Resume session check failed:", err);
@@ -745,7 +810,7 @@ const App = () => {
         console.log("📱 Native Back Button Pressed, current screen:", screen);
         
         // Prevent exiting the app if on main screens
-        if (screen === 'dashboard' || screen === 'onboarding' || screen === 'marketplace') {
+        if (screenRef.current === 'dashboard' || screenRef.current === 'onboarding' || screenRef.current === 'marketplace') {
           // You might want to minimize the app instead
           // CapApp.exitApp(); 
           return;

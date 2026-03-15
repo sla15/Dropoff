@@ -1,6 +1,6 @@
 
 export type Theme = 'light' | 'dark';
-export type Screen = 'onboarding' | 'dashboard' | 'ride' | 'marketplace' | 'earn' | 'profile' | 'checkout' | 'business-detail' | 'store' | 'order-tracking';
+export type Screen = 'splash' | 'onboarding' | 'dashboard' | 'ride' | 'marketplace' | 'earn' | 'profile' | 'checkout' | 'business-detail' | 'store' | 'order-tracking';
 export type RideStatus = 'idle' | 'payment-select' | 'searching' | 'accepted' | 'arrived' | 'in-progress' | 'completed' | 'review' | 'cancelled' | 'cancelled_by_driver';
 
 export interface Category {
