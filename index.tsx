@@ -666,7 +666,8 @@ const App = () => {
       const minTime = new Promise(resolve => setTimeout(resolve, 2000)); 
       const safetyTimeout = new Promise(resolve => setTimeout(resolve, 15000));
 
-      let hasDeterminedDest = false;
+      const hasDeterminedDestRef = { current: false }; // Use local ref-like object for boot closure
+      const markDestDetermined = () => { hasDeterminedDestRef.current = true; };
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("🔐 Auth Change Event:", event, session ? "Session active" : "No session");
@@ -674,7 +675,7 @@ const App = () => {
         if (event === 'SIGNED_IN' && session) {
           Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
           const success = await handleUserAuthenticated(session);
-          if (success) hasDeterminedDest = true;
+          if (success) markDestDetermined();
         } else if (event === 'SIGNED_OUT') {
           Preferences.remove({ key: 'has_ever_logged_in' });
           setScreen('onboarding');
@@ -720,11 +721,13 @@ const App = () => {
           // 2. Determine Destination based on Session
           if (currentSession) {
             const success = await handleUserAuthenticated(currentSession);
-            if (success) hasDeterminedDest = true;
+            if (success) markDestDetermined();
           } else {
             console.log("🚀 Init: No session recovered, heading to onboarding");
-            setScreen('onboarding');
-            hasDeterminedDest = true;
+            if (!hasDeterminedDestRef.current) {
+              setScreen('onboarding');
+              markDestDetermined();
+            }
           }
 
           // 3. Parallel Background Data Fetch (Non-blocking for Destination)
@@ -736,8 +739,10 @@ const App = () => {
         } catch (err) {
           console.error("🚀 Init Critical Failure:", err);
           logError(err instanceof Error ? err : new Error(String(err)), { context: 'initializeApp_runInit' });
-          setScreen('onboarding');
-          hasDeterminedDest = true;
+          if (!hasDeterminedDestRef.current) {
+            setScreen('onboarding');
+            markDestDetermined();
+          }
         }
       };
 
@@ -749,7 +754,7 @@ const App = () => {
           safetyTimeout
         ]);
 
-        if (!hasDeterminedDest) {
+        if (!hasDeterminedDestRef.current) {
           console.warn("⚠️ Init: Navigation fallback triggered");
           setScreen('onboarding');
         }

@@ -477,10 +477,16 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="space-y-6 z-10 w-full relative">
+            <div className="space-y-6 z-[100] w-full relative mb-4">
                <button
-                  onClick={() => { triggerHaptic(); setStep(2); }}
-                  className="group relative overflow-hidden w-full bg-[#00D68F] text-black py-4.5 rounded-[24px] font-black text-[19px] tracking-tight active:scale-[0.97] transition-all shadow-[0_15px_35px_rgba(0,214,143,0.35)] flex items-center justify-center gap-3"
+                  id="get-started-button"
+                  onClick={(e) => { 
+                    e.stopPropagation();
+                    console.log("🚀 Get Started clicked");
+                    triggerHaptic(); 
+                    setStep(2); 
+                  }}
+                  className="group relative overflow-hidden w-full bg-[#00D68F] text-black py-5 rounded-[24px] font-black text-[20px] tracking-tight active:scale-[0.97] transition-all shadow-[0_15px_35px_rgba(0,214,143,0.35)] flex items-center justify-center gap-3 cursor-pointer touch-manipulation"
                >
                   <span className="relative z-10">Get Started</span>
                   <ArrowRight size={22} className="relative z-10 transition-transform duration-300 group-hover:translate-x-1.5" />
