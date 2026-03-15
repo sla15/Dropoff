@@ -774,21 +774,30 @@ const App = () => {
     // 3. App State Change Listener (Resume/Background)
     CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log("📱 App Resumed: verifying and refreshing session...");
+        
+        // Explicitly force a session refresh. This prevents the auto-refresh lock 
+        // from hanging indefinitely if the OS paused the WebView's timers.
+        supabase.auth.refreshSession().then(({ error }) => {
+           if (error) console.warn("📱 Session refresh error (often normal if offline):", error.message);
+           return supabase.auth.getSession();
+        }).then(({ data: { session } }) => {
           if (session) {
-            console.log("📱 App Resumed: refreshing session...");
+            console.log("📱 App Resumed: session verified. Reconnecting Realtime...");
             try {
               supabase.realtime.disconnect();
               supabase.realtime.connect();
               supabase.realtime.setAuth(session.access_token);
-              console.log("📱 Real-time: Connection refreshed and authenticated");
             } catch (rtErr) {
               console.error("📱 Real-time reconnection error:", rtErr);
             }
             const userId = session.user.id;
             subscribeToChanges(userId);
-            import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
+            // Re-sync FCM on resume to ensure waking up
+            import('./utils/fcm').then(({ initFCM }) => initFCM(userId)).catch(err => console.error(err));
           }
+        }).catch(err => {
+           console.error("📱 App Resumed: Critical error in resume sequence:", err);
         });
       }
     });
