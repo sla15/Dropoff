@@ -641,14 +641,10 @@ const App = () => {
           initFCM(session.user.id);
 
           if (!profile.full_name || !profile.phone) {
-            console.log("👤 Profile incomplete, heading to onboarding");
+            console.log("👤 Profile incomplete, redirecting to onboarding");
             setScreen('onboarding');
-          } else {
-            console.log("👤 Profile complete, heading to dashboard");
-            // Only move to dashboard if we are currently "trapped" in Splash or Onboarding
-            setScreen(prev => (prev === 'splash' || prev === 'onboarding') ? 'dashboard' : prev);
           }
-          return true; // Success
+          return true;
         } else {
           console.warn("👤 No profile found for authenticated user");
           setScreen('onboarding');
@@ -720,8 +716,14 @@ const App = () => {
 
           // 2. Determine Destination based on Session
           if (currentSession) {
-            const success = await handleUserAuthenticated(currentSession);
-            if (success) markDestDetermined();
+            console.log("🚀 Init: Session exists, letting user in immediately");
+            setScreen('dashboard'); // Instant Navigation
+            markDestDetermined();
+            
+            // Sync profile and data in background without awaiting
+            handleUserAuthenticated(currentSession).catch(err => {
+               console.error("🚀 Init: Background sync failed:", err);
+            });
           } else {
             console.log("🚀 Init: No session recovered, heading to onboarding");
             if (!hasDeterminedDestRef.current) {
