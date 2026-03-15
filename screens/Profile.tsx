@@ -692,24 +692,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         </a>
 
 
-                        {/* Debugging Tools */}
-                        <div className={`mt-6 p-4 rounded-2xl border border-dashed ${theme === 'light' ? 'border-gray-300' : 'border-gray-700'}`}>
-                            <p className={`text-[10px] font-bold uppercase tracking-widest ${textSec} mb-3`}>Developer Tools</p>
-                            <button
-                                onClick={() => {
-                                    triggerHaptic();
-                                    sendPushNotification(
-                                        "Test Notification ⚡",
-                                        "If you see this, push notifications are working correctly on your device!",
-                                        'customer'
-                                    );
-                                    showAlert("Test Sent", "A test push notification has been triggered. Check your notifications.", "success");
-                                }}
-                                className="w-full py-3 rounded-xl bg-[#00D68F]/10 text-[#00D68F] font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all"
-                            >
-                                <MessageSquare size={16} /> Test Push Notification
-                            </button>
-                        </div>
+
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
                         <p>Version 1.0.5 (Build 202)</p>
