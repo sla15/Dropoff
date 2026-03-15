@@ -36,18 +36,27 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
     const inputBg = theme === 'light' ? 'bg-[#E5E5EA]' : 'bg-[#2C2C2E]';
 
     useEffect(() => {
-        if ((window as any).google && mapContainerRef.current) {
+        let retryCount = 0;
+        const maxRetries = 50; // 50 * 200ms = 10s timeout
+        let initTimer: any;
+
+        if ((window as any).google && (window as any).google.maps && mapContainerRef.current) {
             initMap();
         } else {
-            const checkInterval = setInterval(() => {
-                if ((window as any).google && mapContainerRef.current) {
+            initTimer = setInterval(() => {
+                if ((window as any).google && (window as any).google.maps && mapContainerRef.current) {
                     initMap();
-                    clearInterval(checkInterval);
+                    clearInterval(initTimer);
+                } else if (retryCount >= maxRetries) {
+                    clearInterval(initTimer);
+                    console.error("LocationPicker: Google Maps failed to load.");
                 }
-            }, 100);
+                retryCount++;
+            }, 200);
         }
         return () => {
             if (searchTimeout.current) clearTimeout(searchTimeout.current);
+            if (initTimer) clearInterval(initTimer);
         };
     }, []);
 

@@ -268,57 +268,79 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     };
 
-    // Initialize Map
+    // Initialize Map with Retry Logic for Native WebViews
     useEffect(() => {
+        let retryCount = 0;
+        const maxRetries = 50; // 50 * 200ms = 10 seconds timeout
+        let initTimer: any;
+
         const initMap = () => {
-            if (!mapContainerRef.current || !(window as any).google) return;
+            if (!mapContainerRef.current) return;
+            
+            // Safety check: Ensure Google Maps API is fully loaded
+            if (!(window as any).google || !(window as any).google.maps || !(window as any).google.maps.Map) {
+                if (retryCount < maxRetries) {
+                    retryCount++;
+                    initTimer = setTimeout(initMap, 200);
+                } else {
+                    console.error("RideScreen: Google Maps API failed to load after 10 seconds.");
+                    showAlert("Map Error", "Failed to load the map. Please restart the app or check your connection.", "error");
+                }
+                return;
+            }
+
             const google = (window as any).google;
             const defaultCenter = { lat: 13.4432, lng: -16.5916 };
             const targetCenter = userLocation || (user.last_lat && user.last_lng ? { lat: user.last_lat, lng: user.last_lng } : defaultCenter);
 
-            const newMap = new google.maps.Map(mapContainerRef.current, {
-                center: targetCenter,
-                zoom: 13,
-                disableDefaultUI: true,
-                clickableIcons: false,
-                gestureHandling: 'greedy',
-                styles: theme === 'dark' ? darkMapStyle : []
-            });
+            try {
+                const newMap = new google.maps.Map(mapContainerRef.current, {
+                    center: targetCenter,
+                    zoom: 13,
+                    disableDefaultUI: true,
+                    clickableIcons: false,
+                    gestureHandling: 'greedy',
+                    styles: theme === 'dark' ? darkMapStyle : []
+                });
 
-            newMap.addListener('dragstart', () => {
-                mapInteractionRef.current = true;
-            });
+                newMap.addListener('dragstart', () => {
+                    mapInteractionRef.current = true;
+                });
 
-            setMap(newMap);
-            initialCenterDoneRef.current = true;
-            updateMarker(targetCenter, user.name || 'You', newMap);
+                setMap(newMap);
+                initialCenterDoneRef.current = true;
+                updateMarker(targetCenter, user.name || 'You', newMap);
 
-            const directionsRenderer = new google.maps.DirectionsRenderer({
-                map: newMap,
-                suppressMarkers: true,
-                polylineOptions: {
-                    strokeColor: '#00D68F',
-                    strokeWeight: 5,
-                    strokeOpacity: 0.8
-                }
-            });
+                const directionsRenderer = new google.maps.DirectionsRenderer({
+                    map: newMap,
+                    suppressMarkers: true,
+                    polylineOptions: {
+                        strokeColor: '#00D68F',
+                        strokeWeight: 5,
+                        strokeOpacity: 0.8
+                    }
+                });
 
-            setDirectionsRenderer(directionsRenderer);
-            setDirectionsService(new google.maps.DirectionsService());
-            setAutocompleteService(new google.maps.places.AutocompleteService());
-            setGeocoder(new google.maps.Geocoder());
+                setDirectionsRenderer(directionsRenderer);
+                setDirectionsService(new google.maps.DirectionsService());
+                setAutocompleteService(new google.maps.places.AutocompleteService());
+                setGeocoder(new google.maps.Geocoder());
+            } catch (err) {
+                console.error("RideScreen: Map Initialization Error", err);
+            }
         };
 
-        if ((window as any).google && mapContainerRef.current) {
+        if ((window as any).google && (window as any).google.maps && mapContainerRef.current) {
             initMap();
         } else {
-            const checkInterval = setInterval(() => {
-                if ((window as any).google && mapContainerRef.current) {
+            console.log("RideScreen: Starting polling for Google Maps API...");
+            initTimer = setInterval(() => {
+                if ((window as any).google && (window as any).google.maps && mapContainerRef.current) {
+                    clearInterval(initTimer);
                     initMap();
-                    clearInterval(checkInterval);
                 }
-            }, 100);
-            return () => clearInterval(checkInterval);
+            }, 200);
+            return () => clearInterval(initTimer);
         }
     }, [active]);
 

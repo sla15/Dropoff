@@ -248,6 +248,10 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(() => {
       const google = (window as any).google;
+      if (!google || !google.maps) {
+        console.warn("Dashboard: Google Maps not loaded yet.");
+        return;
+      }
       const service = new google.maps.places.AutocompleteService();
       service.getPlacePredictions({
         input: val,
