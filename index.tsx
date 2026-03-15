@@ -604,7 +604,10 @@ const App = () => {
       realtimeChannel = channel;
     };
 
+    let isSyncingProfile = false; // Prevent concurrent syncs
     const handleUserAuthenticated = async (session: any) => {
+      if (isSyncingProfile) return true;
+      isSyncingProfile = true;
       try {
         if (!session?.user?.id) return false;
         console.log("👤 Syncing profile for user:", session.user.id);
@@ -654,6 +657,8 @@ const App = () => {
         console.error("Auth sync error:", err);
         logError(err instanceof Error ? err : new Error(String(err)), { context: 'handleUserAuthenticated_catch' });
         return false;
+      } finally {
+        isSyncingProfile = false;
       }
     };
 
@@ -701,16 +706,13 @@ const App = () => {
             console.log("🚀 Init: Session found immediately");
             currentSession = session;
           } else {
-            console.log("🚀 Init: No immediate session, retrying for slow storage...");
-            // Higher patience for mobile storage adapters
-            for (let i = 0; i < 10; i++) {
-              await new Promise(r => setTimeout(r, 600));
-              const { data: { session: s } } = await supabase.auth.getSession();
-              if (s) {
-                console.log("🚀 Init: Session recovered on retry", i + 1);
-                currentSession = s; 
-                break; 
-              }
+            console.log("🚀 Init: No immediate session, fast retry...");
+            // Single fast retry for mobile storage adapters
+            await new Promise(r => setTimeout(r, 400));
+            const { data: { session: s } } = await supabase.auth.getSession();
+            if (s) {
+              console.log("🚀 Init: Session recovered on fast retry");
+              currentSession = s; 
             }
           }
 
