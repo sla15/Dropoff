@@ -30,6 +30,9 @@ import { triggerHaptic, sendPushNotification } from './utils/helpers';
 // --- API INITIALIZATION ---
 import { initFCM } from './utils/fcm';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Network } from '@capacitor/network';
+import { Preferences } from '@capacitor/preferences';
+import { Loader2, WifiOff, RefreshCcw, AlertTriangle } from 'lucide-react';
 // --- END API INITIALIZATION ---
 
 // Google Maps initialization is handled in index.html to ensure the callback is available before the script loads.
@@ -79,6 +82,8 @@ const App = () => {
   }, [theme, isNative]);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const [screen, setScreenState] = useState<Screen>('splash');
   const screenRef = useRef<Screen>('splash');
   const setScreen = (scr: Screen | ((prev: Screen) => Screen)) => {
@@ -730,10 +735,22 @@ const App = () => {
       };
 
       try {
+        const initPromise = Promise.all([initialCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
+        
+        // If init takes more than 10 seconds, show the "Slow Connection" modal
+        const slowTimeout = setTimeout(() => {
+          if (!hasDeterminedDest) {
+            console.warn("🐌 Init: Connection seems slow...");
+            setIsSlowConnection(true);
+          }
+        }, 12000);
+
         await Promise.race([
-          Promise.all([minTime, initialCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]),
+          Promise.all([minTime, initPromise]),
           safetyTimeout
         ]);
+
+        clearTimeout(slowTimeout);
 
         if (!hasDeterminedDest) {
           console.warn("⚠️ Init: Navigation fallback triggered");
@@ -741,7 +758,6 @@ const App = () => {
         }
       } catch (err) {
         console.error("Init failed:", err);
-        // Safety fallback to prevent white screen/crashes
         setScreen('onboarding');
       } finally {
         setIsLoading(false);
@@ -749,48 +765,36 @@ const App = () => {
     };
 
 
-    if (Capacitor.isNativePlatform()) {
-      import('@capacitor/app').then(({ App: CapApp }) => {
-        // 1. App State Change Listener (Resume/Background)
-        CapApp.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) {
-            // Aggressive Reconnection Logic (Uber-like)
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              if (session) {
-                console.log("📱 App Resumed: refreshing session...");
-                
-                // 1. Force WebSocket reconnection
-                try {
-                  supabase.realtime.disconnect();
-                  supabase.realtime.connect();
-                  supabase.realtime.setAuth(session.access_token);
-                  console.log("📱 Real-time: Connection refreshed and authenticated");
-                } catch (rtErr) {
-                  console.error("📱 Real-time reconnection error:", rtErr);
-                }
-                
-                // 2. Re-subscribe to user-specific channels
-                const userId = session.user.id;
-                subscribeToChanges(userId);
-                
-                // 3. Re-sync FCM
-                import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
-              } else {
-                console.warn("📱 App Resumed: No active session. Checking for reload...");
-                // If we thought we were logged in but now have no session, reload the app
-                // to trigger a fresh initializeApp flow
-                if (screenRef.current !== 'onboarding' && screenRef.current !== 'splash') {
-                   // window.location.reload(); 
-                }
-              }
-            }).catch(err => {
-              console.error("📱 App Resume session check failed:", err);
-            });
+    // 2. Network Listener
+    Network.addListener('networkStatusChange', status => {
+      console.log("🌐 Network status changed:", status);
+      setIsOffline(!status.connected);
+    });
+
+    // 3. App State Change Listener (Resume/Background)
+    CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            console.log("📱 App Resumed: refreshing session...");
+            try {
+              supabase.realtime.disconnect();
+              supabase.realtime.connect();
+              supabase.realtime.setAuth(session.access_token);
+              console.log("📱 Real-time: Connection refreshed and authenticated");
+            } catch (rtErr) {
+              console.error("📱 Real-time reconnection error:", rtErr);
+            }
+            const userId = session.user.id;
+            subscribeToChanges(userId);
+            import('./utils/fcm').then(({ initFCM }) => initFCM(userId));
           }
         });
-      });
-    }
+      }
+    });
 
+    // Check initial network status
+    Network.getStatus().then(status => setIsOffline(!status.connected));
 
     initializeApp();
 
@@ -986,6 +990,49 @@ const App = () => {
         </div>
       </div>
       {showAssistant && <SmartAssistant onClose={() => setShowAssistant(false)} theme={theme} />}
+
+      {/* Connectivity Modal (Slow or Offline) */}
+      {(isOffline || isSlowConnection) && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md px-6 animate-fade-in">
+          <div className={`${theme === 'dark' ? 'bg-[#1C1C1E] border-white/10' : 'bg-white border-black/5'} border w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl animate-scale-in`}>
+            <div className={`mx-auto w-20 h-20 mb-6 rounded-full flex items-center justify-center ${isOffline ? 'bg-red-500/10' : 'bg-[#00E39A]/10'}`}>
+              {isOffline ? (
+                <WifiOff className="w-10 h-10 text-red-500" />
+              ) : (
+                <AlertTriangle className="w-10 h-10 text-[#00E39A]" />
+              )}
+            </div>
+            
+            <h2 className={`text-2xl font-bold mb-3 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+              {isOffline ? 'You are Offline' : 'Slow Connection'}
+            </h2>
+            
+            <p className={`text-sm mb-8 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {isOffline 
+                ? 'Please check your internet connection to continue using Dropoff.' 
+                : 'The app is taking longer than usual to load. Would you like to try refreshing?'}
+            </p>
+
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full h-16 bg-[#00E39A] text-black rounded-2xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+            >
+              <RefreshCcw className="w-5 h-5" />
+              Refresh App
+            </button>
+            
+            {!isOffline && (
+              <button
+                onClick={() => setIsSlowConnection(false)}
+                className={`w-full h-14 mt-3 rounded-2xl font-semibold text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
+              >
+                Wait a bit longer
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <PremiumModal
         isOpen={modalConfig.isOpen}
         onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
