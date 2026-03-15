@@ -215,6 +215,24 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     return () => clearInterval(interval);
   }, []);
 
+  // Auto-advance card carousel every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!carouselRef.current) return;
+
+      const container = carouselRef.current;
+      const nextIndex = (activeCardIndex + 1) % 2; // Assuming 2 cards (Ride & Marketplace)
+
+      container.scrollTo({
+        left: nextIndex * container.offsetWidth,
+        behavior: 'smooth'
+      });
+      setActiveCardIndex(nextIndex);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeCardIndex]);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning,";
@@ -479,11 +497,10 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 <button
                   key={i}
                   onClick={() => carouselRef.current?.scrollTo({ left: i * carouselRef.current.offsetWidth, behavior: 'smooth' })}
-                  className={`rounded-full transition-all duration-300 ${
-                    activeCardIndex === i
+                  className={`rounded-full transition-all duration-300 ${activeCardIndex === i
                       ? 'w-6 h-2 bg-[#00D68F]'
                       : 'w-2 h-2 bg-gray-300 dark:bg-gray-600'
-                  }`}
+                    }`}
                 />
               ))}
             </div>
