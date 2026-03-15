@@ -51,6 +51,8 @@ interface Props {
 export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen, isActivitiesLoading, isFavoritesLoading, locationPromptDone }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
     try {
       const cached = localStorage.getItem('cached_locations');
@@ -406,24 +408,84 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       </div>
 
       <div className="flex-1 px-5 pt-4 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
-        <div className="grid grid-cols-2 gap-6">
-          <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
-            <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
-            <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
-              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.4)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Ride & Delivery</h2>
-              <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+        {/* ── Hero Cards: side-by-side on wide, swipeable carousel on narrow ── */}
+        <div className="w-full">
+          {/* Wide layout (≥ 480px) */}
+          <div className="hidden min-[480px]:grid grid-cols-2 gap-6">
+            {/* Ride Card */}
+            <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+              <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+              <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
+                <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.4)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Ride & Delivery</h2>
+                <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+              </div>
+            </div>
+            {/* Marketplace Card */}
+            <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+              <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+              <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
+                <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.4)] transition-transform group-hover:scale-110"><ShoppingBag size={20} /></div></div>
+                <h2 className="text-2xl font-black text-white tracking-tight">Market</h2>
+                <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest">Premium Shops</p>
+              </div>
             </div>
           </div>
 
-          <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
-            <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
-            <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
-              <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.4)] transition-transform group-hover:scale-110"><ShoppingBag size={20} /></div></div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Market</h2>
-              <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest">Premium Shops</p>
+          {/* Narrow layout (< 480px): swipeable snap carousel */}
+          <div className="min-[480px]:hidden">
+            <div
+              ref={carouselRef}
+              onScroll={() => {
+                if (!carouselRef.current) return;
+                const idx = Math.round(carouselRef.current.scrollLeft / carouselRef.current.offsetWidth);
+                setActiveCardIndex(idx);
+              }}
+              className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-1 scrollbar-hide"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {/* Ride Card */}
+              <div
+                onClick={() => navigate('ride')}
+                className={`snap-center flex-shrink-0 w-[88vw] h-52 ${bgCard} rounded-[28px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-xl cursor-pointer border border-black/5 dark:border-white/10`}
+              >
+                <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                <div className="absolute bottom-5 right-5 text-right z-10">
+                  <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.4)]"><Car size={20} /></div></div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Ride & Delivery</h2>
+                  <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+                </div>
+              </div>
+              {/* Marketplace Card */}
+              <div
+                onClick={() => navigate('marketplace')}
+                className={`snap-center flex-shrink-0 w-[88vw] h-52 ${bgCard} rounded-[28px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-xl cursor-pointer border border-black/5 dark:border-white/10`}
+              >
+                <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+                <div className="absolute bottom-5 right-5 text-right z-10">
+                  <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.4)]"><ShoppingBag size={20} /></div></div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Market</h2>
+                  <p className="text-[10px] uppercase font-bold text-white/80 tracking-widest">Premium Shops</p>
+                </div>
+              </div>
+            </div>
+            {/* Dot indicators */}
+            <div className="flex justify-center gap-2 mt-3">
+              {[0, 1].map(i => (
+                <button
+                  key={i}
+                  onClick={() => carouselRef.current?.scrollTo({ left: i * carouselRef.current.offsetWidth, behavior: 'smooth' })}
+                  className={`rounded-full transition-all duration-300 ${
+                    activeCardIndex === i
+                      ? 'w-6 h-2 bg-[#00D68F]'
+                      : 'w-2 h-2 bg-gray-300 dark:bg-gray-600'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </div>

@@ -6,6 +6,19 @@
   --safe-area-inset-bottom: env(safe-area-inset-bottom);
   --safe-area-inset-left: env(safe-area-inset-left);
   --safe-area-inset-right: env(safe-area-inset-right);
+
+  /* ── Fluid Typography Scale ──
+     clamp(min, preferred, max)
+     Scales smoothly from 320px (mobile) to 768px (tablet) viewports.
+  */
+  --text-xs:   clamp(0.65rem, 1.8vw, 0.75rem);   /* ~10–12px */
+  --text-sm:   clamp(0.75rem, 2.2vw, 0.875rem);  /* ~12–14px */
+  --text-base: clamp(0.85rem, 2.5vw, 1rem);      /* ~13.5–16px */
+  --text-lg:   clamp(1rem,    2.8vw, 1.125rem);  /* ~16–18px */
+  --text-xl:   clamp(1.1rem,  3.2vw, 1.25rem);   /* ~17.6–20px */
+  --text-2xl:  clamp(1.25rem, 4vw,   1.5rem);    /* ~20–24px */
+  --text-3xl:  clamp(1.5rem,  5vw,   1.875rem);  /* ~24–30px */
+  --text-4xl:  clamp(1.75rem, 6vw,   2.25rem);   /* ~28–36px */
 }
 
 /* Global Native Fixes */
@@ -20,6 +33,27 @@ html, body {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  /* Fluid base font: scales entire app's rem-based text automatically */
+  font-size: clamp(14px, 3.5vw, 16px);
+}
+
+/* ── Fluid Typography Utility Classes ── */
+.fluid-xs   { font-size: var(--text-xs); }
+.fluid-sm   { font-size: var(--text-sm); }
+.fluid-base { font-size: var(--text-base); }
+.fluid-lg   { font-size: var(--text-lg); }
+.fluid-xl   { font-size: var(--text-xl); }
+.fluid-2xl  { font-size: var(--text-2xl); }
+.fluid-3xl  { font-size: var(--text-3xl); }
+.fluid-4xl  { font-size: var(--text-4xl); }
+
+/* ── Scrollbar Utilities ── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-color-scheme: dark) {
