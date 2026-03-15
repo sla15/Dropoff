@@ -1061,6 +1061,9 @@ const App = () => {
 
 const container = document.getElementById('root');
 if (container) {
+  import('./utils/logger').then(({ setupGlobalErrorHandlers }) => {
+     setupGlobalErrorHandlers();
+  }).catch(e => console.error(e));
   const root = createRoot(container);
   root.render(<App />);
 }
