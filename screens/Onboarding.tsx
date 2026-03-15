@@ -160,6 +160,57 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             return;
          }
 
+         if (data.session) {
+            console.log("✅ OTP: Verified session created. Navigating immediately.");
+
+            // 1. Immediate Navigation for better UX
+            navigate('dashboard');
+            localStorage.removeItem('fcm_prompted');
+
+            // 2. Background Profile Sync
+            const syncProfile = async () => {
+               try {
+                  const { data: profile, error: profileError } = await supabase
+                     .from('profiles')
+                     .select('*')
+                     .eq('id', data.session.user.id)
+                     .maybeSingle();
+
+                  if (profileError) {
+                     console.error("Profile Fetch Error:", profileError);
+                     logError(profileError, { context: 'onboarding_verifyOTP_profileFetch' });
+                  }
+
+                  if (profile) {
+                     console.log("👤 Profile: Found existing profile", profile.full_name);
+                     setUser({
+                        id: profile.id,
+                        name: profile.full_name || '',
+                        phone: profile.phone || '',
+                        email: profile.email || '',
+                        location: profile.location || 'Banjul, The Gambia',
+                        photo: profile.avatar_url || null,
+                        role: profile.role || 'customer',
+                        rating: Number(profile.average_rating) || 5.0,
+                        referralCode: profile.referral_code || '',
+                        referralBalance: profile.referral_balance || 0
+                     });
+
+                     if (!profile.full_name) {
+                        console.log("👤 Profile: Incomplete, sending back to setup");
+                        setStep(4); // Drop back if really needed
+                     }
+                  } else {
+                     console.log("👤 Profile: No profile found, sending to setup");
+                     setStep(4);
+                  }
+               } catch (e) {
+                  console.error("Background Sync Error:", e);
+               }
+            };
+
+            syncProfile();
+
          } else {
             setLoading(false);
             showAlert("Session Error", "Could not create session. Please try again.", "error");
