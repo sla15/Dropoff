@@ -675,8 +675,10 @@ const App = () => {
         
         if (event === 'SIGNED_IN' && session) {
           Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
-          const success = await handleUserAuthenticated(session);
-          if (success) markDestDetermined();
+          console.log("🔐 Auth Change Event: SIGNED_IN - marking destination immediately");
+          setScreen('dashboard'); // Let user in NOW
+          markDestDetermined();   // Kill the fallback timer NOW
+          handleUserAuthenticated(session).catch(err => console.error("Background sync error:", err)); // Sync in background
         } else if (event === 'SIGNED_OUT') {
           Preferences.remove({ key: 'has_ever_logged_in' });
           setScreen('onboarding');
