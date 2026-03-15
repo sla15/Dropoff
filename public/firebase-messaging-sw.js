@@ -1,10 +1,7 @@
+// firebase-messaging-sw.js — Service Worker for FCM Background Push
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-// Import and configure the Firebase SDK
-// These scripts are made available when the app is served locally or deployed.
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
-
-// Initialize the Firebase app in the service worker
 firebase.initializeApp({
     apiKey: "AIzaSyC5uK6CYIZ0icQfUUnAd57a5fHyudXxSc4",
     authDomain: "ride-gm.firebaseapp.com",
@@ -17,16 +14,38 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages
+// Handle background/app-closed messages
 messaging.onBackgroundMessage((payload) => {
-    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+    console.log('[SW] FCM Background Message received:', payload);
 
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-        body: payload.notification.body,
-        // icon: '/assets/app_logo.png' // Removed broken path to prevent display errors
-        data: payload.data
-    };
+    const title = payload.notification?.title || payload.data?.title || 'DROPOFF';
+    const body = payload.notification?.body || payload.data?.body || 'You have a new notification';
+    const icon = payload.notification?.image || '/favicon.ico';
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    self.registration.showNotification(title, {
+        body,
+        icon,
+        badge: '/favicon.ico',
+        data: payload.data,
+        tag: payload.data?.type || 'default',
+        renotify: true,
+        requireInteraction: payload.data?.type === 'ride_request' || payload.data?.type === 'order_request',
+    });
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+    console.log('[SW] Notification clicked:', event.notification.tag);
+    event.notification.close();
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if (client.url.includes('localhost') || client.url.includes('ridegambia.com')) {
+                    return client.focus();
+                }
+            }
+            return clients.openWindow('https://ridegambia.com/dashboard');
+        })
+    );
 });
