@@ -601,7 +601,14 @@ const App = () => {
 
     const handleUserAuthenticated = async (session: any) => {
       try {
+        console.log("👤 Syncing profile for user:", session.user.id);
         const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+        
+        if (error) {
+          const { logError } = require('./utils/logger');
+          logError(error, { context: 'handleUserAuthenticated_fetch_profile' });
+        }
+
         if (profile) {
           setUser({
             id: profile.id,
@@ -624,118 +631,100 @@ const App = () => {
           fetchActivities(session.user.id);
           subscribeToChanges(session.user.id);
           
-          // Re-init Push Notifications whenever user is authenticated
+          // Re-init Push Notifications
           initFCM(session.user.id);
 
           if (!profile.full_name || !profile.phone) {
+            console.log("👤 Profile incomplete, heading to onboarding");
             setScreen('onboarding');
           } else {
-            // Only force navigation to dashboard if we are coming from Splash or Onboarding
-            // This prevents kicking the user out of Profile/Ride screens on app resume (e.g. after camera)
+            console.log("👤 Profile complete, heading to dashboard");
             setScreen(prev => (prev === 'splash' || prev === 'onboarding') ? 'dashboard' : prev);
           }
-
+          return true; // Success
         } else {
+          console.warn("👤 No profile found for authenticated user");
           setScreen('onboarding');
+          return false;
         }
       } catch (err) {
         console.error("Auth sync error:", err);
+        const { logError } = require('./utils/logger');
+        logError(err instanceof Error ? err : new Error(String(err)), { context: 'handleUserAuthenticated_catch' });
+        return false;
       }
     };
 
     const initializeApp = async () => {
       setIsLoading(true);
-      const minTime = new Promise(resolve => setTimeout(resolve, 3500));
-      const safetyTimeout = new Promise(resolve => setTimeout(resolve, 8000));
+      const minTime = new Promise(resolve => setTimeout(resolve, 2000)); 
+      const safetyTimeout = new Promise(resolve => setTimeout(resolve, 15000));
 
-      // Use a flag to ensure we only proceed once
       let hasDeterminedDest = false;
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("🔐 Auth Change Event:", event, session ? "Session active" : "No session");
         
         if (event === 'SIGNED_IN' && session) {
-          import('@capacitor/preferences').then(({ Preferences }) => {
-            Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
-          });
-          await handleUserAuthenticated(session);
+          Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
+          const success = await handleUserAuthenticated(session);
+          if (success) hasDeterminedDest = true;
         } else if (event === 'SIGNED_OUT') {
-          import('@capacitor/preferences').then(({ Preferences }) => {
-            Preferences.remove({ key: 'has_ever_logged_in' });
-          });
+          Preferences.remove({ key: 'has_ever_logged_in' });
           setScreen('onboarding');
           setHistory([]);
           setUser({
-            id: '',
-            name: '',
-            phone: '',
-            email: '',
-            location: 'Banjul, The Gambia',
-            photo: '',
-            role: 'customer',
-            rating: 5.0,
-            referralCode: '',
-            referralBalance: 0
+            id: '', name: '', phone: '', email: '', location: 'Banjul, The Gambia',
+            photo: '', role: 'customer', rating: 5.0, referralCode: '', referralBalance: 0
           });
-        } else if (event === 'TOKEN_REFRESHED' && session) {
-          console.log("🔐 Auth: Token Refreshed");
-          supabase.realtime.setAuth(session.access_token);
         }
       });
       authListener = subscription;
 
-      // Initial session check
-      const initialCheck = async () => {
+      const runInit = async () => {
         try {
-          // 1. First, check if there's any session in the storage adapter
-          const { data: { session } } = await supabase.auth.getSession();
+          console.log("🚀 Init: Data parallel fetch...");
+          await Promise.allSettled([fetchSettings(), fetchBusinesses(), fetchCategories()]);
+
+          console.log("🚀 Init: Session check...");
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
           
-          if (session) {
-            console.log("🚀 Init: Session found immediately");
-            await handleUserAuthenticated(session);
-            hasDeterminedDest = true;
-            return;
+          if (sessionError) {
+             const { logError } = require('./utils/logger');
+             logError(sessionError, { context: 'initializeApp_getSession' });
           }
 
-          // 2. If no session immediately, wait a bit longer for the storage adapter to resolve
-          // This is crucial for native platforms where Preferences might be slightly slower to load
-          console.log("🚀 Init: No session yet, waiting for adapter...");
-          for (let i = 0; i < 5; i++) {
-            await new Promise(resolve => setTimeout(resolve, 300));
-            const { data: { session: retrySession } } = await supabase.auth.getSession();
+          if (session) {
+            const success = await handleUserAuthenticated(session);
+            if (success) hasDeterminedDest = true;
+          } else {
+            console.log("🚀 Init: Retrying for slow storage...");
+            let retrySession = null;
+            for (let i = 0; i < 4; i++) {
+              await new Promise(r => setTimeout(r, 600));
+              const { data: { session: s } } = await supabase.auth.getSession();
+              if (s) { retrySession = s; break; }
+            }
+
             if (retrySession) {
-              console.log("🚀 Init: Session found on retry", i + 1);
-              await handleUserAuthenticated(retrySession);
+              const success = await handleUserAuthenticated(retrySession);
+              if (success) hasDeterminedDest = true;
+            } else {
+              setScreen('onboarding');
               hasDeterminedDest = true;
-              return;
             }
           }
-
-          // 3. Last stand: check if we've ever logged in before on this device
-          const { Preferences } = await import('@capacitor/preferences');
-          const { value: hasLoggedInBefore } = await Preferences.get({ key: 'has_ever_logged_in' });
-          
-          if (!hasLoggedInBefore) {
-            console.log("🚀 Init: First time user detected");
-            setScreen('onboarding');
-            hasDeterminedDest = true;
-          } else {
-            // User HAS logged in before but session is missing - 
-            // maybe it expired? We'll still go to onboarding but with a 'renew' context 
-            // or just stay on onboarding. For now, onboarding is the fallback.
-            console.warn("🚀 Init: User has logged in before, but session is missing.");
-            setScreen('onboarding');
-            hasDeterminedDest = true;
-          }
         } catch (err) {
-          console.error("Auth session check error:", err);
+          console.error("🚀 Init Critical Failure:", err);
+          const { logError } = require('./utils/logger');
+          logError(err instanceof Error ? err : new Error(String(err)), { context: 'initializeApp_runInit' });
           setScreen('onboarding');
           hasDeterminedDest = true;
         }
       };
 
       try {
-        const initPromise = Promise.all([initialCheck(), fetchSettings(), fetchBusinesses(), fetchCategories()]);
+        const initPromise = runInit();
         
         // If init takes more than 10 seconds, show the "Slow Connection" modal
         const slowTimeout = setTimeout(() => {
