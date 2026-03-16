@@ -853,27 +853,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (!map || bookingStep !== 'planning') return;
 
         const listener = map.addListener('click', (e: any) => {
-            if (status === 'searching') return;
+            // We cannot depend on 'status' here directly due to closures, but if it's searching we usually unmounted this anyway
             const latLng = e.latLng;
             if (!latLng) return;
 
-            // Geocode the location
+            // Immediately place the pin instead of waiting for Geocode
+            const idx = destinations.findIndex(d => !d);
+            const targetIdx = idx === -1 ? destinations.length - 1 : idx;
+
+            const newCoords = [...destinationCoords];
+            newCoords[targetIdx] = { lat: latLng.lat(), lng: latLng.lng() };
+            setDestinationCoords(newCoords);
+            triggerHaptic();
+
+            // Set a temporary loading text
+            updateDestination(targetIdx, "Finding location...");
+
+            // Geocode the location to get the exact address text
             const geocoder = new (window as any).google.maps.Geocoder();
             geocoder.geocode({ location: latLng }, (results: any, status: string) => {
                 if (status === 'OK' && results[0]) {
                     const address = results[0].formatted_address;
-                    // Update the last empty destination or the last one
-                    const idx = destinations.findIndex(d => !d);
-                    const targetIdx = idx === -1 ? destinations.length - 1 : idx;
-
                     updateDestination(targetIdx, address);
-
-                    // Update coordinates - the centralized effect will handle the pin
-                    const newCoords = [...destinationCoords];
-                    newCoords[targetIdx] = { lat: latLng.lat(), lng: latLng.lng() };
-                    setDestinationCoords(newCoords);
-
-                    triggerHaptic();
+                } else {
+                    updateDestination(targetIdx, "Dropped Pin");
                 }
             });
         });

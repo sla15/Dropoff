@@ -135,6 +135,30 @@ const App = () => {
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const [locationPromptDone, setLocationPromptDone] = useState(false);
 
+  // Define showAlert early so effects can use it safely
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText?: string,
+    cancelText?: string,
+    onCancel?: () => void
+  ) => {
+    setModalConfig({
+      isOpen: true,
+      title,
+      message,
+      type,
+      showCancel,
+      onConfirm,
+      onCancel,
+      confirmText,
+      cancelText
+    });
+  };
+
   // 👤 User State (At the top to prevent ReferenceErrors)
   const [user, setUser] = useState<UserData>({
     id: '',
@@ -160,33 +184,46 @@ const App = () => {
 
     const startFCM = async () => {
       if (hasTriggeredFCM.current) return;
+      hasTriggeredFCM.current = true; // Set immediately to prevent strict mode double-firing
       
-      const promptedBefore = localStorage.getItem('fcm_prompted');
-      if (promptedBefore) {
-        // If already prompted, we still init FCM (to refresh token) but skip permission request
-        console.log("🚀 FCM: Already prompted before, refreshing token...");
-        await initFCM(user.id);
-        hasTriggeredFCM.current = true;
-        return;
-      }
-
-      console.log("🚀 FCM: First time on dashboard, requesting permissions...");
+      console.log("🚀 FCM: Starting FCM initialization sequence...");
       
       if (isNative) {
-        const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
-        let permStatus = await FirebaseMessaging.checkPermissions();
-        if (permStatus.receive === 'prompt') {
-          permStatus = await FirebaseMessaging.requestPermissions();
+        try {
+          const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+          let permStatus = await FirebaseMessaging.checkPermissions();
+          if (permStatus.receive === 'prompt') {
+             // Let Capacitor handle the native prompt (it usually works well even on load for iOS/Android)
+             await FirebaseMessaging.requestPermissions();
+          }
+        } catch (e) {
+          console.error("📱 FCM Native perm error:", e);
+        }
+        await initFCM(user.id);
+      } else {
+        // Web flow: modern browsers require a user gesture to request permissions.
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+          showAlert(
+            "Enable Notifications",
+            "Please enable notifications to receive live updates about your ride and driver status.",
+            "info",
+            async () => {
+              console.log("👆 User clicked Enable, triggering initFCM...");
+              await initFCM(user.id);
+            },
+            true, // show cancel
+            "Enable",
+            "Later"
+          );
+        } else {
+          // If already granted or denied, just run it (it won't prompt)
+          await initFCM(user.id);
         }
       }
-
-      await initFCM(user.id);
-      localStorage.setItem('fcm_prompted', 'true');
-      hasTriggeredFCM.current = true;
     };
 
     startFCM();
-  }, [user.id, isNative, screen]);
+  }, [user.id, isNative, screen, locationPromptDone, showAlert]);
 
   // Foreground Notification Listener
   useEffect(() => {
@@ -250,29 +287,6 @@ const App = () => {
       return [];
     }
   });
-
-  const showAlert = (
-    title: string,
-    message: string,
-    type: 'success' | 'error' | 'info' = 'info',
-    onConfirm?: () => void,
-    showCancel?: boolean,
-    confirmText?: string,
-    cancelText?: string,
-    onCancel?: () => void
-  ) => {
-    setModalConfig({
-      isOpen: true,
-      title,
-      message,
-      type,
-      onConfirm,
-      showCancel,
-      confirmText,
-      cancelText,
-      onCancel
-    });
-  };
 
   const scrollTimeout = useRef<any>(null);
   const lastScrollY = useRef(0);
@@ -673,10 +687,13 @@ const App = () => {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log("🔐 Auth Change Event:", event, session ? "Session active" : "No session");
         
-        if (event === 'SIGNED_IN' && session) {
+        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
           Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
-          console.log("🔐 Auth Change Event: SIGNED_IN - marking destination immediately");
-          setScreen('dashboard'); // Let user in NOW
+          console.log(`🔐 Auth Change Event: ${event} - marking destination immediately`);
+          
+          if (screenRef.current === 'splash' || screenRef.current === 'onboarding') {
+            setScreen('dashboard'); // Let user in NOW
+          }
           markDestDetermined();   // Kill the fallback timer NOW
           handleUserAuthenticated(session).catch(err => console.error("Background sync error:", err)); // Sync in background
         } else if (event === 'SIGNED_OUT') {
