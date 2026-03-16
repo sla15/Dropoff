@@ -667,8 +667,9 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         </a>
 
                         <a 
-                            href="whatsapp://send?phone=+2203888888&text=Hello%20Dropoff%20Support,%20I%20need%20assistance%20with..." 
+                            href="https://wa.me/2203888888?text=Hello%20Dropoff%20Support,%20I%20need%20assistance%20with..." 
                             target="_blank" 
+                            rel="noopener noreferrer"
                             className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}
                         >
                             <div className="w-12 h-12 rounded-full bg-[#25D366]/20 flex items-center justify-center text-[#25D366]">

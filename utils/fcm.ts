@@ -113,8 +113,17 @@ const initWebPush = async (userId?: string) => {
             console.warn("⚠️ FCM: Firebase config missing. Skipping web init.");
             return;
         }
-        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        if (typeof Notification === 'undefined') {
+            console.warn("⚠️ FCM: Notification API not available in this browser.");
+            return;
+        }
+        if (Notification.permission === 'denied') {
             console.warn("⚠️ FCM: Web notifications are blocked by the browser.");
+            return;
+        }
+
+        if (!APP_CONFIG.FCM_VAPID_KEY) {
+            console.warn("⚠️ FCM: VITE_FCM_VAPID_KEY is not set. Web push token cannot be obtained. Add it to your .env file.");
             return;
         }
 
@@ -123,14 +132,23 @@ const initWebPush = async (userId?: string) => {
             messaging = getMessaging(app);
         }
 
-        console.log("🔔 FCM: Initializing Web Push...");
+        console.log("🔔 FCM: Requesting Web Push permission...");
         const permission = await Notification.requestPermission();
         if (permission !== "granted") {
-            console.warn("⚠️ FCM: Web permission not granted");
+            console.warn("⚠️ FCM: Web permission not granted:", permission);
             return;
         }
 
-        const swReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        // Explicitly register the service worker to ensure it's ready before getToken
+        let swReg: ServiceWorkerRegistration | undefined;
+        try {
+            swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+            await navigator.serviceWorker.ready; // Wait for SW to be active
+            console.log("✅ FCM: Service Worker registered:", swReg.scope);
+        } catch (swErr) {
+            console.warn("⚠️ FCM: Service Worker registration failed:", swErr);
+        }
+
         const token = await getToken(messaging, {
             vapidKey: APP_CONFIG.FCM_VAPID_KEY,
             serviceWorkerRegistration: swReg
@@ -140,7 +158,7 @@ const initWebPush = async (userId?: string) => {
             console.log("✅ FCM: Web token:", token.substring(0, 30) + '...');
             if (userId) await syncFCMTokenToSupabase(userId, token);
         } else {
-            console.warn("⚠️ FCM: No web token — check VAPID key and service worker");
+            console.warn("⚠️ FCM: No web token returned — check VAPID key and service worker");
         }
 
         // Web foreground: show browser notification

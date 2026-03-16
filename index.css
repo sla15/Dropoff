@@ -137,19 +137,20 @@ html, body {
   height: 100%;
 }
 
-/* Yango-style Professional Vehicle Markers */
+/* Yango-style Professional Vehicle Markers - Simplified for performance */
 img[src*="drivers%20vehicle%20types"] {
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  /* Removed expensive drop-shadow filter */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+  transition: transform 0.3s ease-out;
   object-fit: contain !important;
   width: 50px !important;
   height: 50px !important;
   display: block;
 }
 
-/* Enhancing depth for premium vehicles */
+/* Enhancing depth for premium vehicles - Simplified */
 img[src*="car_premium"] {
-  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.5));
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Navigation Animations */

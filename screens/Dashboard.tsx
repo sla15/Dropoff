@@ -308,8 +308,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
   const inputBg = theme === 'light' ? 'bg-[#E5E5EA]' : 'bg-[#2C2C2E]';
 
   return (
-    <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden animate-scale-in`}>
-      <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-md transition-all`}>
+    <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden`}>
+      <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} backdrop-blur-sm transition-all`}>
         <div className="flex justify-between items-center mt-2">
           <div className="flex items-center gap-3">
             <div className="relative">
