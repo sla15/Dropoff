@@ -23,101 +23,68 @@ export const initFCM = async (userId?: string) => {
     }
 };
 
-/**
- * Shows a local notification when the app is in the FOREGROUND.
- * FCM suppresses system notifications when the app is open — this bypasses that.
- */
-const showLocalNotification = async (title: string, body: string, data?: any) => {
-    try {
-        const { LocalNotifications } = await import('@capacitor/local-notifications');
-        
-        // Check and request permissions first (required on Android 13+)
-        let permStatus = await LocalNotifications.checkPermissions();
-        if (permStatus.display === 'prompt') {
-            permStatus = await LocalNotifications.requestPermissions();
-        }
-        if (permStatus.display !== 'granted') {
-            console.warn("⚠️ FCM: Local notification permission not granted:", permStatus.display);
-            return;
-        }
-
-        const isUrgent = data?.type && ['ride_request', 'order_request', 'new_delivery', 'batch_update'].includes(data.type);
-
-        await LocalNotifications.schedule({
-            notifications: [{
-                id: Math.floor(Math.random() * 2147483647), // Max int value for Android
-                title: title || 'DROPOFF',
-                body: body || '',
-                extra: data,
-                sound: 'default',
-                // 'ic_launcher' is guaranteed to exist in every Capacitor build
-                // Do NOT use 'ic_stat_onesignal_default' — that icon doesn't exist
-                smallIcon: 'ic_launcher',
-                iconColor: isUrgent ? '#00E39A' : '#00D68F',
-                channelId: isUrgent ? 'ride_requests' : 'default',
-                autoCancel: true,
-            }]
-        });
-        console.log("✅ FCM: Foreground local notification displayed:", title);
-    } catch (err) {
-        console.error("❌ FCM: Local notification display error:", err);
-    }
-};
-
 const initNativePush = async (userId?: string) => {
     try {
         console.log("🔔 FCM: Initializing Native Push (Capacitor)...");
 
         // 1. Create channels for Android 8.0+
         if (Capacitor.getPlatform() === 'android') {
-            await FirebaseMessaging.createChannel({
-                id: 'ride_requests',
-                name: 'Ride & Order Requests',
-                description: 'Critical alerts for new rides and order updates',
-                importance: 5,
-                visibility: 1,
-                vibration: true,
-                lights: true,
-                lightColor: '#00E39A'
-            });
-            await FirebaseMessaging.createChannel({
-                id: 'default',
-                name: 'General Notifications',
-                description: 'Updates and general information',
-                importance: 4,
-                visibility: 1,
-                vibration: true,
-            });
-            console.log("✅ FCM: Android Channels created");
+            try {
+                await FirebaseMessaging.createChannel({
+                    id: 'ride_requests',
+                    name: 'Ride & Order Requests',
+                    description: 'Critical alerts for new rides and order updates',
+                    importance: 5, // MAX importance = heads-up notification
+                    visibility: 1, // PUBLIC
+                    vibration: true,
+                    lights: true,
+                    lightColor: '#00E39A',
+                    sound: 'default',
+                });
+                await FirebaseMessaging.createChannel({
+                    id: 'default',
+                    name: 'General Notifications',
+                    description: 'Updates and general information',
+                    importance: 4, // HIGH
+                    visibility: 1, // PUBLIC
+                    vibration: true,
+                    sound: 'default',
+                });
+                console.log("✅ FCM: Android Channels created (ride_requests + default)");
+            } catch (channelErr) {
+                console.warn("⚠️ FCM: Channel creation warning:", channelErr);
+            }
         }
 
         // 2. Check / request FCM permissions
         let permStatus = await FirebaseMessaging.checkPermissions();
+        console.log("🔔 FCM: Current permission status:", permStatus.receive);
         if (permStatus.receive === 'prompt') {
             permStatus = await FirebaseMessaging.requestPermissions();
+            console.log("🔔 FCM: Permission after request:", permStatus.receive);
         }
         if (permStatus.receive !== 'granted') {
             console.warn("⚠️ FCM: Push permission not granted:", permStatus.receive);
             return;
         }
 
-        // 3. Register listeners (remove old ones first to avoid duplicates)
+        // 3. Register listeners
         await FirebaseMessaging.removeAllListeners();
 
-        // CRITICAL: When app is FOREGROUND, FCM does NOT show a system notification.
-        // We must manually display it using LocalNotifications.
-        FirebaseMessaging.addListener('notificationReceived', async (event) => {
-            const notif = event.notification;
-            console.log('🔔 FCM: Foreground message received → showing local notification:', notif.title);
-            await showLocalNotification(
-                notif.title || 'DROPOFF',
-                notif.body || '',
-                notif.data
-            );
+        // Foreground notifications: With notification_foreground: "true" in the
+        // data payload (set in the edge function), @capacitor-firebase/messaging
+        // will automatically show the notification in the system tray.
+        // This listener is for when we want to do something EXTRA with the data.
+        FirebaseMessaging.addListener('notificationReceived', (event) => {
+            console.log('🔔 FCM: Foreground notification received:', JSON.stringify(event.notification));
+            // The notification is already shown by the plugin thanks to 
+            // notification_foreground: "true" in the data payload.
+            // No need for LocalNotifications.
         });
 
+        // When user taps on a notification
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
-            console.log('🔔 FCM: Push notification tapped:', event.notification.title);
+            console.log('🔔 FCM: Notification tapped:', event.notification?.title);
             // Future: navigate to relevant screen based on event.notification.data?.type
         });
 
@@ -125,7 +92,7 @@ const initNativePush = async (userId?: string) => {
         console.log("📡 FCM: Getting device token...");
         const result = await FirebaseMessaging.getToken();
         if (result.token) {
-            console.log('✅ FCM: Token retrieved:', result.token.substring(0, 20) + '...');
+            console.log('✅ FCM: Token retrieved:', result.token.substring(0, 30) + '...');
             if (userId) {
                 await syncFCMTokenToSupabase(userId, result.token);
             }
@@ -133,7 +100,7 @@ const initNativePush = async (userId?: string) => {
             console.warn("⚠️ FCM: getToken() returned no token");
         }
 
-        console.log("📡 FCM: Native initialization complete");
+        console.log("✅ FCM: Native initialization complete");
 
     } catch (err) {
         console.error("❌ FCM: Native init error:", err);
@@ -146,7 +113,7 @@ const initWebPush = async (userId?: string) => {
             console.warn("⚠️ FCM: Firebase config missing. Skipping web init.");
             return;
         }
-        if (Notification.permission === 'denied') {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'denied') {
             console.warn("⚠️ FCM: Web notifications are blocked by the browser.");
             return;
         }
@@ -170,18 +137,18 @@ const initWebPush = async (userId?: string) => {
         });
 
         if (token) {
-            console.log("✅ FCM: Web token generated:", token.substring(0, 20) + '...');
+            console.log("✅ FCM: Web token:", token.substring(0, 30) + '...');
             if (userId) await syncFCMTokenToSupabase(userId, token);
         } else {
-            console.warn("⚠️ FCM: No web token available — check VAPID key and service worker registration");
+            console.warn("⚠️ FCM: No web token — check VAPID key and service worker");
         }
 
-        // Foreground web messages: show a native browser notification
+        // Web foreground: show browser notification
         onMessage(messaging, (payload) => {
             console.log("🔔 FCM: Web foreground message:", payload);
-            const title = payload.notification?.title || 'DROPOFF';
+            const title = payload.notification?.title || payload.data?.notification_title || 'DROPOFF';
             const options: NotificationOptions = {
-                body: payload.notification?.body || '',
+                body: payload.notification?.body || payload.data?.notification_body || '',
                 icon: '/favicon.ico',
                 badge: '/favicon.ico',
                 tag: payload.data?.type || 'default',
@@ -204,7 +171,7 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
         const lastToken = localStorage.getItem('last_fcm_sync_token');
         const lastUser = localStorage.getItem('last_fcm_sync_user');
         if (lastToken === token && lastUser === userId) {
-            console.log('📡 FCM: Token already synced for this user, skipping.');
+            console.log('📡 FCM: Token already synced, skipping.');
             return;
         }
 
@@ -214,7 +181,7 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
             .eq('id', userId);
 
         if (error) {
-            console.error('❌ FCM: Failed to sync token:', error);
+            console.error('❌ FCM: Sync failed:', error);
         } else {
             console.log('✅ FCM: Token synced to Supabase');
             localStorage.setItem('last_fcm_sync_token', token);
