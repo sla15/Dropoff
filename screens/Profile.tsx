@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera as CameraIcon, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 
-import { Theme, Screen, UserData, Activity, Business, AppSettings } from '../types';
+import { Theme, Screen, UserData, Activity, Business, AppSettings, SavedLocation } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -40,7 +40,7 @@ interface Props {
     handleLogout: () => Promise<void>;
 }
 
-type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support';
+type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support' | 'saved-locations';
 
 // Drawer Component Defined Outside to fix Input Focus issues
 // Added Swipe-to-close logic
@@ -156,10 +156,40 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
     const [homeLocData, setHomeLocData] = useState<{ address: string; lat: number; lng: number } | null>(null);
     const [showLP, setShowLP] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [editingLoc, setEditingLoc] = useState<SavedLocation | null>(null);
+    const [showLocPicker, setShowLocPicker] = useState(false);
 
     useEffect(() => {
         fetchHomeLocation();
+        fetchSavedLocations();
     }, []);
+
+    const fetchSavedLocations = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const { data, error } = await supabase
+                .from('user_saved_locations')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('created_at', { ascending: false });
+
+            if (data) {
+                setSavedLocations(data.map(d => ({
+                    id: d.id,
+                    label: d.label,
+                    emoji: d.emoji || '📍',
+                    address: d.address,
+                    latitude: d.latitude,
+                    longitude: d.longitude
+                })));
+            }
+        } catch (err) {
+            console.error("Fetch Saved Locations Error:", err);
+        }
+    };
 
     const fetchHomeLocation = async () => {
         try {
@@ -385,6 +415,16 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
                     </button>
 
+                    <button onClick={() => openDrawer('saved-locations')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
+                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10`}>
+                                <MapPin size={22} />
+                            </div>
+                            <span className="font-bold text-lg">Saved Locations</span>
+                        </div>
+                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                    </button>
+
                     <button onClick={() => openDrawer('history')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
                         <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-orange-50 text-orange-500 dark:bg-orange-500/10`}>
@@ -605,6 +645,139 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             ))}
                         </div>
                     )}
+                </Drawer>
+            )}
+
+            {/* Saved Locations Drawer */}
+            {activeDrawer === 'saved-locations' && (
+                <Drawer title="Saved Locations" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard}>
+                    <div className="pb-20">
+                        {savedLocations.length === 0 ? (
+                            <div className={`text-center py-10 ${textSec}`}>No saved locations yet.</div>
+                        ) : (
+                            <div className="space-y-4 mb-8">
+                                {savedLocations.map(loc => (
+                                    <div key={loc.id} className={`p-4 rounded-2xl ${inputBg} flex items-center gap-4 group/item`}>
+                                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xl">
+                                            {loc.emoji}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold truncate">{loc.label}</h4>
+                                            <p className={`text-xs ${textSec} truncate`}>{loc.address}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    triggerHaptic();
+                                                    setEditingLoc(loc);
+                                                    setShowLocPicker(true);
+                                                }}
+                                                className="p-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-all text-blue-500 active:scale-95"
+                                            >
+                                                <UserCog size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    triggerHaptic();
+                                                    showAlert(
+                                                        "Delete Location",
+                                                        `Are you sure you want to delete "${loc.label}"?`,
+                                                        "info",
+                                                        async () => {
+                                                            try {
+                                                                const { error } = await supabase
+                                                                    .from('user_saved_locations')
+                                                                    .delete()
+                                                                    .eq('id', loc.id);
+                                                                
+                                                                if (error) throw error;
+                                                                setSavedLocations(prev => prev.filter(l => l.id !== loc.id));
+                                                                if (loc.label === 'Home') fetchHomeLocation();
+                                                            } catch (err) {
+                                                                console.error("Delete Location Error:", err);
+                                                                showAlert("Error", "Failed to delete location", "error");
+                                                            }
+                                                        },
+                                                        true,
+                                                        "Delete",
+                                                        "Cancel"
+                                                    );
+                                                }}
+                                                className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-all text-red-500 active:scale-95"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => {
+                                triggerHaptic();
+                                setEditingLoc(null);
+                                setShowLocPicker(true);
+                            }}
+                            className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
+                        >
+                            <MapPin size={20} /> Add New Location
+                        </button>
+
+                        {showLocPicker && (
+                            <LocationPicker
+                                theme={theme}
+                                title={editingLoc ? `Edit ${editingLoc.label}` : "Add New Location"}
+                                user={user}
+                                initialLocation={editingLoc ? { lat: editingLoc.latitude, lng: editingLoc.longitude } : undefined}
+                                onClose={() => {
+                                    setShowLocPicker(false);
+                                    setEditingLoc(null);
+                                }}
+                                onConfirm={async (locData) => {
+                                    try {
+                                        const { data: { session } } = await supabase.auth.getSession();
+                                        if (!session) return;
+
+                                        let label = editingLoc ? editingLoc.label : "";
+                                        if (!label) {
+                                             label = window.prompt("Enter a label for this location (e.g. Work, Gym):", "New Location") || "Saved Location";
+                                        }
+                                        
+                                        const payload = {
+                                            user_id: session.user.id,
+                                            label: label,
+                                            address: locData.address,
+                                            latitude: locData.lat,
+                                            longitude: locData.lng,
+                                            emoji: editingLoc ? editingLoc.emoji : (label.toLowerCase().includes('work') ? '💼' : label.toLowerCase().includes('gym') ? '🏋️' : '📍')
+                                        };
+
+                                        if (editingLoc) {
+                                            const { error } = await supabase
+                                                .from('user_saved_locations')
+                                                .update(payload)
+                                                .eq('id', editingLoc.id);
+                                            if (error) throw error;
+                                        } else {
+                                            const { error } = await supabase
+                                                .from('user_saved_locations')
+                                                .insert([payload]);
+                                            if (error) throw error;
+                                        }
+
+                                        fetchSavedLocations();
+                                        if (label === 'Home') fetchHomeLocation();
+                                        setShowLocPicker(false);
+                                        setEditingLoc(null);
+                                    } catch (err) {
+                                        console.error("Save Location Error:", err);
+                                        showAlert("Error", "Failed to save location", "error");
+                                    }
+                                }}
+                            />
+                        )}
+                    </div>
                 </Drawer>
             )}
 
