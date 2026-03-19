@@ -186,8 +186,8 @@ const initWebPush = async (userId?: string) => {
 export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
         if (!userId || !token) return;
-        const lastToken = localStorage.getItem('last_fcm_sync_token');
-        const lastUser = localStorage.getItem('last_fcm_sync_user');
+        const lastToken = localStorage.getItem('customer_last_fcm_sync_token_v2');
+        const lastUser = localStorage.getItem('customer_last_fcm_sync_user_v2');
         if (lastToken === token && lastUser === userId) {
             console.log('📡 FCM: Token already synced, skipping.');
             return;
@@ -195,15 +195,15 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
 
         const { error } = await supabase
             .from('profiles')
-            .update({ fcm_token: token, updated_at: new Date().toISOString() })
+            .update({ fcm_token_customer: token, updated_at: new Date().toISOString() })
             .eq('id', userId);
 
         if (error) {
             console.error('❌ FCM: Sync failed:', error);
         } else {
             console.log('✅ FCM: Token synced to Supabase');
-            localStorage.setItem('last_fcm_sync_token', token);
-            localStorage.setItem('last_fcm_sync_user', userId);
+            localStorage.setItem('customer_last_fcm_sync_token_v2', token);
+            localStorage.setItem('customer_last_fcm_sync_user_v2', userId);
         }
     } catch (err) {
         console.error('❌ FCM: Sync exception:', err);
