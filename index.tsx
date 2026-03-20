@@ -29,7 +29,9 @@ import { triggerHaptic, sendPushNotification } from './utils/helpers';
 
 // --- API INITIALIZATION ---
 import { initFCM } from './utils/fcm';
+import { UpdatePopup } from './components/UpdatePopup';
 import { App as CapacitorApp } from '@capacitor/app';
+
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { Loader2, WifiOff, RefreshCcw, AlertTriangle } from 'lucide-react';
@@ -134,6 +136,14 @@ const App = () => {
   const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const [locationPromptDone, setLocationPromptDone] = useState(false);
+
+  const [updateConfig, setUpdateConfig] = useState<{
+    show: boolean,
+    type: 'force' | 'optional',
+    latestVersion: string,
+    updateUrl: string
+  } | null>(null);
+
 
   // Define showAlert early so effects can use it safely
   const showAlert = (
@@ -440,9 +450,55 @@ const App = () => {
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase.from('app_settings').select('*').limit(1).maybeSingle();
-      if (data && !error) setSettings(data);
+      if (data && !error) {
+        setSettings(data);
+        
+        // --- Version Check Logic ---
+        if (Capacitor.isNativePlatform()) {
+          (async () => {
+            try {
+              const info = await CapacitorApp.getInfo();
+              const currentVersion = info.version; // e.g., "1.7.5"
+              
+              const minVersion = data.min_app_version || '1.0.0';
+              const latestVersion = data.latest_app_version || '1.7.5';
+              
+              const isLower = (v1: string, v2: string) => {
+                const parts1 = v1.split('.').map(Number);
+                const parts2 = v2.split('.').map(Number);
+                for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+                  const p1 = parts1[i] || 0;
+                  const p2 = parts2[i] || 0;
+                  if (p1 < p2) return true;
+                  if (p1 > p2) return false;
+                }
+                return false;
+              };
+
+              if (isLower(currentVersion, minVersion)) {
+                setUpdateConfig({
+                  show: true,
+                  type: 'force',
+                  latestVersion: latestVersion,
+                  updateUrl: Capacitor.getPlatform() === 'android' ? (data.update_url_android || '') : (data.update_url_ios || '')
+                });
+              } else if (isLower(currentVersion, latestVersion)) {
+                if (!sessionStorage.getItem('update_dismissed')) {
+                  setUpdateConfig({
+                    show: true,
+                    type: 'optional',
+                    latestVersion: latestVersion,
+                    updateUrl: Capacitor.getPlatform() === 'android' ? (data.update_url_android || '') : (data.update_url_ios || '')
+                  });
+                }
+              }
+            } catch (e) { console.error("Update check error:", e); }
+          })();
+        }
+      }
     } catch (err) { console.error("Settings Fetch Error:", err); }
   };
+
 
   // Precise Business Hours Check
   const isBusinessOpen = (workingHours: { start: string, end: string } | null, dbIsOpen: boolean) => {
@@ -1065,6 +1121,19 @@ const App = () => {
         confirmText={modalConfig.confirmText}
         cancelText={modalConfig.cancelText}
       />
+
+      {/* 🚀 Update Popup Overlay */}
+      {updateConfig?.show && (
+        <UpdatePopup 
+          type={updateConfig.type}
+          latestVersion={updateConfig.latestVersion}
+          updateUrl={updateConfig.updateUrl}
+          onDismiss={() => {
+            setUpdateConfig(null);
+            sessionStorage.setItem('update_dismissed', 'true');
+          }}
+        />
+      )}
     </div>
   );
 };

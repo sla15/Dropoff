@@ -14,9 +14,9 @@ export const SplashScreen = ({ theme }: { theme: Theme }) => {
           {/* Logo: Slide from above */}
           <div className="relative z-10 animate-logo-drop will-change-transform">
             <img
-              src="/assets/logo.png"
+              src="/assets/splash-dark.png"
               alt="Logo"
-              className="w-[50vw] h-[50vw] max-w-[320px] max-h-[320px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)] rounded-[20%]"
+              className="w-[50vw] h-[50vw] max-w-[320px] max-h-[320px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)]"
             />
           </div>
 
