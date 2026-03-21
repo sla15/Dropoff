@@ -300,7 +300,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     disableDefaultUI: true,
                     clickableIcons: false,
                     gestureHandling: 'greedy',
-                    styles: theme === 'dark' ? darkMapStyle : []
+                    styles: [] // Standard Light Theme
                 });
 
                 newMap.addListener('dragstart', () => {

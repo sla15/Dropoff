@@ -68,7 +68,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
             center,
             zoom: 15,
             disableDefaultUI: true,
-            styles: theme === 'dark' ? darkMapStyle : []
+            styles: [] // Standard Light Theme
         });
 
         const getMarkerIcon = () => {

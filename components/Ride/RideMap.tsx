@@ -24,7 +24,7 @@ export const RideMap: React.FC<RideMapProps> = ({
         if (map) {
             console.log("RideMap: Map instance received and active");
             map.setOptions({
-                styles: theme === 'dark' ? darkMapStyle : []
+                styles: [] // Standard Light Theme
             });
         } else {
             console.log("RideMap: Map instance is currently null");

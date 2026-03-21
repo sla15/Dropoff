@@ -6,6 +6,8 @@ import { triggerHaptic } from '../utils/helpers';
 
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
+import { IntroductionWalkthrough } from '../components/IntroductionWalkthrough';
+import { Preferences } from '@capacitor/preferences';
 import { initFCM } from '../utils/fcm';
 
 interface Props {
@@ -72,11 +74,33 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'market' | 'maps'>('market');
   const [predictions, setPredictions] = useState<any[]>([]);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
   const searchTimeout = useRef<any>(null);
   const sessionToken = useRef<any>(null);
 
   const EMOJIS = ['🏠', '💼', '🏋️', '🏫', '🌳', '🛍️', '🍽️', '🎾'];
   const LABELS = ['Home', 'Work', 'Gym', 'School', 'Park', 'Mall', 'Restaurant', 'Club'];
+
+  const completeWalkthrough = async () => {
+    await Preferences.set({ key: 'has_seen_walkthrough_v1', value: 'true' });
+    setShowWalkthrough(false);
+  };
+
+  useEffect(() => {
+    const checkWalkthrough = async () => {
+      const { value } = await Preferences.get({ key: 'has_seen_walkthrough_v1' });
+      if (!value) {
+        setShowWalkthrough(true);
+      }
+    };
+    checkWalkthrough();
+
+    return () => {
+      // Auto-skip (mark as seen) if user navigates away mid-tour
+      // Note: This is an unmount cleanup, we fire and forget the preference set
+      Preferences.set({ key: 'has_seen_walkthrough_v1', value: 'true' });
+    };
+  }, []);
 
   useEffect(() => {
     fetchLocations();
@@ -107,6 +131,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       console.error("Quiet Mode Error:", err);
     }
   };
+
+
 
   const fetchLocations = async () => {
     try {
@@ -311,7 +337,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden`}>
       <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} backdrop-blur-sm transition-all`}>
         <div className="flex justify-between items-center mt-2">
-          <div className="flex items-center gap-3">
+          <div id="walkthrough-profile" className="flex items-center gap-3">
             <div className="relative">
               <div
                 className={`w-12 h-12 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/20 flex items-center justify-center'} border-2 border-white dark:border-[#1C1C1E]`}
@@ -343,7 +369,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             {theme === 'light' ? <Sun size={20} className="text-orange-500" /> : <Moon size={20} className="text-[#00D68F]" />}
           </button>
         </div>
-        <div className="flex items-center gap-3 mt-1">
+        <div id="walkthrough-search-container" className="flex items-center gap-3 mt-1">
           <div className="relative flex-1">
             <Search className={`absolute left-4 top-1/2 -translate-y-1/2 ${textSec}`} size={20} />
             <input
@@ -431,7 +457,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           {/* Wide layout (≥ 480px) */}
           <div className="hidden min-[480px]:grid grid-cols-2 gap-6">
             {/* Ride Card */}
-            <div onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <div id="walkthrough-ride-card" onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
               <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
@@ -441,7 +467,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               </div>
             </div>
             {/* Marketplace Card */}
-            <div onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <div id="walkthrough-marketplace-card" onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.2)] dark:shadow-[0_40px_60px_-25px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
               <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
@@ -508,7 +534,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         </div>
 
         {/* 1. Saved Places Section (Top) */}
-        <div className="w-full mt-4">
+        <div id="walkthrough-saved-places" className="w-full mt-4">
           <div className="flex justify-center mb-6">
             <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Saved Places</h3>
           </div>
@@ -611,7 +637,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           </div>
         )}
 
-        <div className="mb-2 w-full">
+        <div id="walkthrough-recent-activities" className="mb-2 w-full">
           <div className="flex flex-col items-center mb-5 relative px-4 text-center">
             <h3 className={`text-xl font-black ${textMain} tracking-tight`}>Recent Activities</h3>
             <button onClick={() => { setProfileDrawerToOpen('history'); navigate('profile'); }} className="mt-2 text-xs font-bold text-[#00D68F] flex items-center gap-1 bg-[#00D68F]/10 px-4 py-2 rounded-full hover:bg-[#00D68F]/20 transition-colors">
@@ -803,7 +829,17 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           </button>
         </div>
       )}
-
+      {showWalkthrough && (
+        <IntroductionWalkthrough 
+          theme={theme} 
+          onStep={(index) => {
+            if (index === 1) setSearchMode('market');
+            if (index === 2) setSearchMode('maps');
+            if (index === 3) setSearchMode('maps');
+          }}
+          onComplete={completeWalkthrough} 
+        />
+      )}
     </div>
   );
 };

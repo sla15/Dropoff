@@ -133,15 +133,15 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
 
 // Formats phone numbers by adding a space after the country code prefix.
 const safeFormatPhone = (phoneStr: string) => {
-   if (!phoneStr) return "";
-   // Typical E.164 without space -> Add space after 1-3 digit country code
-   if (phoneStr.startsWith('+')) {
-      const match = phoneStr.match(/^(\+\d{1,3})(\d+)$/);
-      if (match) return `${match[1]} ${match[2]}`;
-      return phoneStr;
-   }
-   // Fallback for extremely old accounts that only saved the local number
-   return `+220 ${phoneStr}`;
+    if (!phoneStr) return "";
+    // Typical E.164 without space -> Add space after 1-3 digit country code
+    if (phoneStr.startsWith('+')) {
+        const match = phoneStr.match(/^(\+\d{1,3})(\d+)$/);
+        if (match) return `${match[1]} ${match[2]}`;
+        return phoneStr;
+    }
+    // Fallback for extremely old accounts that only saved the local number
+    return `+220 ${phoneStr}`;
 };
 
 export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer, handleLogout }: Props) => {
@@ -702,7 +702,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                                                     .from('user_saved_locations')
                                                                     .delete()
                                                                     .eq('id', loc.id);
-                                                                
+
                                                                 if (error) throw error;
                                                                 setSavedLocations(prev => prev.filter(l => l.id !== loc.id));
                                                                 if (loc.label === 'Home') fetchHomeLocation();
@@ -726,21 +726,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         )}
 
-                        <button
-                            onClick={() => {
-                                triggerHaptic();
-                                setEditingLoc(null);
-                                setShowLocPicker(true);
-                            }}
-                            className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
-                        >
-                            <MapPin size={20} /> Add New Location
-                        </button>
+                        <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
 
                         {showLocPicker && (
                             <LocationPicker
                                 theme={theme}
-                                title={editingLoc ? `Edit ${editingLoc.label}` : "Add New Location"}
+                                title={editingLoc ? `Edit ${editingLoc.label}` : "Select Location"}
                                 user={user}
                                 initialLocation={editingLoc ? { lat: editingLoc.latitude, lng: editingLoc.longitude } : undefined}
                                 onClose={() => {
@@ -752,11 +743,9 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                         const { data: { session } } = await supabase.auth.getSession();
                                         if (!session) return;
 
-                                        let label = editingLoc ? editingLoc.label : "";
-                                        if (!label) {
-                                             label = window.prompt("Enter a label for this location (e.g. Work, Gym):", "New Location") || "Saved Location";
-                                        }
-                                        
+                                        // Since we only allow editing now, editingLoc should always be present
+                                        const label = editingLoc ? editingLoc.label : "Saved Location";
+
                                         const payload = {
                                             user_id: session.user.id,
                                             label: label,
@@ -771,11 +760,6 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                                 .from('user_saved_locations')
                                                 .update(payload)
                                                 .eq('id', editingLoc.id);
-                                            if (error) throw error;
-                                        } else {
-                                            const { error } = await supabase
-                                                .from('user_saved_locations')
-                                                .insert([payload]);
                                             if (error) throw error;
                                         }
 
@@ -852,9 +836,9 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         </a>
 
-                        <a 
-                            href="https://wa.me/2203888888?text=Hello%20Dropoff%20Support,%20I%20need%20assistance%20with..." 
-                            target="_blank" 
+                        <a
+                            href="https://wa.me/2203888888?text=Hello%20Dropoff%20Support,%20I%20need%20assistance%20with..."
+                            target="_blank"
                             rel="noopener noreferrer"
                             className={`p-5 rounded-2xl ${inputBg} flex items-center gap-4 hover:opacity-80 transition-opacity`}
                         >
@@ -882,7 +866,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.0.5 (Build 202)</p>
+                        <p>Version 1.7.7 (Build 207)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>
