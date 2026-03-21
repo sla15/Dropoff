@@ -16,7 +16,6 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'body' as any,
       style: 'dark' as any,
-      resizeOnFullScreen: true,
     },
     FirebaseMessaging: {
       presentationOptions: ["badge", "sound", "alert"],

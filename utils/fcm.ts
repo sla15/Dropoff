@@ -85,7 +85,9 @@ const initNativePush = async (userId?: string) => {
         // When user taps on a notification
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Notification tapped:', event.notification?.title);
-            // Future: navigate to relevant screen based on event.notification.data?.type
+            if (event.notification?.data) {
+                window.dispatchEvent(new CustomEvent('notification_tapped', { detail: event.notification.data }));
+            }
         });
 
         // 4. Get and sync the FCM token

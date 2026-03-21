@@ -247,6 +247,22 @@ const App = () => {
     return () => window.removeEventListener('foreground_notification', handleForegroundPush);
   }, []);
 
+  // Background/Tap Notification Listener
+  useEffect(() => {
+    const handleNotificationTap = (e: any) => {
+      const data = e.detail;
+      console.log("👆 Notification tapped, routing to:", data);
+      if (data?.type === 'order_update' && data.order_id) {
+        setActiveOrderId(data.order_id);
+        navigate('order-tracking');
+      } else if (data?.type === 'ride_update' || data?.type === 'ride_request' || data?.ride_id) {
+        navigate('ride');
+      }
+    };
+
+    window.addEventListener('notification_tapped', handleNotificationTap);
+    return () => window.removeEventListener('notification_tapped', handleNotificationTap);
+  }, []);
 
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
     return localStorage.getItem('active_order_id');
@@ -765,8 +781,7 @@ const App = () => {
                  } else {
                     setScreen('onboarding');
                  }
-               })
-               .catch(err => {
+               }, (err: any) => {
                  console.error("Exception fetching profile during auth change:", err);
                  setScreen('onboarding');
                });
