@@ -131,6 +131,19 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
     );
 };
 
+// Formats phone numbers by adding a space after the country code prefix.
+const safeFormatPhone = (phoneStr: string) => {
+   if (!phoneStr) return "";
+   // Typical E.164 without space -> Add space after 1-3 digit country code
+   if (phoneStr.startsWith('+')) {
+      const match = phoneStr.match(/^(\+\d{1,3})(\d+)$/);
+      if (match) return `${match[1]} ${match[2]}`;
+      return phoneStr;
+   }
+   // Fallback for extremely old accounts that only saved the local number
+   return `+220 ${phoneStr}`;
+};
+
 export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer, handleLogout }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
@@ -401,7 +414,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                     </div>
 
                     <h2 className="text-3xl font-black tracking-tight text-center">{user.name || 'User'}</h2>
-                    <p className={`${textSec} font-medium text-center mt-1`}>{user.phone}</p>
+                    <p className={`${textSec} font-medium text-center mt-1`}>{safeFormatPhone(user.phone)}</p>
                 </div>
 
                 <div className={`${bgCard} rounded-[32px] overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)] dark:shadow-none dark:bg-white/[0.02] border border-gray-100/50 dark:border-white/5`}>
@@ -509,7 +522,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                             <div>
                                 <label className={`text-xs font-bold ${textSec} mb-1 block`}>Phone Number</label>
-                                <input value={editPhone} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
+                                <input value={safeFormatPhone(editPhone)} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
                             </div>
                             <div>
                                 <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
-import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
 import { triggerHaptic, sendPushNotification } from '../utils/helpers';
 import { CONFIG } from '../config';
@@ -26,14 +26,56 @@ interface Props {
    ) => void;
 }
 
+const COUNTRIES = [
+   { code: '+220', flag: '🇬🇲', name: 'Gambia', maxLen: 7 },
+   { code: '+221', flag: '🇸🇳', name: 'Senegal', maxLen: 9 },
+   { code: '+234', flag: '🇳🇬', name: 'Nigeria', maxLen: 10 },
+   { code: '+233', flag: '🇬🇭', name: 'Ghana', maxLen: 9 },
+   { code: '+44', flag: '🇬🇧', name: 'UK', maxLen: 10 },
+   { code: '+1', flag: '🇺🇸', name: 'USA', maxLen: 10 },
+   { code: '+254', flag: '🇰🇪', name: 'Kenya', maxLen: 9 },
+   { code: '+27', flag: '🇿🇦', name: 'South Africa', maxLen: 9 },
+];
+
 export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props) => {
    const [step, setStep] = useState(1);
+   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+   const [showCountryPicker, setShowCountryPicker] = useState(false);
    const [phone, setPhone] = useState('');
    const [otp, setOtp] = useState('');
    const [name, setName] = useState('');
    const [email, setEmail] = useState('');
    const [referralInput, setReferralInput] = useState('');
    const [loading, setLoading] = useState(false);
+
+   // Resume Onboarding if user is already logged in but profile is incomplete
+   useEffect(() => {
+      const checkResumeOnboarding = async () => {
+         const { data: { session } } = await supabase.auth.getSession();
+         if (session) {
+            console.log("Onboarding: User found, checking profile completeness...");
+            const { data: profile } = await supabase
+               .from('profiles')
+               .select('full_name, phone')
+               .eq('id', session.user.id)
+               .single();
+
+            if (profile) {
+               if (!profile.full_name || !profile.phone) {
+                  console.log("Onboarding: Incomplete profile, jumping to Step 4");
+                  setStep(4);
+                  setName(profile.full_name || '');
+                  setPhone(profile.phone || '');
+               }
+            } else {
+               // No profile yet, likely just signed up
+               console.log("Onboarding: No profile found, starting from Step 4");
+               setStep(4);
+            }
+         }
+      };
+      checkResumeOnboarding();
+   }, []);
    const [photo, setPhoto] = useState<string | null>(null);
    const [photoFile, setPhotoFile] = useState<File | null>(null);
    const [homeLocation, setHomeLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
@@ -80,6 +122,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
    const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
    const inputBg = theme === 'light' ? 'bg-[#E5E5EA]' : 'bg-[#2C2C2E]';
+   const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
 
    const ProgressBar = ({ currentStep }: { currentStep: number }) => {
       const activeIndex = currentStep - 2;
@@ -111,7 +154,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       triggerHaptic();
       setLoading(true);
 
-      const fullPhone = `+220${phone}`;
+      const fullPhone = `${selectedCountry.code}${phone}`;
       console.log("Sending OTP to:", fullPhone);
 
       const { error } = await supabase.auth.signInWithOtp({
@@ -134,7 +177,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       triggerHaptic();
 
       try {
-         const fullPhone = `+220${phone}`;
+         const fullPhone = `${selectedCountry.code}${phone}`;
          const tokenToVerify = tokenOverride || otp;
 
          console.log("📡 OTP: Verifying for", fullPhone);
@@ -161,13 +204,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          }
 
          if (data.session) {
-            console.log("✅ OTP: Verified session created. Navigating immediately.");
+            console.log("✅ OTP: Verified session created. Syncing profile before navigation.");
 
-            // 1. Immediate Navigation for better UX
-            navigate('dashboard');
             localStorage.removeItem('fcm_prompted');
 
-            // 2. Background Profile Sync
             const syncProfile = async () => {
                try {
                   const { data: profile, error: profileError } = await supabase
@@ -196,9 +236,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         referralBalance: profile.referral_balance || 0
                      });
 
-                     if (!profile.full_name) {
+                     if (!profile.full_name || !profile.phone) {
                         console.log("👤 Profile: Incomplete, sending back to setup");
-                        setStep(4); // Drop back if really needed
+                        setStep(4);
+                     } else {
+                        navigate('dashboard');
                      }
                   } else {
                      console.log("👤 Profile: No profile found, sending to setup");
@@ -206,6 +248,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                   }
                } catch (e) {
                   console.error("Background Sync Error:", e);
+                  setStep(4); // Fallback to setup if sync fails
+               } finally {
+                  setLoading(false);
                }
             };
 
@@ -272,7 +317,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             const { error } = await supabase.from('profiles').upsert({
                id: userId,
                full_name: name,
-               phone: `+220${phone}`,
+               phone: `${selectedCountry.code}${phone}`,
                email: email,
                avatar_url: finalAvatarUrl,
                role: 'customer',
@@ -534,20 +579,25 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                   
                   <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
                   
-                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[280px] mx-auto transition-colors`}>
-                     <div className="font-bold text-2xl flex items-center gap-2 shrink-0">
-                        <span>🇬🇲</span> +220
+                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors`}>
+                     <div 
+                        className="font-bold text-2xl flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
+                        onClick={() => { triggerHaptic(); setShowCountryPicker(true); }}
+                     >
+                        <span>{selectedCountry.flag}</span> {selectedCountry.code}
+                        <ChevronDown size={20} className={`${textSec} opacity-70`} />
                      </div>
                      <input
+                        id="phone-input"
                         type="tel"
                         autoFocus
                         placeholder="### ####"
                         value={phone}
                         onChange={(e) => {
                            const val = e.target.value.replace(/\D/g, '');
-                           if (val.length <= 7) setPhone(val);
+                           if (val.length <= selectedCountry.maxLen) setPhone(val);
                         }}
-                        className={`w-36 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                        className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
                      />
                   </div>
                   <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
@@ -557,12 +607,54 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             <div className="mt-auto px-2 pb-safe">
                <button
                   onClick={sendOTP}
-                  disabled={phone.length < 3 || loading}
-                  className={`w-full ${phone.length >= 7 ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
+                  disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
+                  className={`w-full ${phone.length >= (selectedCountry.maxLen - 2) ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
                >
                   {loading ? <Loader2 className="animate-spin" /> : 'Continue'}
                </button>
             </div>
+            
+            {showCountryPicker && (
+               <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
+                  <div className="absolute inset-0" onClick={() => setShowCountryPicker(false)}></div>
+                  <div className={`w-full ${bgCard} rounded-t-[32px] pt-6 pb-safe relative z-10 max-h-[85vh] flex flex-col shadow-2xl`}>
+                     <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-6 opacity-50"></div>
+                     <div className="px-6 pb-4 flex justify-between items-center border-b border-gray-100/50 dark:border-gray-800/50">
+                        <h3 className="text-2xl font-black tracking-tight">Select Country</h3>
+                        <button onClick={() => setShowCountryPicker(false)} className={`p-2.5 rounded-full ${theme === 'light' ? 'bg-gray-100 active:bg-gray-200' : 'bg-white/10 active:bg-white/20'} transition-colors`}>
+                           <X size={20} />
+                        </button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar">
+                        {COUNTRIES.map(c => (
+                           <div 
+                              key={c.code} 
+                              onClick={() => {
+                                 triggerHaptic();
+                                 setSelectedCountry(c);
+                                 setShowCountryPicker(false);
+                                 setPhone('');
+                                 setTimeout(() => document.getElementById('phone-input')?.focus(), 300);
+                              }}
+                              className={`flex items-center gap-4 py-4 border-b ${theme === 'light' ? 'border-gray-100' : 'border-gray-800/50'} cursor-pointer active:bg-gray-100 dark:active:bg-white/5 transition-colors`}
+                           >
+                              <span className="text-3xl">{c.flag}</span>
+                              <span className="font-bold text-lg flex-1">{c.name}</span>
+                              <span className={`${textSec} font-bold`}>{c.code}</span>
+                              {selectedCountry.code === c.code && (
+                                 <div className="w-6 h-6 rounded-full bg-[#00D68F] flex items-center justify-center text-black">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-black"></div>
+                                 </div>
+                              )}
+                           </div>
+                        ))}
+                        <div className="pt-6 pb-4 text-center">
+                           <p className={`text-xs font-semibold ${textSec} opacity-60`}>Dropoff currently operates exclusively in the listed countries.</p>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            )}
          </div>
       );
    }
@@ -577,7 +669,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                   </div>
 
                   <h2 className="text-3xl font-bold tracking-tight mb-3">Enter code</h2>
-                  <p className={`${textSec} mb-12`}>Sent to +220 {phone}</p>
+                  <p className={`${textSec} mb-12`}>Sent to {selectedCountry.code} {phone}</p>
                   
                   <div className="flex items-center justify-center gap-3 mb-10 relative">
                      <div className="flex gap-2">
@@ -670,7 +762,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
                            <Briefcase size={18} className={textSec} />
                            <input
-                              placeholder="e.g. Buba Camara"
+                              placeholder="e.g. Lamin Faye"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
                               className="flex-1 bg-transparent outline-none font-medium text-sm"
@@ -702,7 +794,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
                            <Gift size={18} className={textSec} />
                            <input
-                              placeholder="e.g. ALEX2025"
+                              placeholder="e.g. DROP2025"
                               value={referralInput}
                               onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
                               maxLength={10}

@@ -740,17 +740,37 @@ const App = () => {
       const hasDeterminedDestRef = { current: false }; // Use local ref-like object for boot closure
       const markDestDetermined = () => { hasDeterminedDestRef.current = true; };
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         console.log("🔐 Auth Change Event:", event, session ? "Session active" : "No session");
         
         if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
           Preferences.set({ key: 'has_ever_logged_in', value: 'true' });
           console.log(`🔐 Auth Change Event: ${event} - marking destination immediately`);
           
-          if (screenRef.current === 'splash' || screenRef.current === 'onboarding') {
-            setScreen('dashboard'); // Let user in NOW
-          }
           markDestDetermined();   // Kill the fallback timer NOW
+          
+          if (screenRef.current === 'splash') {
+            // Check profile before deciding where to go - refined check without blocking
+            supabase
+               .from('profiles')
+               .select('full_name, phone')
+               .eq('id', session.user.id)
+               .maybeSingle()
+               .then(({ data: profile, error }) => {
+                 if (error) {
+                    console.error("Error fetching profile during auth change:", error);
+                    setScreen('onboarding');
+                 } else if (profile && profile.full_name && profile.phone) {
+                    setScreen('dashboard');
+                 } else {
+                    setScreen('onboarding');
+                 }
+               })
+               .catch(err => {
+                 console.error("Exception fetching profile during auth change:", err);
+                 setScreen('onboarding');
+               });
+          }
           handleUserAuthenticated(session).catch(err => console.error("Background sync error:", err)); // Sync in background
         } else if (event === 'SIGNED_OUT') {
           Preferences.remove({ key: 'has_ever_logged_in' });
@@ -793,11 +813,11 @@ const App = () => {
 
           // 2. Determine Destination based on Session
           if (currentSession) {
-            console.log("🚀 Init: Session exists, letting user in immediately");
-            setScreen('dashboard'); // Instant Navigation
-            markDestDetermined();
+            console.log("🚀 Init: Session exists, letting user in via Auth Listener profile check");
+            // The Auth Change listener handles routing from 'splash' depending on profile completeness.
+            markDestDetermined(); // Ensure fallback doesn't trigger
             
-            // Sync profile and data in background without awaiting
+            // Sync profile and data in background without await
             handleUserAuthenticated(currentSession).catch(err => {
                console.error("🚀 Init: Background sync failed:", err);
             });

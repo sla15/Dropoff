@@ -344,7 +344,11 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                         </div>
                         <h2 className="text-2xl font-black text-center mb-2">{Config.label}</h2>
                         <p className={`text-center ${textSec} font-medium`}>
-                            {status === 'delivered' ? 'Completed' : 'Estimated arrival: 25 min'}
+                            {status === 'delivered' ? 'Completed' : 
+                             status === 'picked-up' ? 'Estimated arrival: 12 min' :
+                             status === 'preparing' ? 'Estimated arrival: 25 min' :
+                             status === 'pending' ? 'Estimated arrival: 40 min' :
+                             'Arriving now'}
                         </p>
                     </div>
 

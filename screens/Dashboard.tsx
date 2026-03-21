@@ -319,7 +319,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               >
                 {!user.photo && (
                   <span className="text-[#00D68F] font-bold text-lg">
-                    {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                    {user.name ? user.name.charAt(0).toUpperCase() : '?'}
                   </span>
                 )}
               </div>
@@ -327,7 +327,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             <div className="flex flex-col">
               <span className={`text-[11px] ${textSec} font-bold uppercase tracking-wider mb-0.5`}>{getGreeting()}</span>
               <div className="flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tight">{user.name || 'Alex'}</span>
+                <span className="text-2xl font-black tracking-tight">{user.name || 'User'}</span>
                 {settings.is_rating_enabled && (
                   <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
                     user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
