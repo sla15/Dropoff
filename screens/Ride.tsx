@@ -1010,6 +1010,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 markersRef.current.forEach(m => m?.setMap(null));
                 markersRef.current = [];
                 setDestinations(['']);
+                setDestinationCoords([null]);
+                setRealDistanceKm(0);
+                setEtaSeconds(300);
+                notifiedDriversRef.current.clear();
                 setBookingStep('planning');
                 setAssignedDriverId(null);
                 setAssignedDriver(null);
@@ -1436,6 +1440,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
         markersRef.current.forEach(m => m?.setMap(null));
         markersRef.current = [];
+        notifiedDriversRef.current.clear();
         setDestinations(['']);
         setDestinationCoords([null]);
         setBookingStep('planning');
@@ -1541,6 +1546,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
         markersRef.current.forEach(m => m?.setMap(null));
         markersRef.current = [];
+        notifiedDriversRef.current.clear();
         setDestinations(['']);
         setDestinationCoords([null]);
         setBookingStep('planning');
@@ -1738,7 +1744,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {showCancellationSummary && (
                 <RideCancellationSummary
-                    onClose={() => { setShowCancellationSummary(false); setStatus('idle'); navigate('dashboard'); }}
+                    onClose={() => { 
+                        setShowCancellationSummary(false); 
+                        setStatus('idle'); 
+                        navigate('dashboard'); 
+                        notifiedDriversRef.current.clear(); // Ensure fresh start for next ride attempt
+                    }}
                     bgCard={bgCard}
                     textSec={textSec}
                     inputBg={inputBg}
