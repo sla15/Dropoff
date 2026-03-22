@@ -420,8 +420,28 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 console.log("Found active ride, restoring state:", activeRide);
 
                 // Restore destinations for UI
-                setDestinations([activeRide.dropoff_address]);
+                const recoveredDestinations: string[] = [];
+                const recoveredCoords: ({ lat: number, lng: number } | null)[] = [];
+
+                if (activeRide.stops && Array.isArray(activeRide.stops)) {
+                    activeRide.stops.forEach((stop: any) => {
+                        recoveredDestinations.push(stop.address);
+                        recoveredCoords.push(stop.lat && stop.lng ? { lat: stop.lat, lng: stop.lng } : null);
+                    });
+                }
+
+                // Final destination
+                recoveredDestinations.push(activeRide.dropoff_address);
+                recoveredCoords.push(activeRide.dropoff_lat && activeRide.dropoff_lng ? { lat: activeRide.dropoff_lat, lng: activeRide.dropoff_lng } : null);
+
+                setDestinations(recoveredDestinations);
+                setDestinationCoords(recoveredCoords);
                 setRealDistanceKm(activeRide.distance_km || 0);
+
+                // Auto-pan to the destination or your location
+                if (map && recoveredCoords[recoveredCoords.length - 1]) {
+                    map.panTo(recoveredCoords[recoveredCoords.length - 1]);
+                }
 
                 // Resume tracking
                 handleBookRide(activeRide.id);
@@ -589,8 +609,17 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         };
 
         const fetchDrivers = async () => {
-            const { data } = await supabase.from('drivers').select('*').eq('is_online', true);
-            if (data) refreshMarkers(data);
+            const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
+            
+            if (isRequestActive && assignedDriverId) {
+                // If a driver is assigned, discard all other drivers and ONLY fetch the assigned one
+                const { data } = await supabase.from('drivers').select('*').eq('id', assignedDriverId);
+                if (data) refreshMarkers(data);
+            } else {
+                // Regular free-roam viewing
+                const { data } = await supabase.from('drivers').select('*').eq('is_online', true);
+                if (data) refreshMarkers(data);
+            }
         };
 
         // Initial fetch
@@ -745,7 +774,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     let totalSeconds = 0;
                     const route = result.routes[0];
                     if (route && route.legs) {
-                        const newCoords = [...destinationCoords];
+                        const newCoords = destinationCoords.length > 0 ? [...destinationCoords] : new Array(route.legs.length).fill(null);
                         route.legs.forEach((leg: any, i: number) => {
                             totalMeters += leg.distance.value;
                             totalSeconds += leg.duration.value;
@@ -984,8 +1013,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 setBookingStep('planning');
                 setAssignedDriverId(null);
                 setAssignedDriver(null);
-                setStatus('cancelled');
-                setShowCancellationSummary(true);
+                if (updatedRide.driver_id) {
+                    setStatus('cancelled');
+                    setShowCancellationSummary(true);
+                } else {
+                    setStatus('idle');
+                    navigate('dashboard');
+                }
             }
         };
 
@@ -1168,6 +1202,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 dropoff_address: destinations[destinations.length - 1],
                 dropoff_lat: destinationCoords[destinationCoords.length - 1]?.lat,
                 dropoff_lng: destinationCoords[destinationCoords.length - 1]?.lng,
+                stops: destinations.length > 1 ? destinations.slice(0, -1).map((d, i) => ({
+                    address: d,
+                    lat: destinationCoords[i]?.lat,
+                    lng: destinationCoords[i]?.lng
+                })) : [],
                 price: calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice,
                 status: 'searching',
                 ride_type: rideType,
@@ -1232,10 +1271,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         await supabase.functions.invoke('send-fcm-notification', {
                             body: {
                                 userIds: driversToNotify,
-                                title: 'New Ride Request! 🚗',
+                                title: `New Ride Request! 🚗 #${ride.id.slice(0, 4)}`,
                                 message: 'A new request is waiting near you.',
                                 target: 'driver',
-                                data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
+                                tag: ride.id, // Explicit tag for grouping/stacking
+                                id: ride.id,
+                                data: { ride_id: ride.id, type: 'RIDE_REQUEST', tag: ride.id }
                             }
                         });
                         console.log(`✅ Requested notifications for ${driversToNotify.length} drivers`);
@@ -1439,7 +1480,6 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     reviewer_id: session.user.id,
                     target_id: assignedDriverId,
                     rating: rating,
-                    comment: "Rated via app",
                     role_target: 'driver'
                 });
 
@@ -1454,30 +1494,58 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             }
 
             // 4. Success - Reset and exit
-            setRating(5);
-            setReviewComment('');
-            setStatus('idle');
-            setAssignedDriverId(null);
-            setAssignedDriver(null);
-            setShowPaymentSummary(false);
-            setShowCancellationSummary(false);
-            setIsMinimalRating(false);
-
-            // Full Cleanup
-            if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-            markersRef.current.forEach(m => m?.setMap(null));
-            markersRef.current = [];
-            setDestinations(['']);
-            setDestinationCoords([null]);
-            setBookingStep('planning');
-
-            navigate('dashboard');
+            finalizeTripCleanup();
         } catch (err: any) {
             console.error("Submit Review Error:", err);
             showAlert("Error", `Feedback failed: ${err.message}`, "error");
         } finally {
             setLoading(false);
         }
+    };
+
+    const skipReview = async () => {
+        setLoading(true);
+        triggerHaptic();
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                // Deduct Referral Balance if used (even if review skipped)
+                const { originalPrice, amountUsed } = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
+                if (amountUsed > 0) {
+                    await supabase.rpc('deduct_referral_balance', {
+                        user_id: session.user.id,
+                        amount: amountUsed
+                    });
+                }
+            }
+            finalizeTripCleanup();
+        } catch (err: any) {
+            console.error("Skip Review error:", err);
+            finalizeTripCleanup(); // Still cleanup even on error
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const finalizeTripCleanup = () => {
+        setRating(5);
+        setStatus('idle');
+        setAssignedDriverId(null);
+        setAssignedDriver(null);
+        setShowPaymentSummary(false);
+        setShowCancellationSummary(false);
+        setIsMinimalRating(false);
+
+        // Full Cleanup
+        if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
+        markersRef.current.forEach(m => m?.setMap(null));
+        markersRef.current = [];
+        setDestinations(['']);
+        setDestinationCoords([null]);
+        setBookingStep('planning');
+
+        navigate('dashboard');
     };
 
     // --- SHEET DRAG HANDLERS ---
