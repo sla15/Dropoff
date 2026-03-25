@@ -116,6 +116,7 @@ const App = () => {
   const [prefilledTier, setPrefilledTier] = useState<string | null>(null);
   const [prefilledDistance, setPrefilledDistance] = useState<number | null>(null);
   const [marketSearchQuery, setMarketSearchQuery] = useState('');
+
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean,
     title: string,
@@ -287,7 +288,7 @@ const App = () => {
     min_ride_price: 150,
     min_delivery_fee: 50,
     driver_search_radius_km: 10,
-    referral_reward_amount: 50,
+    referral_reward_amount: 0,
     currency_symbol: 'D',
     commission_percentage: 15,
     rating_window_limit: 100,
@@ -543,7 +544,7 @@ const App = () => {
 
   const fetchBusinesses = async () => {
     try {
-      const { data, error } = await supabase.from('businesses').select(`*`);
+      const { data, error } = await supabase.from('businesses').select(`*, products(*)`);
       if (data && !error) {
         setBusinesses(data.map((b: any) => ({
           id: b.id,
@@ -560,7 +561,16 @@ const App = () => {
           isOpen: isBusinessOpen(b.working_hours, b.is_open),
           working_hours: b.working_hours,
           distance: '2.5 km',
-          products: []
+          products: (b.products || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.image_url || '',
+            description: p.description || '',
+            stock: p.stock || 0,
+            mainCategory: p.category || '',
+            categories: []
+          }))
         })));
       }
     } catch (err) { console.error(err); }
@@ -1055,6 +1065,7 @@ const App = () => {
         setPrefilledTier={setPrefilledTier}
         setPrefilledDistance={setPrefilledDistance}
         setMarketSearchQuery={setMarketSearchQuery}
+
         settings={settings}
         showAlert={showAlert}
         activeOrderId={activeOrderId}

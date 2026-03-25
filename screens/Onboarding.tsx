@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
-import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X, Search } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
-import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -127,11 +127,104 @@ const COUNTRIES = [
    { code: '+27', flag: '🇿🇦', name: 'South Africa', maxLen: 9 },
 ];
 
+
+// Draggable Bottom Sheet for Country Code Picker
+const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, forceExpand?: boolean }) => {
+   const [dragY, setDragY] = useState(0);
+   const [isDragging, setIsDragging] = useState(false);
+   const [isPeeked, setIsPeeked] = useState(false);
+   const startY = useRef(0);
+   const drawerRef = useRef<HTMLDivElement>(null);
+   const PEEK_Y = 480;
+   useEffect(() => {
+      if (forceExpand) {
+         setDragY(0);
+         setIsPeeked(false);
+      }
+   }, [forceExpand]);
+
+   const handleTouchStart = (e: React.TouchEvent) => {
+      const scrollContainer = drawerRef.current?.querySelector('.overflow-y-auto');
+      if (scrollContainer && scrollContainer.scrollTop > 0) return;
+      startY.current = e.touches[0].clientY;
+      setIsDragging(true);
+   };
+
+   const handleTouchMove = (e: React.TouchEvent) => {
+      if (!isDragging) return;
+      const currentY = e.touches[0].clientY;
+      const delta = currentY - startY.current;
+
+      if (isPeeked) {
+         if (delta < 0) {
+            setDragY(Math.max(0, PEEK_Y + delta));
+         }
+      } else {
+         if (delta > 0) {
+            setDragY(delta);
+         }
+      }
+   };
+
+   const handleTouchEnd = () => {
+      setIsDragging(false);
+      if (isPeeked) {
+         if (dragY < PEEK_Y - 100) {
+            setDragY(0);
+            setIsPeeked(false);
+         } else {
+            setDragY(PEEK_Y);
+         }
+      } else {
+         if (dragY > 150) {
+            setDragY(PEEK_Y);
+            setIsPeeked(true);
+         } else {
+            setDragY(0);
+         }
+      }
+   };
+
+   return (
+      <div className={`fixed inset-0 z-[101] flex flex-col justify-end transition-opacity duration-500 ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
+         <div
+            ref={drawerRef}
+            className={`w-full ${theme === 'light' ? 'bg-white/85' : 'bg-[#1C1C1E]/85'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+            style={{
+               transform: `translateY(${dragY}px)`,
+               transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'
+            }}
+         >
+            {/* Drag Handle Area */}
+            <div
+               className="w-full pt-5 pb-2 flex justify-center cursor-grab active:cursor-grabbing touch-none"
+               onTouchStart={handleTouchStart}
+               onTouchMove={handleTouchMove}
+               onTouchEnd={handleTouchEnd}
+            >
+               <div className="w-16 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full flex-shrink-0 opacity-40"></div>
+            </div>
+
+            <div className="px-8 pb-4 flex justify-between items-center border-b border-gray-100/50 dark:border-gray-800/50">
+               <h2 className="text-2xl font-black tracking-tight">{title}</h2>
+               <button onClick={onClose} className={`p-2.5 rounded-full ${theme === 'light' ? 'bg-gray-100 active:bg-gray-200' : 'bg-white/10 active:bg-white/20'} transition-colors`}>
+                  <X size={20} />
+               </button>
+            </div>
+            {children}
+         </div>
+      </div>
+   );
+};
+
 export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props) => {
    const [step, setStep] = useState(1);
    const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
    const [showCountryPicker, setShowCountryPicker] = useState(false);
+   const [isClosing, setIsClosing] = useState(false);
    const [countrySearch, setCountrySearch] = useState('');
+   const [isDrawerExpanded, setIsDrawerExpanded] = useState(false);
    const [phone, setPhone] = useState('');
    const [otp, setOtp] = useState('');
    const [name, setName] = useState('');
@@ -362,7 +455,14 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    const handleCompleteProfile = async () => {
       triggerHaptic();
-      if (!name) { showAlert("Required", "Please enter your name", "info"); return; }
+      if (!name.trim() || /<[^>]*>/.test(name)) { 
+         showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed).", "info"); 
+         return; 
+      }
+      if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || /<[^>]*>/.test(email))) {
+         showAlert("Invalid Email", "Please enter a valid email address.", "info");
+         return;
+      }
       setLoading(true);
 
       // 1. Update Local State (Immediate UI feedback)
@@ -381,14 +481,16 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             // 3. Upload Photo to Supabase Storage (if exists)
             if (photoFile) {
                try {
-                  console.log("Uploading photo to Storage...");
-                  const fileExt = photoFile.name.split('.').pop();
-                  const fileName = `${userId}-${Math.random()}.${fileExt}`;
+                  console.log("Compressing & Uploading photo to Storage...");
+                  const compressedBlob = await compressImage(photoFile, 800, 0.7);
+                  const fileName = `${userId}-${Date.now()}.jpg`;
                   const filePath = `user-avatars/${fileName}`;
 
                   const { error: uploadError } = await supabase.storage
                      .from('avatars')
-                     .upload(filePath, photoFile);
+                     .upload(filePath, compressedBlob, {
+                        contentType: 'image/jpeg'
+                     });
 
                   if (uploadError) throw uploadError;
 
@@ -706,34 +808,45 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             </div>
             
             {showCountryPicker && (
-               <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
-                  <div className="absolute inset-0" onClick={() => setShowCountryPicker(false)}></div>
-                  <div className={`w-full ${bgCard} rounded-t-[32px] pt-6 pb-safe relative z-10 max-h-[85vh] flex flex-col shadow-2xl`}>
-                     <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-6 opacity-50"></div>
-                     <div className="px-6 pb-4 flex justify-between items-center border-b border-gray-100/50 dark:border-gray-800/50">
-                        <h3 className="text-2xl font-black tracking-tight">Select Country</h3>
-                        <button onClick={() => setShowCountryPicker(false)} className={`p-2.5 rounded-full ${theme === 'light' ? 'bg-gray-100 active:bg-gray-200' : 'bg-white/10 active:bg-white/20'} transition-colors`}>
-                           <X size={20} />
-                        </button>
+               <Drawer 
+                  title="Select Country" 
+                  onClose={() => {
+                     setIsClosing(true);
+                     setTimeout(() => {
+                        setShowCountryPicker(false);
+                        setIsClosing(false);
+                        setCountrySearch('');
+                        setIsDrawerExpanded(false);
+                     }, 300);
+                  }} 
+                  isClosing={isClosing} 
+                  theme={theme}
+                  forceExpand={isDrawerExpanded}
+               >
+                  <div className="px-6 py-4">
+                     <div className={`flex items-center gap-3 p-3.5 rounded-2xl ${inputBg} border border-transparent focus-within:border-[#00D68F]/30 transition-all`}>
+                        <Search size={18} className={textSec} />
+                        <input
+                           placeholder="Search country name or code..."
+                           value={countrySearch}
+                           onChange={(e) => setCountrySearch(e.target.value)}
+                           onFocus={() => setIsDrawerExpanded(true)}
+                           className="flex-1 bg-transparent outline-none font-bold text-sm"
+                        />
+                        {countrySearch.length > 0 && (
+                           <button onClick={() => setCountrySearch('')} className="p-1 rounded-full bg-gray-200 dark:bg-gray-800">
+                              <X size={14} className={textSec} />
+                           </button>
+                        )}
                      </div>
-                     <div className="px-6 py-4">
-                        <div className={`flex items-center gap-3 p-3.5 rounded-2xl ${inputBg} border border-transparent focus-within:border-[#00D68F]/30 transition-all`}>
-                           <Briefcase size={18} className={textSec} />
-                           <input
-                              placeholder="Search country..."
-                              value={countrySearch}
-                              onChange={(e) => setCountrySearch(e.target.value)}
-                              className="flex-1 bg-transparent outline-none font-bold text-sm"
-                           />
-                           {countrySearch.length > 0 && (
-                              <button onClick={() => setCountrySearch('')} className="p-1 rounded-full bg-gray-200 dark:bg-gray-800">
-                                 <X size={14} className={textSec} />
-                              </button>
-                           )}
-                        </div>
-                     </div>
-                     <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar">
-                        {COUNTRIES.filter(c => 
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar">
+                     {COUNTRIES.filter(c => 
+                        c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+                        c.code.includes(countrySearch)
+                     ).length > 0 ? (
+                        COUNTRIES.filter(c => 
                            c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
                            c.code.includes(countrySearch)
                         ).map(c => (
@@ -742,9 +855,13 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                               onClick={() => {
                                  triggerHaptic();
                                  setSelectedCountry(c);
-                                 setShowCountryPicker(false);
-                                 setPhone('');
-                                 setTimeout(() => document.getElementById('phone-input')?.focus(), 300);
+                                 setIsClosing(true);
+                                 setTimeout(() => {
+                                    setShowCountryPicker(false);
+                                    setIsClosing(false);
+                                    setCountrySearch('');
+                                    setTimeout(() => document.getElementById('phone-input')?.focus(), 100);
+                                 }, 300);
                               }}
                               className={`flex items-center gap-4 py-4 border-b ${theme === 'light' ? 'border-gray-100' : 'border-gray-800/50'} cursor-pointer active:bg-gray-100 dark:active:bg-white/5 transition-colors`}
                            >
@@ -757,13 +874,17 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                  </div>
                               )}
                            </div>
-                        ))}
-                        <div className="pt-6 pb-4 text-center">
-                           <p className={`text-xs font-semibold ${textSec} opacity-60`}>Dropoff currently operates exclusively in the listed countries.</p>
+                        ))
+                     ) : (
+                        <div className="py-20 text-center opacity-40">
+                           <p className="font-bold">No results for "{countrySearch}"</p>
                         </div>
+                     )}
+                     <div className="pt-6 pb-20 text-center">
+                        <p className={`text-xs font-semibold ${textSec} opacity-60 px-4`}>Dropoff currently operates exclusively in the listed countries.</p>
                      </div>
                   </div>
-               </div>
+               </Drawer>
             )}
          </div>
       );

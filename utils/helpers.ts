@@ -48,3 +48,43 @@ export const getInitialAvatar = (name: string, size: number = 40, theme: 'light'
         <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="${size / 2}" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${initial}</text>
     </svg>`;
 };
+
+export const compressImage = async (file: File | Blob, maxWidth = 1024, quality = 0.8): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxWidth) {
+                        width *= maxWidth / height;
+                        height = maxWidth;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error('Image compression failed: could not create blob'));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = (err) => reject(new Error('Image load failed'));
+        };
+        reader.onerror = (err) => reject(new Error('File read failed'));
+    });
+};

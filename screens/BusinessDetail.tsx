@@ -76,6 +76,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 .from('products')
                 .select('*')
                 .eq('business_id', selectedBusiness.id)
+                .eq('is_available', true)
                 .order('name', { ascending: true });
 
             if (data && !error) {

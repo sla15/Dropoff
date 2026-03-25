@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera as CameraIcon, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 
 import { Theme, Screen, UserData, Activity, Business, AppSettings, SavedLocation } from '../types';
-import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 import { Capacitor } from '@capacitor/core';
@@ -256,13 +256,13 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
             if (!userId) throw new Error("No active session found");
 
-            if (!editName.trim()) {
-                showAlert("Missing Name", "Full Name cannot be empty.", "error");
+            if (!editName.trim() || /<[^>]*>/.test(editName)) {
+                showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed).", "error");
                 setLoading(false);
                 return;
             }
-            if (!editLocation.trim()) {
-                showAlert("Missing Location", "Home Location cannot be empty.", "error");
+            if (!editLocation.trim() || /<[^>]*>/.test(editLocation)) {
+                showAlert("Invalid Location", "Please enter a valid location.", "error");
                 setLoading(false);
                 return;
             }
@@ -271,22 +271,19 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
             // 1. Upload new photo if selected
             if (photoFile) {
-                console.log("Uploading Profile Photo...");
-                const isBlob = !(photoFile instanceof File);
-                const fileExt = isBlob ? 'jpg' : (photoFile as File).name.split('.').pop();
-                const fileName = `${userId}-${Math.random()}.${fileExt}`;
+                console.log("Compressing & Uploading Profile Photo...");
+                const compressedBlob = await compressImage(photoFile, 800, 0.7);
+                const fileName = `${userId}-${Date.now()}.jpg`;
                 const filePath = `user-avatars/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('avatars')
-                    .upload(filePath, photoFile, {
-                        contentType: isBlob ? 'image/jpeg' : undefined,
+                    .upload(filePath, compressedBlob, {
+                        contentType: 'image/jpeg',
                         upsert: true
                     });
 
-
                 if (uploadError) throw uploadError;
-
 
                 const { data: { publicUrl } } = supabase.storage
                     .from('avatars')
@@ -866,7 +863,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.9.0 (Build 211)</p>
+                        <p>Version 1.8.3 (Build 212)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>

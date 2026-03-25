@@ -270,6 +270,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     if (e.key === 'Enter' && searchQuery.trim()) {
       if (searchMode === 'market') {
         setMarketSearchQuery(searchQuery);
+        // marketSearchType is already managed by the tabs
         navigate('marketplace');
       }
     }
@@ -408,6 +409,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             {searchMode === 'market' ? <ShoppingBag size={24} /> : <MapIcon size={24} />}
           </button>
         </div>
+
 
         {/* Reward Balance Badge */}
         {user.referralBalance > 0 && (
