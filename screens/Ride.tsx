@@ -1198,6 +1198,16 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 return;
             }
 
+            const isLocationInGambia = (lat: number, lng: number) => {
+                return (lat >= 13.0 && lat <= 13.9) && (lng >= -16.9 && lng <= -13.7);
+            };
+
+            if (!isLocationInGambia(pickup_lat, pickup_lng)) {
+                showAlert("Outside Service Area", "Oops! Our rides and deliveries are currently only available within The Gambia. We hope to expand to your location soon!", "info");
+                setStatus('idle');
+                return;
+            }
+
             const { data, error: insertError } = await supabase.from('rides').insert({
                 customer_id: session.user.id,
                 pickup_address: 'Current Location',

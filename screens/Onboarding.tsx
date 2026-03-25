@@ -31,9 +31,99 @@ const COUNTRIES = [
    { code: '+221', flag: '🇸🇳', name: 'Senegal', maxLen: 9 },
    { code: '+234', flag: '🇳🇬', name: 'Nigeria', maxLen: 10 },
    { code: '+233', flag: '🇬🇭', name: 'Ghana', maxLen: 9 },
+   { code: '+225', flag: '🇨🇮', name: "Côte d'Ivoire", maxLen: 10 },
+   { code: '+231', flag: '🇱🇷', name: 'Liberia', maxLen: 9 },
+   { code: '+232', flag: '🇸🇱', name: 'Sierra Leone', maxLen: 8 },
+   { code: '+224', flag: '🇬🇳', name: 'Guinea', maxLen: 9 },
+   { code: '+223', flag: '🇲🇱', name: 'Mali', maxLen: 8 },
+   { code: '+226', flag: '🇧🇫', name: 'Burkina Faso', maxLen: 10 },
+   { code: '+222', flag: '🇲🇷', name: 'Mauritania', maxLen: 8 },
+   { code: '+227', flag: '🇳🇪', name: 'Niger', maxLen: 8 },
+   { code: '+235', flag: '🇹🇩', name: 'Chad', maxLen: 8 },
+   { code: '+237', flag: '🇨🇲', name: 'Cameroon', maxLen: 9 },
+   { code: '+241', flag: '🇬🇦', name: 'Gabon', maxLen: 7 },
+   { code: '+242', flag: '🇨🇬', name: 'Congo', maxLen: 9 },
+   { code: '+243', flag: '🇨🇩', name: 'DR Congo', maxLen: 9 },
+   { code: '+236', flag: '🇨🇫', name: 'CAR', maxLen: 8 },
+   { code: '+240', flag: '🇬🇶', name: 'Equatorial Guinea', maxLen: 9 },
+   { code: '+244', flag: '🇦🇴', name: 'Angola', maxLen: 9 },
+   { code: '+264', flag: '🇳🇦', name: 'Namibia', maxLen: 9 },
+   { code: '+267', flag: '🇧🇼', name: 'Botswana', maxLen: 8 },
+   { code: '+268', flag: '🇸🇿', name: 'Eswatini', maxLen: 9 },
+   { code: '+266', flag: '🇱🇸', name: 'Lesotho', maxLen: 8 },
+   { code: '+263', flag: '🇿🇼', name: 'Zimbabwe', maxLen: 10 },
+   { code: '+260', flag: '🇿🇲', name: 'Zambia', maxLen: 9 },
+   { code: '+261', flag: '🇲🇬', name: 'Madagascar', maxLen: 9 },
+   { code: '+265', flag: '🇲🇼', name: 'Malawi', maxLen: 9 },
+   { code: '+254', flag: '🇰🇪', name: 'Kenya', maxLen: 10 },
+   { code: '+255', flag: '🇹🇿', name: 'Tanzania', maxLen: 9 },
+   { code: '+256', flag: '🇺🇬', name: 'Uganda', maxLen: 9 },
+   { code: '+250', flag: '🇷🇼', name: 'Rwanda', maxLen: 9 },
+   { code: '+257', flag: '🇧🇮', name: 'Burundi', maxLen: 8 },
+   { code: '+251', flag: '🇪🇹', name: 'Ethiopia', maxLen: 9 },
+   { code: '+252', flag: '🇸🇴', name: 'Somalia', maxLen: 9 },
+   { code: '+253', flag: '🇩🇯', name: 'Djibouti', maxLen: 8 },
+   { code: '+249', flag: '🇸🇩', name: 'Sudan', maxLen: 9 },
+   { code: '+211', flag: '🇸🇸', name: 'South Sudan', maxLen: 9 },
+   { code: '+20', flag: '🇪🇬', name: 'Egypt', maxLen: 10 },
+   { code: '+212', flag: '🇲🇦', name: 'Morocco', maxLen: 9 },
+   { code: '+213', flag: '🇩🇿', name: 'Algeria', maxLen: 9 },
+   { code: '+216', flag: '🇹🇳', name: 'Tunisia', maxLen: 8 },
+   { code: '+218', flag: '🇱🇾', name: 'Libya', maxLen: 9 },
    { code: '+44', flag: '🇬🇧', name: 'UK', maxLen: 10 },
    { code: '+1', flag: '🇺🇸', name: 'USA', maxLen: 10 },
-   { code: '+254', flag: '🇰🇪', name: 'Kenya', maxLen: 9 },
+   { code: '+33', flag: '🇫🇷', name: 'France', maxLen: 9 },
+   { code: '+49', flag: '🇩🇪', name: 'Germany', maxLen: 11 },
+   { code: '+34', flag: '🇪🇸', name: 'Spain', maxLen: 9 },
+   { code: '+39', flag: '🇮🇹', name: 'Italy', maxLen: 10 },
+   { code: '+31', flag: '🇳🇱', name: 'Netherlands', maxLen: 9 },
+   { code: '+32', flag: '🇧🇪', name: 'Belgium', maxLen: 9 },
+   { code: '+41', flag: '🇨🇭', name: 'Switzerland', maxLen: 9 },
+   { code: '+43', flag: '🇦🇹', name: 'Austria', maxLen: 10 },
+   { code: '+46', flag: '🇸🇪', name: 'Sweden', maxLen: 9 },
+   { code: '+47', flag: '🇳🇴', name: 'Norway', maxLen: 8 },
+   { code: '+45', flag: '🇩🇰', name: 'Denmark', maxLen: 8 },
+   { code: '+358', flag: '🇫🇮', name: 'Finland', maxLen: 9 },
+   { code: '+353', flag: '🇮🇪', name: 'Ireland', maxLen: 9 },
+   { code: '+351', flag: '🇵🇹', name: 'Portugal', maxLen: 9 },
+   { code: '+30', flag: '🇬🇷', name: 'Greece', maxLen: 10 },
+   { code: '+90', flag: '🇹🇷', name: 'Turkey', maxLen: 10 },
+   { code: '+7', flag: '🇷🇺', name: 'Russia', maxLen: 10 },
+   { code: '+86', flag: '🇨🇳', name: 'China', maxLen: 11 },
+   { code: '+91', flag: '🇮🇳', name: 'India', maxLen: 10 },
+   { code: '+81', flag: '🇯🇵', name: 'Japan', maxLen: 10 },
+   { code: '+82', flag: '🇰🇷', name: 'South Korea', maxLen: 10 },
+   { code: '+61', flag: '🇦🇺', name: 'Australia', maxLen: 9 },
+   { code: '+64', flag: '🇳🇿', name: 'New Zealand', maxLen: 9 },
+   { code: '+1', flag: '🇨🇦', name: 'Canada', maxLen: 10 },
+   { code: '+55', flag: '🇧🇷', name: 'Brazil', maxLen: 11 },
+   { code: '+54', flag: '🇦🇷', name: 'Argentina', maxLen: 10 },
+   { code: '+56', flag: '🇨🇱', name: 'Chile', maxLen: 9 },
+   { code: '+57', flag: '🇨🇴', name: 'Colombia', maxLen: 10 },
+   { code: '+58', flag: '🇻🇪', name: 'Venezuela', maxLen: 10 },
+   { code: '+51', flag: '🇵🇪', name: 'Peru', maxLen: 9 },
+   { code: '+52', flag: '🇲🇽', name: 'Mexico', maxLen: 10 },
+   { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia', maxLen: 9 },
+   { code: '+971', flag: '🇦🇪', name: 'UAE', maxLen: 9 },
+   { code: '+974', flag: '🇶🇦', name: 'Qatar', maxLen: 8 },
+   { code: '+965', flag: '🇰🇼', name: 'Kuwait', maxLen: 8 },
+   { code: '+968', flag: '🇴🇲', name: 'Oman', maxLen: 8 },
+   { code: '+973', flag: '🇧🇭', name: 'Bahrain', maxLen: 8 },
+   { code: '+972', flag: '🇮🇱', name: 'Israel', maxLen: 9 },
+   { code: '+962', flag: '🇯🇴', name: 'Jordan', maxLen: 9 },
+   { code: '+961', flag: '🇱🇧', name: 'Lebanon', maxLen: 8 },
+   { code: '+963', flag: '🇸🇾', name: 'Syria', maxLen: 9 },
+   { code: '+964', flag: '🇮🇶', name: 'Iraq', maxLen: 10 },
+   { code: '+98', flag: '🇮🇷', name: 'Iran', maxLen: 10 },
+   { code: '+92', flag: '🇵🇰', name: 'Pakistan', maxLen: 10 },
+   { code: '+880', flag: '🇧🇩', name: 'Bangladesh', maxLen: 10 },
+   { code: '+94', flag: '🇱🇰', name: 'Sri Lanka', maxLen: 9 },
+   { code: '+66', flag: '🇹🇭', name: 'Thailand', maxLen: 9 },
+   { code: '+84', flag: '🇻🇳', name: 'Vietnam', maxLen: 9 },
+   { code: '+60', flag: '🇲🇾', name: 'Malaysia', maxLen: 9 },
+   { code: '+65', flag: '🇸🇬', name: 'Singapore', maxLen: 8 },
+   { code: '+62', flag: '🇮🇩', name: 'Indonesia', maxLen: 11 },
+   { code: '+63', flag: '🇵🇭', name: 'Philippines', maxLen: 10 },
    { code: '+27', flag: '🇿🇦', name: 'South Africa', maxLen: 9 },
 ];
 
@@ -41,6 +131,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [step, setStep] = useState(1);
    const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
    const [showCountryPicker, setShowCountryPicker] = useState(false);
+   const [countrySearch, setCountrySearch] = useState('');
    const [phone, setPhone] = useState('');
    const [otp, setOtp] = useState('');
    const [name, setName] = useState('');
@@ -531,7 +622,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="space-y-6 z-[100] w-full relative mb-4">
+            <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
                <button
                   id="get-started-button"
                   onClick={(e) => { 
@@ -604,7 +695,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
             
-            <div className="mt-auto px-2 pb-safe">
+            <div className="mt-auto px-2 pb-safe transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
                <button
                   onClick={sendOTP}
                   disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
@@ -625,8 +716,27 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            <X size={20} />
                         </button>
                      </div>
+                     <div className="px-6 py-4">
+                        <div className={`flex items-center gap-3 p-3.5 rounded-2xl ${inputBg} border border-transparent focus-within:border-[#00D68F]/30 transition-all`}>
+                           <Briefcase size={18} className={textSec} />
+                           <input
+                              placeholder="Search country..."
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              className="flex-1 bg-transparent outline-none font-bold text-sm"
+                           />
+                           {countrySearch.length > 0 && (
+                              <button onClick={() => setCountrySearch('')} className="p-1 rounded-full bg-gray-200 dark:bg-gray-800">
+                                 <X size={14} className={textSec} />
+                              </button>
+                           )}
+                        </div>
+                     </div>
                      <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar">
-                        {COUNTRIES.map(c => (
+                        {COUNTRIES.filter(c => 
+                           c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+                           c.code.includes(countrySearch)
+                        ).map(c => (
                            <div 
                               key={c.code} 
                               onClick={() => {
@@ -704,7 +814,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto flex flex-col gap-4 px-2 pb-safe">
+            <div className="mt-auto flex flex-col gap-4 px-2 pb-safe transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -806,7 +916,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto pb-safe pt-6 px-2">
+            <div className="mt-auto pb-safe pt-6 px-2 transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}

@@ -240,6 +240,14 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                 throw new Error(`The following businesses are currently closed: ${names}. Please remove their items from your cart to proceed.`);
             }
 
+            const isLocationInGambia = (lat: number, lng: number) => {
+                return (lat >= 13.0 && lat <= 13.9) && (lng >= -16.9 && lng <= -13.7);
+            };
+
+            if (!isLocationInGambia(deliveryLocation.lat, deliveryLocation.lng)) {
+                throw new Error("Oops! Our product delivery is currently only available within The Gambia. We hope to expand to your location soon!");
+            }
+
             // Generate batch_id for all orders (backend relies on this for merchant/driver visibility)
             const batchId = crypto.randomUUID();
             let firstOrderId: string | null = null;

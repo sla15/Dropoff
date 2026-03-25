@@ -141,7 +141,7 @@ const safeFormatPhone = (phoneStr: string) => {
         return phoneStr;
     }
     // Fallback for extremely old accounts that only saved the local number
-    return `+220 ${phoneStr}`;
+    return phoneStr;
 };
 
 export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer, handleLogout }: Props) => {
@@ -866,7 +866,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.8.0 (Build 210)</p>
+                        <p>Version 1.9.0 (Build 211)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>
