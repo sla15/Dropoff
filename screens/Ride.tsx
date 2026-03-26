@@ -1249,6 +1249,15 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         let currentRadius = startRadius;
         const HARD_STOP_LIMIT = 120; // Auto-stop at 120km
         const interval = setInterval(async () => {
+            // First, guarantee the ride is strictly still in 'searching' state
+            // This prevents the loop from acting or prompting if the driver already accepted (even if real-time drops the event)
+            const { data: rideCheck } = await supabase.from('rides').select('status').eq('id', ride.id).single();
+            if (rideCheck && rideCheck.status !== 'searching') {
+                console.log(`🛑 Stopping search loop. Ride status is now: ${rideCheck.status}`);
+                clearInterval(interval);
+                return;
+            }
+
             // Radial search for drivers
             if (!userLocation) {
                 console.log("⚠️ Cannot search: userLocation is null.");
@@ -1316,6 +1325,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             if (currentRadius >= maxRadius) {
                 clearInterval(interval);
 
+                // Double check status before showing the expansion/cancel alert
+                const { data: latestRide } = await supabase.from('rides').select('status').eq('id', ride.id).single();
+                if (latestRide && latestRide.status !== 'searching') {
+                    console.log(`🛑 Skipping prompt. Ride is already ${latestRide.status}`);
+                    return; 
+                }
+
                 // Ask user if they want to continue
                 showAlert(
                     "No Drivers Found",
@@ -1338,12 +1354,6 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     }
                 );
             } else {
-                // Double check status before incrementing
-                const { data: latestRide } = await supabase.from('rides').select('status').eq('id', ride.id).single();
-                if (latestRide && latestRide.status !== 'searching') {
-                    clearInterval(interval);
-                    return;
-                }
                 currentRadius += 2;
                 setSearchRadius(currentRadius);
             }
