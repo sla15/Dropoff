@@ -264,7 +264,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [photoFile, setPhotoFile] = useState<File | null>(null);
    const [homeLocation, setHomeLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
    const [showPicker, setShowPicker] = useState(false);
-   const [keyboardHeight, setKeyboardHeight] = useState(0);
    const [vehicleIndex, setVehicleIndex] = useState(0);
  
    const vehicles = [
@@ -280,25 +279,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return () => clearInterval(interval);
    }, [vehicles.length]);
 
-   useEffect(() => {
-      let showListener: any;
-      let hideListener: any;
 
-      if (Capacitor.isNativePlatform()) {
-         Keyboard.addListener('keyboardWillShow', info => {
-            setKeyboardHeight(info.keyboardHeight);
-         }).then(l => showListener = l);
-
-         Keyboard.addListener('keyboardWillHide', () => {
-            setKeyboardHeight(0);
-         }).then(l => hideListener = l);
-
-         return () => {
-            if (showListener) showListener.remove();
-            if (hideListener) hideListener.remove();
-         };
-      }
-   }, []);
 
    const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -724,7 +705,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${Math.min(20, keyboardHeight / 4)}px)` : 'none' }}>
+            <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300">
                <button
                   id="get-started-button"
                   onClick={(e) => { 
@@ -800,7 +781,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                      <input
                         id="phone-input"
                         type="tel"
-                        autoFocus
                         placeholder="### ####"
                         value={phone}
                         onChange={(e) => {
@@ -962,7 +942,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto flex flex-col gap-4 px-2 pb-10 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
+            <div className="mt-auto flex flex-col gap-4 px-2 pb-10 transition-all duration-300">
                <button
                   onClick={sendOTP}
                   disabled={loading}
