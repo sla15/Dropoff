@@ -564,22 +564,40 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             img.src = imageUrl;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                canvas.width = 128; // Higher resolution for rotation quality
+                canvas.width = 128; 
                 canvas.height = 128;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
 
-                ctx.translate(64, 64);
-                ctx.rotate((rotation * Math.PI) / 180);
-                ctx.drawImage(img, -32, -32, 64, 64);
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
 
-                const rotatedUrl = canvas.toDataURL();
+                // Preserve Aspect Ratio and fit within 128x128 circle for safe rotation
+                const aspect = img.width / img.height;
+                const maxDim = 110; // Max dimension to comfortably fit diagonal in 128
+                let drawW, drawH;
+                
+                if (aspect > 1) {
+                    drawW = maxDim;
+                    drawH = maxDim / aspect;
+                } else {
+                    drawH = maxDim;
+                    drawW = maxDim * aspect;
+                }
+
+                ctx.translate(64, 64);
+                // Source PNGs point South, so add 180 offset
+                ctx.rotate(((rotation + 180) * Math.PI) / 180);
+                // Draw centered with correct aspect ratio
+                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+
+                const rotatedUrl = canvas.toDataURL('image/png');
                 iconCache.current.set(cacheKey, rotatedUrl);
 
                 callback({
                     url: rotatedUrl,
-                    scaledSize: new (window as any).google.maps.Size(48, 48),
-                    anchor: new (window as any).google.maps.Point(24, 24),
+                    scaledSize: new (window as any).google.maps.Size(56, 56),
+                    anchor: new (window as any).google.maps.Point(28, 28),
                     optimized: false
                 });
             };
