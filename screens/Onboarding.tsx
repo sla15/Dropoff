@@ -190,7 +190,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { t
          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
          <div
             ref={drawerRef}
-            className={`w-full ${theme === 'light' ? 'bg-white/85' : 'bg-[#1C1C1E]/85'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+            className={`w-full ${theme === 'light' ? 'bg-white/85' : 'bg-[#1C1C1E]/85'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] min-h-[80vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
             style={{
                transform: `translateY(${dragY}px)`,
                transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'
@@ -724,7 +724,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
+            <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${Math.min(20, keyboardHeight / 4)}px)` : 'none' }}>
                <button
                   id="get-started-button"
                   onClick={(e) => { 
@@ -797,7 +797,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
             
-            <div className="mt-auto px-2 pb-safe transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
+            <div className="mt-auto px-2 pb-10 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
                <button
                   onClick={sendOTP}
                   disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
@@ -823,8 +823,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                   theme={theme}
                   forceExpand={isDrawerExpanded}
                >
-                  <div className="px-6 py-4">
-                     <div className={`flex items-center gap-3 p-3.5 rounded-2xl ${inputBg} border border-transparent focus-within:border-[#00D68F]/30 transition-all`}>
+                  <div className="px-6 py-4 flex-shrink-0">
+                     <div className={`flex items-center gap-3 h-14 p-3.5 rounded-2xl ${inputBg} border border-transparent focus-within:border-[#00D68F]/30 transition-all`}>
                         <Search size={18} className={textSec} />
                         <input
                            placeholder="Search country name or code..."
@@ -849,9 +849,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         COUNTRIES.filter(c => 
                            c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
                            c.code.includes(countrySearch)
-                        ).map(c => (
+                        ).map((c, index) => (
                            <div 
-                              key={c.code} 
+                              key={`${c.name}-${c.code}-${index}`} 
                               onClick={() => {
                                  triggerHaptic();
                                  setSelectedCountry(c);
@@ -935,7 +935,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto flex flex-col gap-4 px-2 pb-safe transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
+            <div className="mt-auto flex flex-col gap-4 px-2 pb-10 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -1037,7 +1037,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
 
-            <div className="mt-auto pb-safe pt-6 px-2 transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 20}px` : '0px' }}>
+            <div className="mt-auto pb-10 pt-6 px-2 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}

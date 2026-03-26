@@ -48,23 +48,32 @@ const App = () => {
   }, []);
 
   // 🌓 Theme Management (Apple-style)
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem('ride_theme') || localStorage.getItem('app_theme');
-    if (saved) return saved as Theme;
-    // Force dark by default for the premium "dark by nature" experience
-    return 'dark';
-  });
+  const [theme, setThemeState] = useState<Theme>('dark');
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    localStorage.setItem('ride_theme', t);
-    localStorage.setItem('app_theme', t);
+    Preferences.set({ key: 'app_theme', value: t });
   };
 
   useEffect(() => {
+    const loadTheme = async () => {
+      const { value: saved } = await Preferences.get({ key: 'app_theme' });
+      if (saved) {
+        setThemeState(saved as Theme);
+      } else {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setThemeState(isDark ? 'dark' : 'light');
+      }
+    };
+    loadTheme();
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('ride_theme') && !localStorage.getItem('app_theme')) {
+    const handleChange = async (e: MediaQueryListEvent) => {
+      const { value: saved } = await Preferences.get({ key: 'app_theme' });
+      // If no manual preference is saved, follow system changes
+      if (!saved) {
         setThemeState(e.matches ? 'dark' : 'light');
       }
     };

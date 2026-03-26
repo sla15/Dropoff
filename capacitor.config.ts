@@ -14,7 +14,7 @@ const config: CapacitorConfig = {
       launchShowDuration: 0,
     },
     Keyboard: {
-      resize: 'body' as any,
+      resize: 'none' as any,
       style: 'dark' as any,
     },
     FirebaseMessaging: {
