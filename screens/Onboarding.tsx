@@ -764,15 +764,32 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 2) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-            <div className="flex-1 flex flex-col justify-center items-center text-center">
-               <div className="w-full max-w-sm mx-auto">
-                  <div className="flex justify-center mb-8">
-                     <ProgressBar currentStep={2} />
-                  </div>
-                  
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
-                  
-                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors`}>
+             {/* Header Navigation: Top-Right Action Button */}
+             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
+                <button 
+                   onClick={() => setStep(1)} 
+                   className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
+                >
+                   <ArrowLeft size={22} />
+                </button>
+                <button
+                   onClick={sendOTP}
+                   disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
+                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${phone.length >= (selectedCountry.maxLen - 2) ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+                >
+                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Continue <ArrowRight size={18} /></>}
+                </button>
+             </div>
+
+             <div className="flex-1 flex flex-col justify-center items-center text-center">
+                <div className="w-full max-w-sm mx-auto">
+                   <div className="flex justify-center mb-8">
+                      <ProgressBar currentStep={2} />
+                   </div>
+                   
+                   <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
+                   
+                   <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors focus-within:border-[#00D68F]`}>
                      <div 
                         className="font-bold text-2xl flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
                         onClick={() => { triggerHaptic(); setShowCountryPicker(true); }}
@@ -790,21 +807,16 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            const val = e.target.value.replace(/\D/g, '');
                            if (val.length <= selectedCountry.maxLen) setPhone(val);
                         }}
-                        className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
-                     />
+                         onKeyDown={(e) => {
+                            if (e.key === 'Enter' && phone.length >= (selectedCountry.maxLen - 2) && !loading) {
+                               sendOTP();
+                            }
+                         }}
+                         className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                      />
                   </div>
                   <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
                </div>
-            </div>
-            
-            <div className="mt-auto px-2 pb-10 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
-               <button
-                  onClick={sendOTP}
-                  disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
-                  className={`w-full ${phone.length >= (selectedCountry.maxLen - 2) ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
-               >
-                  {loading ? <Loader2 className="animate-spin" /> : 'Continue'}
-               </button>
             </div>
             
             {showCountryPicker && (
@@ -893,11 +905,21 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 3) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-            <div className="flex-1 flex flex-col justify-center items-center text-center">
-               <div className="w-full max-w-sm mx-auto">
-                  <div className="flex justify-center mb-10">
-                    <ProgressBar currentStep={3} />
-                  </div>
+             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+                <button
+                   onClick={() => verifyOTP()}
+                   disabled={otp.length < 6 || loading}
+                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${otp.length === 6 ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+                >
+                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Verify <ArrowRight size={18} /></>}
+                </button>
+             </div>
+
+             <div className="flex-1 flex flex-col justify-center items-center text-center">
+                <div className="w-full max-w-sm mx-auto">
+                   <div className="flex justify-center mb-10">
+                     <ProgressBar currentStep={3} />
+                   </div>
 
                   <h2 className="text-3xl font-bold tracking-tight mb-3">Enter code</h2>
                   <p className={`${textSec} mb-12`}>Sent to {selectedCountry.code} {phone}</p>
@@ -929,21 +951,18 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            const val = e.target.value.replace(/\D/g, '');
                            if (val.length <= 6) setOtp(val);
                         }}
-                        autoFocus
-                     />
+                         onKeyDown={(e) => {
+                            if (e.key === 'Enter' && otp.length === 6 && !loading) {
+                               verifyOTP();
+                            }
+                         }}
+                         autoFocus
+                      />
                   </div>
                </div>
             </div>
 
             <div className="mt-auto flex flex-col gap-4 px-2 pb-10 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
-               <button
-                  onClick={() => verifyOTP()}
-                  disabled={otp.length < 6 || loading}
-                  className={`w-full ${otp.length === 6 ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
-               >
-                  {loading ? <Loader2 className="animate-spin" /> : 'Verify Code'}
-               </button>
-
                <button
                   onClick={sendOTP}
                   disabled={loading}
@@ -959,11 +978,21 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 4) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="flex-1 flex flex-col justify-center items-center">
-               <div className="w-full max-w-sm mx-auto">
-                  <div className="flex justify-center mb-6">
-                     <ProgressBar currentStep={4} />
-                  </div>
+             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+                <button
+                   onClick={handleCompleteProfile}
+                   disabled={loading || !name}
+                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${name ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+                >
+                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Next <ArrowRight size={18} /></>}
+                </button>
+             </div>
+
+             <div className="flex-1 flex flex-col justify-center items-center">
+                <div className="w-full max-w-sm mx-auto">
+                   <div className="flex justify-center mb-6">
+                      <ProgressBar currentStep={4} />
+                   </div>
 
                   <div className="text-center mb-6">
                      <h1 className="text-2xl font-bold mb-2">Let's get to know you</h1>
@@ -996,6 +1025,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                               placeholder="e.g. Lamin Faye"
                               value={name}
                               onChange={(e) => setName(e.target.value)}
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && name.trim() && !loading) {
+                                    handleCompleteProfile();
+                                 }
+                              }}
                               className="flex-1 bg-transparent outline-none font-medium text-sm"
                            />
                         </div>
@@ -1012,6 +1046,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                               placeholder="name@example.com"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && name.trim() && !loading) {
+                                    handleCompleteProfile();
+                                 }
+                              }}
                               className="flex-1 bg-transparent outline-none font-medium text-sm"
                            />
                         </div>
@@ -1029,22 +1068,17 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                               value={referralInput}
                               onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
                               maxLength={10}
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && name.trim() && !loading) {
+                                    handleCompleteProfile();
+                                 }
+                              }}
                               className="flex-1 bg-transparent outline-none font-medium uppercase tracking-widest text-sm placeholder:normal-case placeholder:tracking-normal"
                            />
                         </div>
                      </div>
                   </div>
                </div>
-            </div>
-
-            <div className="mt-auto pb-10 pt-6 px-2 transition-all duration-300" style={{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight - 10}px)` : 'none' }}>
-               <button
-                  onClick={handleCompleteProfile}
-                  disabled={loading || !name}
-                  className={`w-full ${name ? 'bg-[#00D68F] text-black shadow-[0_15px_30px_rgba(0,214,143,0.3)]' : 'bg-gray-800 text-gray-500'} py-4.5 rounded-[22px] font-bold text-lg active:scale-95 transition-all flex items-center justify-center gap-2`}
-               >
-                  {loading ? <Loader2 className="animate-spin" /> : <>Next <ArrowRight size={20} /></>}
-               </button>
             </div>
          </div>
       );
@@ -1053,11 +1087,20 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 5) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="flex-1 flex flex-col justify-center items-center text-center">
-               <div className="w-full max-w-sm mx-auto">
-                  <div className="flex justify-center mb-8">
-                     <ProgressBar currentStep={5} />
-                  </div>
+             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+                <button
+                   onClick={() => navigate('dashboard')}
+                   className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"
+                >
+                   Skip/Finish <ArrowRight size={18} />
+                </button>
+             </div>
+
+             <div className="flex-1 flex flex-col justify-center items-center text-center">
+                <div className="w-full max-w-sm mx-auto">
+                   <div className="flex justify-center mb-8">
+                      <ProgressBar currentStep={5} />
+                   </div>
 
                   <div className="text-center mb-10">
                      <h1 className="text-3xl font-bold mb-3">Where is Home?</h1>
