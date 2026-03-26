@@ -231,6 +231,21 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [email, setEmail] = useState('');
    const [referralInput, setReferralInput] = useState('');
    const [loading, setLoading] = useState(false);
+   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+   useEffect(() => {
+      if (Capacitor.isNativePlatform()) {
+         Keyboard.addListener('keyboardWillShow', info => {
+            setKeyboardHeight(info.keyboardHeight);
+         });
+         Keyboard.addListener('keyboardWillHide', () => {
+            setKeyboardHeight(0);
+         });
+         return () => {
+            Keyboard.removeAllListeners();
+         };
+      }
+   }, []);
 
    // Resume Onboarding if user is already logged in but profile is incomplete
    useEffect(() => {
@@ -265,13 +280,13 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [homeLocation, setHomeLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
    const [showPicker, setShowPicker] = useState(false);
    const [vehicleIndex, setVehicleIndex] = useState(0);
- 
+
    const vehicles = [
       { src: "/assets/black_luxury_side.png", alt: "Premium Car" },
       { src: "/assets/white_yaris_side.png", alt: "Economic Car" },
       { src: "/assets/scooter_side_view.png", alt: "Scooter" }
    ];
- 
+
    useEffect(() => {
       const interval = setInterval(() => {
          setVehicleIndex((prev) => (prev + 1) % vehicles.length);
@@ -436,9 +451,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    const handleCompleteProfile = async () => {
       triggerHaptic();
-      if (!name.trim() || /<[^>]*>/.test(name)) { 
-         showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed).", "info"); 
-         return; 
+      if (!name.trim() || /<[^>]*>/.test(name)) {
+         showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed).", "info");
+         return;
       }
       if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || /<[^>]*>/.test(email))) {
          showAlert("Invalid Email", "Please enter a valid email address.", "info");
@@ -517,7 +532,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                      referee_id: userId,
                      status: 'pending'
                   });
-               console.log("Referral Linked!");
+                  console.log("Referral Linked!");
                   // Persistent storage for checkout
                   localStorage.setItem('pending_gift_card', referralInput.toUpperCase());
                } else {
@@ -562,10 +577,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          if (error) throw error;
 
          setUser(prev => ({ ...prev, location: locData.address }));
-         
+
          // FINAL ONBOARDING SUCCESS PUSH
          sendPushNotification("Welcome to Dropoff! 🚀", `Hi ${name.split(' ')[0]}, thanks for joining us! Your journey starts here.`);
-         
+
          navigate('dashboard');
       } catch (err: any) {
          console.error("Save Location Error:", err);
@@ -581,13 +596,13 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          if (Capacitor.isNativePlatform()) {
             const permissions = await Geolocation.checkPermissions();
             console.log("📍 Location permission status:", permissions.location);
-            
+
             if (permissions.location === 'denied') {
                showAlert("Location Denied", "Please enable location permissions in your phone settings to use this feature.", "info");
                setLoading(false);
                return;
             }
-            
+
             if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
                const request = await Geolocation.requestPermissions();
                if (request.location !== 'granted') {
@@ -645,7 +660,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1"/>
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1" />
                      </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#grid)" />
@@ -659,10 +674,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                      The future <br />
                      of <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D68F] to-[#00A06A]" style={{ filter: 'drop-shadow(0 0 10px rgba(0,214,143,0.4))' }}>movement.</span>
                   </p>
-                  
+
                   {/* Accent line */}
                   <div className="w-12 h-1.5 rounded-full bg-gradient-to-r from-[#00D68F] to-[#00A06A] mb-7 shadow-[0_0_10px_rgba(0,214,143,0.5)]"></div>
-                  
+
                   <p className={`text-[19px] sm:text-2xl font-semibold max-w-[280px] leading-snug tracking-tight ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                      Swift rides, smart deliveries. <br />
                      All in one premium app.
@@ -675,27 +690,27 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                <div className="relative w-full aspect-[2/1]">
                   {/* Common Ground Shadow for all vehicles */}
                   <div className="absolute bottom-[20%] left-[15%] w-[70%] h-[12%] bg-black/60 blur-[35px] rounded-[100%] transition-opacity duration-1000"></div>
-                  
+
                   {vehicles.map((v, i) => {
                      const isActive = i === vehicleIndex;
                      const isPrev = i === (vehicleIndex - 1 + vehicles.length) % vehicles.length;
-                     const slideClass = isActive 
-                        ? 'opacity-100 translate-x-0 scale-100 z-10' 
-                        : isPrev 
+                     const slideClass = isActive
+                        ? 'opacity-100 translate-x-0 scale-100 z-10'
+                        : isPrev
                            ? 'opacity-0 -translate-x-[40%] scale-95 blur-md z-0'
                            : 'opacity-0 translate-x-[40%] scale-95 blur-md z-0';
 
                      return (
-                        <div 
+                        <div
                            key={v.src}
                            className={`absolute inset-0 w-full h-full transition-all duration-[1200ms] ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-center ${slideClass}`}
                         >
-                           <img 
-                              src={v.src} 
+                           <img
+                              src={v.src}
                               className="w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.5)]"
-                              style={{ 
-                                 transform: isActive ? 'translateY(-8px)' : 'translateY(8px)', 
-                                 transition: 'transform 2.5s ease-in-out' 
+                              style={{
+                                 transform: isActive ? 'translateY(-8px)' : 'translateY(8px)',
+                                 transition: 'transform 2.5s ease-in-out'
                               }}
                               alt={v.alt}
                            />
@@ -708,11 +723,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             <div className="space-y-6 z-[100] w-full relative mb-4 transition-all duration-300">
                <button
                   id="get-started-button"
-                  onClick={(e) => { 
-                    e.stopPropagation();
-                    console.log("🚀 Get Started clicked");
-                    triggerHaptic(); 
-                    setStep(2); 
+                  onClick={(e) => {
+                     e.stopPropagation();
+                     console.log("🚀 Get Started clicked");
+                     triggerHaptic();
+                     setStep(2);
                   }}
                   className="group relative overflow-hidden w-full bg-[#00D68F] text-black py-5 rounded-[24px] font-black text-[20px] tracking-tight active:scale-[0.97] transition-all shadow-[0_15px_35px_rgba(0,214,143,0.35)] flex items-center justify-center gap-3 cursor-pointer touch-manipulation"
                >
@@ -729,7 +744,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </p>
             </div>
 
-            <style dangerouslySetInnerHTML={{__html: `
+            <style dangerouslySetInnerHTML={{
+               __html: `
                .group:hover .sweep-animation {
                   animation: shimmer 1.5s infinite;
                }
@@ -745,33 +761,36 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 2) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-             {/* Header Navigation: Top-Right Action Button */}
-             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
-                <button 
-                   onClick={() => setStep(1)} 
-                   className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
-                >
-                   <ArrowLeft size={22} />
-                </button>
-                <button
-                   onClick={sendOTP}
-                   disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
-                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${phone.length >= (selectedCountry.maxLen - 2) ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
-                >
-                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Continue <ArrowRight size={18} /></>}
-                </button>
-             </div>
+            {/* Header Navigation: Top-Right Action Button */}
+            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
+               <button
+                  onClick={() => setStep(1)}
+                  className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
+               >
+                  <ArrowLeft size={22} />
+               </button>
+               <button
+                  onClick={sendOTP}
+                  disabled={phone.length < (selectedCountry.maxLen - 2) || loading}
+                  className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${phone.length >= (selectedCountry.maxLen - 2) ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+               >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <>Continue <ArrowRight size={18} /></>}
+               </button>
+            </div>
 
-             <div className="flex-1 flex flex-col justify-center items-center text-center">
-                <div className="w-full max-w-sm mx-auto">
-                   <div className="flex justify-center mb-8">
-                      <ProgressBar currentStep={2} />
-                   </div>
-                   
-                   <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
-                   
-                   <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors focus-within:border-[#00D68F]`}>
-                     <div 
+            <div
+               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-[15vh] px-4 no-scrollbar"
+               style={{ paddingBottom: Math.max(20, keyboardHeight + 20) }}
+            >
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-8">
+                     <ProgressBar currentStep={2} />
+                  </div>
+
+                  <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
+
+                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors focus-within:border-[#00D68F]`}>
+                     <div
                         className="font-bold text-2xl flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
                         onClick={() => { triggerHaptic(); setShowCountryPicker(true); }}
                      >
@@ -787,21 +806,24 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            const val = e.target.value.replace(/\D/g, '');
                            if (val.length <= selectedCountry.maxLen) setPhone(val);
                         }}
-                         onKeyDown={(e) => {
-                            if (e.key === 'Enter' && phone.length >= (selectedCountry.maxLen - 2) && !loading) {
-                               sendOTP();
-                            }
-                         }}
-                         className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
-                      />
+                        onKeyDown={(e) => {
+                           if (e.key === 'Enter' && phone.length >= (selectedCountry.maxLen - 2) && !loading) {
+                              sendOTP();
+                           }
+                        }}
+                        onFocus={(e) => {
+                           setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                        }}
+                        className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                     />
                   </div>
                   <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
                </div>
             </div>
-            
+
             {showCountryPicker && (
-               <Drawer 
-                  title="Select Country" 
+               <Drawer
+                  title="Select Country"
                   onClose={() => {
                      setIsClosing(true);
                      setTimeout(() => {
@@ -810,8 +832,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         setCountrySearch('');
                         setIsDrawerExpanded(false);
                      }, 300);
-                  }} 
-                  isClosing={isClosing} 
+                  }}
+                  isClosing={isClosing}
                   theme={theme}
                   forceExpand={isDrawerExpanded}
                >
@@ -832,18 +854,18 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         )}
                      </div>
                   </div>
-                  
+
                   <div className="flex-1 overflow-y-auto px-6 py-2 no-scrollbar">
-                     {COUNTRIES.filter(c => 
-                        c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+                     {COUNTRIES.filter(c =>
+                        c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
                         c.code.includes(countrySearch)
                      ).length > 0 ? (
-                        COUNTRIES.filter(c => 
-                           c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+                        COUNTRIES.filter(c =>
+                           c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
                            c.code.includes(countrySearch)
                         ).map((c, index) => (
-                           <div 
-                              key={`${c.name}-${c.code}-${index}`} 
+                           <div
+                              key={`${c.name}-${c.code}-${index}`}
                               onClick={() => {
                                  triggerHaptic();
                                  setSelectedCountry(c);
@@ -885,25 +907,28 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 3) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
-                <button
-                   onClick={() => verifyOTP()}
-                   disabled={otp.length < 6 || loading}
-                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${otp.length === 6 ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
-                >
-                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Verify <ArrowRight size={18} /></>}
-                </button>
-             </div>
+            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+               <button
+                  onClick={() => verifyOTP()}
+                  disabled={otp.length < 6 || loading}
+                  className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${otp.length === 6 ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+               >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <>Verify <ArrowRight size={18} /></>}
+               </button>
+            </div>
 
-             <div className="flex-1 flex flex-col justify-center items-center text-center">
-                <div className="w-full max-w-sm mx-auto">
-                   <div className="flex justify-center mb-10">
+            <div
+               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-[15vh] px-4 no-scrollbar"
+               style={{ paddingBottom: Math.max(20, keyboardHeight + 20) }}
+            >
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-10">
                      <ProgressBar currentStep={3} />
-                   </div>
+                  </div>
 
                   <h2 className="text-3xl font-bold tracking-tight mb-3">Enter code</h2>
                   <p className={`${textSec} mb-12`}>Sent to {selectedCountry.code} {phone}</p>
-                  
+
                   <div className="flex items-center justify-center gap-3 mb-10 relative">
                      <div className="flex gap-2">
                         {[0, 1, 2].map((i) => (
@@ -920,7 +945,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            </div>
                         ))}
                      </div>
-                     
+
                      <input
                         className="absolute inset-0 opacity-0 w-full h-full cursor-default caret-transparent"
                         type="tel"
@@ -931,13 +956,13 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            const val = e.target.value.replace(/\D/g, '');
                            if (val.length <= 6) setOtp(val);
                         }}
-                         onKeyDown={(e) => {
-                            if (e.key === 'Enter' && otp.length === 6 && !loading) {
-                               verifyOTP();
-                            }
-                         }}
-                         autoFocus
-                      />
+                        onKeyDown={(e) => {
+                           if (e.key === 'Enter' && otp.length === 6 && !loading) {
+                              verifyOTP();
+                           }
+                        }}
+                        autoFocus
+                     />
                   </div>
                </div>
             </div>
@@ -958,21 +983,24 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 4) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
-                <button
-                   onClick={handleCompleteProfile}
-                   disabled={loading || !name}
-                   className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${name ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
-                >
-                   {loading ? <Loader2 className="animate-spin" size={18} /> : <>Next <ArrowRight size={18} /></>}
-                </button>
-             </div>
+            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+               <button
+                  onClick={handleCompleteProfile}
+                  disabled={loading || !name}
+                  className={`px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 ${name ? 'bg-[#00D68F] text-black shadow-xl shadow-[#00D68F]/30' : 'bg-gray-800 text-gray-500 opacity-60'}`}
+               >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : <>Next <ArrowRight size={18} /></>}
+               </button>
+            </div>
 
-             <div className="flex-1 flex flex-col justify-center items-center">
-                <div className="w-full max-w-sm mx-auto">
-                   <div className="flex justify-center mb-6">
-                      <ProgressBar currentStep={4} />
-                   </div>
+            <div
+               className="flex-1 flex flex-col justify-start items-center overflow-y-auto pt-[8vh] px-4 no-scrollbar"
+               style={{ paddingBottom: Math.max(20, keyboardHeight + 20) }}
+            >
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-6">
+                     <ProgressBar currentStep={4} />
+                  </div>
 
                   <div className="text-center mb-6">
                      <h1 className="text-2xl font-bold mb-2">Let's get to know you</h1>
@@ -1010,6 +1038,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                     handleCompleteProfile();
                                  }
                               }}
+                              onFocus={(e) => {
+                                 setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                              }}
                               className="flex-1 bg-transparent outline-none font-medium text-sm"
                            />
                         </div>
@@ -1030,6 +1061,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                  if (e.key === 'Enter' && name.trim() && !loading) {
                                     handleCompleteProfile();
                                  }
+                              }}
+                              onFocus={(e) => {
+                                 setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
                               }}
                               className="flex-1 bg-transparent outline-none font-medium text-sm"
                            />
@@ -1053,6 +1087,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                     handleCompleteProfile();
                                  }
                               }}
+                              onFocus={(e) => {
+                                 setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                              }}
                               className="flex-1 bg-transparent outline-none font-medium uppercase tracking-widest text-sm placeholder:normal-case placeholder:tracking-normal"
                            />
                         </div>
@@ -1067,20 +1104,20 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 5) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-             <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
-                <button
-                   onClick={() => navigate('dashboard')}
-                   className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"
-                >
-                   Skip/Finish <ArrowRight size={18} />
-                </button>
-             </div>
+            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+               <button
+                  onClick={() => navigate('dashboard')}
+                  className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"
+               >
+                  Skip/Finish <ArrowRight size={18} />
+               </button>
+            </div>
 
-             <div className="flex-1 flex flex-col justify-center items-center text-center">
-                <div className="w-full max-w-sm mx-auto">
-                   <div className="flex justify-center mb-8">
-                      <ProgressBar currentStep={5} />
-                   </div>
+            <div className="flex-1 flex flex-col justify-center items-center text-center overflow-y-auto pt-20 pb-4 no-scrollbar">
+               <div className="w-full max-w-sm mx-auto">
+                  <div className="flex justify-center mb-8">
+                     <ProgressBar currentStep={5} />
+                  </div>
 
                   <div className="text-center mb-10">
                      <h1 className="text-3xl font-bold mb-3">Where is Home?</h1>
