@@ -535,21 +535,53 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     }, [active, map, !!userLocation]); // Re-center when location first arrives
 
     // --- REAL-TIME DRIVER TRACKING ---
+    const iconCache = useRef<Map<string, string>>(new Map());
+
     useEffect(() => {
         if (!map) return;
 
-        const getVehicleIcon = (vType: string) => {
+        const getVehicleIcon = (vType: string, rotation: number = 0, callback: (icon: any) => void) => {
             const iconRoot = 'assets/drivers%20vehicle%20types/';
             let iconName = 'car_economic_3d_backup.png';
 
             if (vType === 'premium') iconName = 'car_premium_3d_backup.png';
             if (vType === 'scooter') iconName = 'car_scooter_3d_backup.png';
 
-            return {
-                url: iconRoot + iconName,
-                scaledSize: new (window as any).google.maps.Size(48, 48),
-                anchor: new (window as any).google.maps.Point(24, 24),
-                optimized: false
+            const imageUrl = iconRoot + iconName;
+            const cacheKey = `${imageUrl}-${rotation}`;
+
+            if (iconCache.current.has(cacheKey)) {
+                callback({
+                    url: iconCache.current.get(cacheKey),
+                    scaledSize: new (window as any).google.maps.Size(48, 48),
+                    anchor: new (window as any).google.maps.Point(24, 24),
+                    optimized: false
+                });
+                return;
+            }
+
+            const img = new Image();
+            img.src = imageUrl;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128; // Higher resolution for rotation quality
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                ctx.translate(64, 64);
+                ctx.rotate((rotation * Math.PI) / 180);
+                ctx.drawImage(img, -32, -32, 64, 64);
+
+                const rotatedUrl = canvas.toDataURL();
+                iconCache.current.set(cacheKey, rotatedUrl);
+
+                callback({
+                    url: rotatedUrl,
+                    scaledSize: new (window as any).google.maps.Size(48, 48),
+                    anchor: new (window as any).google.maps.Point(24, 24),
+                    optimized: false
+                });
             };
         };
 
@@ -565,17 +597,26 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     marker.setPosition(position);
                     marker.setVisible(!isRequestActive || d.id === assignedDriverId);
                     marker.setMap(map);
-                } else {
-                    const icon = getVehicleIcon(d.vehicle_category || 'economic');
-                    marker = new (window as any).google.maps.Marker({
-                        position,
-                        map: map,
-                        icon,
-                        title: `Driver ${d.id}`,
-                        optimized: false,
-                        visible: !isRequestActive || d.id === assignedDriverId
+                    
+                    // Update rotation if changed
+                    const currentHeading = Math.round(d.heading || 0);
+                    getVehicleIcon(d.vehicle_category || 'economic', currentHeading, (newIcon) => {
+                        if (marker.getIcon()?.url !== newIcon.url) {
+                            marker.setIcon(newIcon);
+                        }
                     });
-                    markersMap.set(d.id, marker);
+                } else {
+                    getVehicleIcon(d.vehicle_category || 'economic', Math.round(d.heading || 0), (icon) => {
+                        const newMarker = new (window as any).google.maps.Marker({
+                            position,
+                            map: map,
+                            icon,
+                            title: `Driver ${d.id}`,
+                            optimized: false,
+                            visible: !isRequestActive || d.id === assignedDriverId
+                        });
+                        markersMap.set(d.id, newMarker);
+                    });
                 }
 
                 // ETA Logic for assigned driver - Throttled to 30s to save cost
