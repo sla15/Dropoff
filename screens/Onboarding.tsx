@@ -762,7 +762,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
             {/* Header Navigation: Top-Right Action Button */}
-            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
+            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
                <button
                   onClick={() => setStep(1)}
                   className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
@@ -907,7 +907,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 3) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -983,7 +983,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 4) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}
@@ -1104,7 +1104,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 5) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="absolute top-8 left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={() => navigate('dashboard')}
                   className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"
