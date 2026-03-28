@@ -43,6 +43,16 @@ interface Props {
 
 export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, showAlert, onSearchingChange, indexLocation }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
+    const [driverCancelledModal, setDriverCancelledModal] = useState(false);
+    const [driverCancelledName, setDriverCancelledName] = useState('');
+    // Saved trip data for re-search after driver cancellation
+    const cancelledTripRef = useRef<{
+        destinations: string[];
+        destinationCoords: ({ lat: number; lng: number } | null)[];
+        realDistanceKm: number;
+        selectedTier: string;
+        rideType: 'ride' | 'delivery';
+    } | null>(null);
 
     useEffect(() => {
         if (onSearchingChange) {
@@ -102,6 +112,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
     const notifiedDriversRef = useRef<Set<string>>(new Set());
+
+    // 🔒 Refs that mirror state — used inside subscription/polling closures to avoid stale reads
+    // Declared AFTER all state so there are no forward-reference issues.
+    const statusRef = useRef<RideStatus>(status);
+    const destinationsRef = useRef<string[]>(destinations);
+    const destinationCoordsRef = useRef<({ lat: number; lng: number } | null)[]>(destinationCoords);
+    const realDistanceKmRef = useRef<number>(realDistanceKm);
+    const selectedTierRef = useRef<string>(selectedTier);
+    const rideTypeRef = useRef<'ride' | 'delivery'>(rideType);
+    const assignedDriverRef = useRef<any>(assignedDriver);
+    const directionsRendererRef = useRef<any>(directionsRenderer);
+    const currentRideIdRef = useRef<string | null>(currentRideId);
+
+    // Keep refs in sync with state
+    useEffect(() => { statusRef.current = status; }, [status]);
+    useEffect(() => { destinationsRef.current = destinations; }, [destinations]);
+    useEffect(() => { destinationCoordsRef.current = destinationCoords; }, [destinationCoords]);
+    useEffect(() => { realDistanceKmRef.current = realDistanceKm; }, [realDistanceKm]);
+    useEffect(() => { selectedTierRef.current = selectedTier; }, [selectedTier]);
+    useEffect(() => { rideTypeRef.current = rideType; }, [rideType]);
+    useEffect(() => { assignedDriverRef.current = assignedDriver; }, [assignedDriver]);
+    useEffect(() => { directionsRendererRef.current = directionsRenderer; }, [directionsRenderer]);
+    useEffect(() => { currentRideIdRef.current = currentRideId; }, [currentRideId]);
+
 
     // Drag Sheet State
     const PEEK_OFFSET = 320; // Reduced from 460 to ensure visibility
@@ -1015,74 +1049,130 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         });
     }, [map, bookingStep, destinationCoords]);
 
-    // ✅ STABLE RIDE SUBSCRIPTION — Lives in its own useEffect keyed on currentRideId.
-    // This is the correct React pattern: subscriptions must NOT live in closures inside async functions.
-    // A polling fallback is included to catch events that real-time may miss.
+    // ✅ ROBUST RIDE SUBSCRIPTION — Uses refs to avoid stale closure reads.
+    // Real-time subscription + aggressive polling fallback that detects ANY status change.
     useEffect(() => {
         if (!currentRideId) return;
 
-        const handleRideUpdate = async (updatedRide: any) => {
-            console.log('[RideSub] Status update:', updatedRide.status);
+        let lastKnownDbStatus: string | null = null; // Track what we've already processed
+        let isHandling = false; // Prevent concurrent handling
 
-            if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
-                if (searchIntervalRef.current) {
-                    clearInterval(searchIntervalRef.current);
-                    searchIntervalRef.current = null;
-                }
-                const { data: driverData } = await supabase
-                    .from('drivers')
-                    .select('*, profile:profiles(full_name, phone, average_rating)')
-                    .eq('id', updatedRide.driver_id)
-                    .single();
-                if (driverData) {
-                    const formattedDriver = {
-                        ...driverData,
-                        name: (driverData.profile as any)?.full_name || 'Driver',
-                        phone: (driverData.profile as any)?.phone || '',
-                        rating: (driverData.profile as any)?.average_rating || 5.0
-                    };
-                    setAssignedDriverId(updatedRide.driver_id);
-                    setAssignedDriver(formattedDriver);
-                    setStatus('accepted');
-                    sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+        const handleRideUpdate = async (updatedRide: any) => {
+            // Deduplicate: don't re-process the same status
+            if (updatedRide.status === lastKnownDbStatus) return;
+            if (isHandling) return;
+            isHandling = true;
+            lastKnownDbStatus = updatedRide.status;
+
+            console.log('[RideSub] 🔔 Status change detected:', updatedRide.status, '| driver_id:', updatedRide.driver_id);
+
+            try {
+                if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
+                    if (searchIntervalRef.current) {
+                        clearInterval(searchIntervalRef.current);
+                        searchIntervalRef.current = null;
+                    }
+                    const { data: driverData } = await supabase
+                        .from('drivers')
+                        .select('*, profile:profiles(full_name, phone, average_rating)')
+                        .eq('id', updatedRide.driver_id)
+                        .single();
+                    if (driverData) {
+                        const formattedDriver = {
+                            ...driverData,
+                            name: (driverData.profile as any)?.full_name || 'Driver',
+                            phone: (driverData.profile as any)?.phone || '',
+                            rating: (driverData.profile as any)?.average_rating || 5.0
+                        };
+                        setAssignedDriverId(updatedRide.driver_id);
+                        setAssignedDriver(formattedDriver);
+                        setStatus('accepted');
+                        sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                        triggerHaptic();
+                    }
+                } else if (updatedRide.status === 'arrived') {
+                    setStatus('arrived');
+                    sendPush("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
                     triggerHaptic();
+                } else if (updatedRide.status === 'in-progress') {
+                    setStatus('in-progress');
+                    triggerHaptic();
+                } else if (updatedRide.status === 'completed') {
+                    setCurrentRideId(null);
+                    sendPush("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
+                    completeTrip();
+                } else if (
+                    updatedRide.status === 'cancelled' || 
+                    updatedRide.status === 'cancelled_by_driver' ||
+                    (updatedRide.status === 'searching' && !updatedRide.driver_id && ['accepted', 'arrived', 'in-progress'].includes(statusRef.current))
+                ) {
+                    console.log('[RideSub] 🚨 CANCELLATION DETECTED — processing immediately');
+
+                    // If the backend sent it back to the search pool, aggressively cancel it 
+                    // so another driver doesn't accept it while the user decides what to do.
+                    if (updatedRide.status === 'searching') {
+                        supabase.from('rides').update({ status: 'cancelled' }).eq('id', updatedRide.id).then();
+                    }
+
+                    // Read CURRENT values from refs (not stale closure state)
+                    const curDestinations = destinationsRef.current;
+                    const curCoords = destinationCoordsRef.current;
+                    const curDistance = realDistanceKmRef.current;
+                    const curTier = selectedTierRef.current;
+                    const curRideType = rideTypeRef.current;
+                    const curDriver = assignedDriverRef.current;
+                    const curRenderer = directionsRendererRef.current;
+
+                    // Snapshot trip data BEFORE clearing — so "Find Another Driver" can re-use it
+                    cancelledTripRef.current = {
+                        destinations: [...curDestinations],
+                        destinationCoords: [...curCoords],
+                        realDistanceKm: curDistance,
+                        selectedTier: curTier,
+                        rideType: curRideType
+                    };
+
+                    // Immediately clean up state
+                    setCurrentRideId(null);
+                    if (searchIntervalRef.current) {
+                        clearInterval(searchIntervalRef.current);
+                        searchIntervalRef.current = null;
+                    }
+                    if (curRenderer) {
+                        try { curRenderer.setDirections({ routes: [] }); } catch (e) { }
+                    }
+                    markersRef.current.forEach(m => m?.setMap(null));
+                    markersRef.current = [];
+                    setDestinations(['']);
+                    setDestinationCoords([null]);
+                    setRealDistanceKm(0);
+                    setEtaSeconds(300);
+                    notifiedDriversRef.current.clear();
+                    setBookingStep('planning');
+
+                    if (updatedRide.driver_id || updatedRide.status === 'cancelled_by_driver') {
+                        // Driver cancelled — show action modal
+                        const cancelledByName = curDriver?.name || 'Your driver';
+                        const isDelivery = curRideType === 'delivery';
+                        setAssignedDriverId(null);
+                        setAssignedDriver(null);
+                        setStatus('idle');
+                        setDriverCancelledName(cancelledByName);
+                        setDriverCancelledModal(true);
+                        triggerHaptic();
+                        sendPush(
+                            isDelivery ? 'DROPOFF: Delivery Cancelled' : 'DROPOFF: Ride Cancelled',
+                            `${cancelledByName} has cancelled your ${isDelivery ? 'delivery' : 'ride'}.`
+                        );
+                    } else {
+                        setAssignedDriverId(null);
+                        setAssignedDriver(null);
+                        setStatus('idle');
+                        navigate('dashboard');
+                    }
                 }
-            } else if (updatedRide.status === 'arrived') {
-                setStatus('arrived');
-                sendPush("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
-                triggerHaptic();
-            } else if (updatedRide.status === 'in-progress') {
-                setStatus('in-progress');
-                triggerHaptic();
-            } else if (updatedRide.status === 'completed') {
-                setCurrentRideId(null);
-                sendPush("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
-                completeTrip();
-            } else if (updatedRide.status === 'cancelled' || updatedRide.status === 'cancelled_by_driver') {
-                // Immediately clean up and show modal — no refresh needed
-                setCurrentRideId(null);
-                if (searchIntervalRef.current) {
-                    clearInterval(searchIntervalRef.current);
-                    searchIntervalRef.current = null;
-                }
-                if (directionsRenderer) directionsRenderer.setDirections({ routes: [] });
-                markersRef.current.forEach(m => m?.setMap(null));
-                markersRef.current = [];
-                setDestinations(['']);
-                setDestinationCoords([null]);
-                setRealDistanceKm(0);
-                setEtaSeconds(300);
-                notifiedDriversRef.current.clear();
-                setBookingStep('planning');
-                setAssignedDriverId(null);
-                setAssignedDriver(null);
-                if (updatedRide.driver_id) {
-                    setStatus('cancelled');
-                    setShowCancellationSummary(true);
-                } else {
-                    setStatus('idle');
-                    navigate('dashboard');
-                }
+            } finally {
+                isHandling = false;
             }
         };
 
@@ -1092,33 +1182,137 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${currentRideId}` },
-                (payload) => { handleRideUpdate(payload.new); }
+                (payload) => {
+                    console.log('[RideSub] Real-time event received:', payload.new);
+                    handleRideUpdate(payload.new);
+                }
             )
             .subscribe((subStatus) => {
                 console.log('[RideSub] Channel status:', subStatus);
             });
 
-        // 2. Polling fallback — catches events real-time may miss (network issues, etc.)
-        // Guard: only process if the DB status is a terminal one we haven't handled yet.
-        const terminalStatuses = ['cancelled', 'cancelled_by_driver', 'completed'];
-        const pollingRef = setInterval(async () => {
-            const { data } = await supabase
-                .from('rides')
-                .select('id, status, driver_id')
-                .eq('id', currentRideId)
-                .single();
-            // Only trigger update for terminal/important status changes, not while still searching/in-progress
-            if (data && terminalStatuses.includes(data.status)) {
-                handleRideUpdate(data);
+        // 2. Aggressive polling fallback — catches ANY status change real-time may miss.
+        // Polls every 3 seconds. Compares against lastKnownDbStatus to avoid duplicate processing.
+        const pollingTimer = setInterval(async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('rides')
+                    .select('id, status, driver_id')
+                    .eq('id', currentRideId)
+                    .single();
+
+                if (error) {
+                    console.warn('[RideSub] Polling query error:', error.message);
+                    return;
+                }
+
+                if (data && data.status !== lastKnownDbStatus) {
+                    console.log('[RideSub] 📡 Polling detected status change:', lastKnownDbStatus, '→', data.status);
+                    handleRideUpdate(data);
+                }
+            } catch (err) {
+                console.warn('[RideSub] Polling exception:', err);
             }
-        }, 5000);
+        }, 3000);
 
         return () => {
             console.log('[RideSub] Cleaning up subscription for', currentRideId);
             supabase.removeChannel(channel);
-            clearInterval(pollingRef);
+            clearInterval(pollingTimer);
         };
     }, [currentRideId]);
+
+    // 🛡️ FAILSAFE: Independent customer-level polling.
+    // Catches cancellations even if currentRideId was cleared or the subscription dropped.
+    // Runs while the user is on a non-idle ride status.
+    useEffect(() => {
+        if (!user.id || status === 'idle' || status === 'completed' || status === 'cancelled') return;
+
+        const failsafeTimer = setInterval(async () => {
+            try {
+                // Check if there are ANY active rides for this customer
+                const { data: activeRides, error } = await supabase
+                    .from('rides')
+                    .select('id, status, driver_id')
+                    .eq('customer_id', user.id)
+                    .in('status', ['searching', 'accepted', 'arrived', 'in-progress'])
+                    .neq('type', 'MERCHANT_DELIVERY')
+                    .limit(1);
+
+                if (error) return;
+
+                // If status shows we have an active ride but DB says none exist → ride was cancelled/completed externally
+                const activeRide = activeRides?.[0];
+                const ghostAssignedRide = activeRide && activeRide.status === 'searching' && !activeRide.driver_id && ['accepted', 'arrived', 'in-progress'].includes(statusRef.current);
+
+                if ( ((!activeRides || activeRides.length === 0) || ghostAssignedRide) && statusRef.current !== 'idle' && statusRef.current !== 'completed') {
+                    console.log('[Failsafe] ⚠️ No active rides found (or orphaned search detected) — forcing cleanup');
+
+                    // If it was a ghost search (driver dropped it), actively cancel it so no other driver picks it up
+                    if (ghostAssignedRide && activeRide?.id) {
+                        supabase.from('rides').update({ status: 'cancelled' }).eq('id', activeRide.id).then();
+                    }
+
+                    // Read CURRENT values from refs
+                    const curDestinations = destinationsRef.current;
+                    const curCoords = destinationCoordsRef.current;
+                    const curDistance = realDistanceKmRef.current;
+                    const curTier = selectedTierRef.current;
+                    const curRideType = rideTypeRef.current;
+                    const curDriver = assignedDriverRef.current;
+                    const curRenderer = directionsRendererRef.current;
+
+                    // Save trip data for potential re-search
+                    if (curDestinations[0]) {
+                        cancelledTripRef.current = {
+                            destinations: [...curDestinations],
+                            destinationCoords: [...curCoords],
+                            realDistanceKm: curDistance,
+                            selectedTier: curTier,
+                            rideType: curRideType
+                        };
+                    }
+
+                    // Clean up
+                    setCurrentRideId(null);
+                    if (searchIntervalRef.current) {
+                        clearInterval(searchIntervalRef.current);
+                        searchIntervalRef.current = null;
+                    }
+                    if (curRenderer) {
+                        try { curRenderer.setDirections({ routes: [] }); } catch (e) { }
+                    }
+                    markersRef.current.forEach(m => m?.setMap(null));
+                    markersRef.current = [];
+                    setDestinations(['']);
+                    setDestinationCoords([null]);
+                    setRealDistanceKm(0);
+                    setEtaSeconds(300);
+                    notifiedDriversRef.current.clear();
+                    setBookingStep('planning');
+
+                    // Show the driver-cancelled modal
+                    const cancelledByName = curDriver?.name || 'Your driver';
+                    const isDelivery = curRideType === 'delivery';
+                    setAssignedDriverId(null);
+                    setAssignedDriver(null);
+                    setStatus('idle');
+                    setDriverCancelledName(cancelledByName);
+                    setDriverCancelledModal(true);
+                    triggerHaptic();
+                    sendPush(
+                        isDelivery ? 'DROPOFF: Delivery Cancelled' : 'DROPOFF: Ride Cancelled',
+                        `${cancelledByName} has cancelled your ${isDelivery ? 'delivery' : 'ride'}.`
+                    );
+                }
+            } catch (err) {
+                console.warn('[Failsafe] Polling error:', err);
+            }
+        }, 5000);
+
+        return () => clearInterval(failsafeTimer);
+    }, [user.id, status]);
+
 
 
     const handleSearch = (val: string, index: number) => {
@@ -1833,6 +2027,106 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     textSec={textSec}
                     inputBg={inputBg}
                 />
+            )}
+
+            {/* ── Driver Cancelled Action Modal ── */}
+            {driverCancelledModal && (
+                <div className="absolute inset-0 z-[100] flex items-end justify-center">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => {
+                            setDriverCancelledModal(false);
+                            cancelledTripRef.current = null;
+                            navigate('dashboard');
+                        }}
+                    />
+
+                    {/* Sheet */}
+                    <div
+                        className={`relative w-full rounded-t-[2.5rem] ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} shadow-2xl pb-safe animate-slide-up`}
+                        style={{ animation: 'slideUp 0.4s cubic-bezier(0.2,0.8,0.2,1) both' }}
+                    >
+                        {/* Drag pill */}
+                        <div className="flex justify-center pt-4 pb-2">
+                            <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
+                        </div>
+
+                        <div className="px-6 pb-8 pt-2 flex flex-col items-center gap-5">
+                            {/* Icon */}
+                            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mt-2">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="15" y1="9" x2="9" y2="15" />
+                                    <line x1="9" y1="9" x2="15" y2="15" />
+                                </svg>
+                            </div>
+
+                            {/* Heading — dynamic for ride vs delivery */}
+                            <div className="text-center">
+                                <h2 className={`text-xl font-bold mb-1 ${theme === 'light' ? 'text-[#000]' : 'text-white'}`}>
+                                    {cancelledTripRef.current?.rideType === 'delivery' ? 'Delivery Cancelled' : 'Ride Cancelled'}
+                                </h2>
+                                <p className={`text-sm leading-relaxed ${theme === 'light' ? 'text-[#636366]' : 'text-[#98989D]'}`}>
+                                    <span className="font-semibold text-red-400">{driverCancelledName}</span> has cancelled your {cancelledTripRef.current?.rideType === 'delivery' ? 'delivery' : 'ride'}.{'\n'}
+                                    Would you like us to find you another driver?
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="w-full flex flex-col gap-3 mt-1">
+                                <button
+                                    onClick={() => {
+                                        setDriverCancelledModal(false);
+                                        triggerHaptic();
+                                        // Restore the saved trip data and re-search
+                                        const saved = cancelledTripRef.current;
+                                        if (saved && saved.destinations[0]) {
+                                            setDestinations(saved.destinations);
+                                            setDestinationCoords(saved.destinationCoords);
+                                            setRealDistanceKm(saved.realDistanceKm);
+                                            setSelectedTier(saved.selectedTier);
+                                            setRideType(saved.rideType);
+                                            setBookingStep('selecting');
+                                            cancelledTripRef.current = null;
+                                            // Kick off a fresh search with restored data
+                                            handleBookRide();
+                                        } else {
+                                            cancelledTripRef.current = null;
+                                            setStatus('idle');
+                                        }
+                                    }}
+                                    className="w-full py-4 rounded-2xl bg-[#00D68F] text-black font-bold text-base active:scale-95 transition-transform shadow-lg shadow-[#00D68F]/30"
+                                >
+                                    🔍 Find Another Driver
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setDriverCancelledModal(false);
+                                        cancelledTripRef.current = null;
+                                        setStatus('idle');
+                                        setDestinations(['']);
+                                        setDestinationCoords([null]);
+                                        setRealDistanceKm(0);
+                                        setBookingStep('planning');
+                                        navigate('dashboard');
+                                    }}
+                                    className={`w-full py-4 rounded-2xl font-semibold text-base active:scale-95 transition-transform ${theme === 'light' ? 'bg-[#F2F2F7] text-[#636366]' : 'bg-[#2C2C2E] text-[#98989D]'}`}
+                                >
+                                    No, Cancel Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>{`
+                        @keyframes slideUp {
+                            from { transform: translateY(100%); opacity: 0; }
+                            to   { transform: translateY(0);    opacity: 1; }
+                        }
+                    `}</style>
+                </div>
             )}
 
             {showPaymentSummary && (

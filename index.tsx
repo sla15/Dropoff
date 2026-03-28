@@ -619,6 +619,8 @@ const App = () => {
         'pending_gift_card'
       ];
       keysToClear.forEach(key => localStorage.removeItem(key));
+      // Clear cached profile from Preferences
+      Preferences.remove({ key: 'cached_user_profile' }).catch(() => {});
       
       // 4. Reset Navigation
       setScreen('onboarding');
@@ -724,7 +726,7 @@ const App = () => {
         }
 
         if (profile) {
-          setUser({
+          const loadedUser = {
             id: profile.id,
             name: profile.full_name || '',
             phone: profile.phone || '',
@@ -737,7 +739,11 @@ const App = () => {
             referralBalance: profile.referral_balance || 0,
             last_lat: profile.last_lat,
             last_lng: profile.last_lng
-          });
+          };
+          setUser(loadedUser);
+
+          // 💾 Persist profile to Preferences so it survives offline reconnections
+          Preferences.set({ key: 'cached_user_profile', value: JSON.stringify(loadedUser) }).catch(() => {});
           
           setIsFavoritesLoading(true);
           setIsActivitiesLoading(true);
@@ -821,7 +827,22 @@ const App = () => {
       const runInit = async () => {
         try {
           console.log("🚀 Init: Start...");
-          
+
+          // 0. Immediately load cached profile from Preferences
+          // This guarantees the user's name/photo are visible even before any network call.
+          try {
+            const { value: cachedProfile } = await Preferences.get({ key: 'cached_user_profile' });
+            if (cachedProfile) {
+              const parsed = JSON.parse(cachedProfile);
+              if (parsed && parsed.id && parsed.name) {
+                console.log("🚀 Init: Restoring cached profile for:", parsed.name);
+                setUser(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("🚀 Init: Failed to restore cached profile:", e);
+          }
+
           // 1. Critical Session Check - FIRST priority
           console.log("🚀 Init: Session check...");
           let currentSession = null;
@@ -900,10 +921,40 @@ const App = () => {
     };
 
 
-    // 2. Network Listener
-    Network.addListener('networkStatusChange', status => {
-      console.log("🌐 Network status changed:", status);
-      setIsOffline(!status.connected);
+    // 2. Network Listener — also re-syncs profile when connection is restored
+    Network.addListener('networkStatusChange', async (netStatus) => {
+      console.log("🌐 Network status changed:", netStatus);
+      setIsOffline(!netStatus.connected);
+
+      if (netStatus.connected) {
+        console.log("🌐 Network restored — re-syncing session & profile...");
+        try {
+          // Force-reset the sync guard so network restore is never blocked by a stale lock
+          isSyncingProfile = false;
+
+          // Refresh the JWT first (it may have expired while offline)
+          await supabase.auth.refreshSession().catch(() => {});
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            console.log("🌐 Network restore: session valid, reloading profile...");
+            // Await the sync to ensure profile is loaded before moving on
+            await handleUserAuthenticated(session).catch(err =>
+              console.warn("🌐 Network restore profile sync failed:", err)
+            );
+            // Reconnect Realtime channels that may have dropped
+            try {
+              supabase.realtime.disconnect();
+              supabase.realtime.connect();
+              supabase.realtime.setAuth(session.access_token);
+              subscribeToChanges(session.user.id);
+            } catch (rtErr) {
+              console.warn("🌐 Realtime reconnect error:", rtErr);
+            }
+          }
+        } catch (err) {
+          console.warn("🌐 Network restore re-sync error:", err);
+        }
+      }
     });
 
     // 3. App State Change Listener (Resume/Background)
