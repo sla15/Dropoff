@@ -60,19 +60,21 @@ html, body {
 
 /* Safe Area Padding Utilities */
 .pt-safe {
-  padding-top: var(--safe-area-inset-top);
+  /* Provides a minimum of 24px padding for Android status bars if env() is zero */
+  padding-top: max(var(--safe-area-inset-top), 24px);
 }
 
 .pb-safe {
-  padding-bottom: var(--safe-area-inset-bottom);
+  /* Provides a minimum of 24px padding for Android navigation layers if env() is zero */
+  padding-bottom: max(var(--safe-area-inset-bottom), 24px);
 }
 
 .mt-safe {
-  margin-top: var(--safe-area-inset-top);
+  margin-top: max(var(--safe-area-inset-top), 24px);
 }
 
 .mb-safe {
-  margin-bottom: var(--safe-area-inset-bottom);
+  margin-bottom: max(var(--safe-area-inset-bottom), 24px);
 }
 
 /* Screen Transitions */
@@ -176,3 +178,60 @@ img[src*="car_premium"] {
 .animate-shimmer {
   animation: shimmer 2s infinite;
 }
+
+/* ── Low-End Device Performance Mode ──
+   Applied via JS detection on <html> element.
+   Disables expensive GPU effects on budget devices.
+*/
+.low-end-device *,
+.low-end-device *::before,
+.low-end-device *::after {
+  /* Kill ALL backdrop-filters system-wide */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Remove heavy box-shadows on low-end */
+.low-end-device .shadow-2xl,
+.low-end-device .shadow-xl,
+.low-end-device .shadow-lg,
+.low-end-device [class*="shadow-[0_"] {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15) !important;
+}
+
+/* Reduce animation complexity - keep functional animations, remove decorative ones */
+@media (prefers-reduced-motion: no-preference) {
+  .low-end-device .animate-bounce {
+    animation: none !important;
+  }
+  .low-end-device .animate-pulse {
+    animation: none !important;
+    opacity: 0.6;
+  }
+  .low-end-device .animate-spin {
+    /* Keep spin for loading indicators, they are functional */
+    animation-duration: 1s;
+  }
+  .low-end-device [class*="hover:-translate"] {
+    transform: none !important;
+  }
+  .low-end-device [class*="hover:scale"] {
+    transform: none !important;
+  }
+  /* Keep active:scale for tap feedback responsiveness */
+}
+
+/* Simplify screen transitions on low-end */
+.low-end-device .animate-scale-in {
+  animation-duration: 0.15s !important;
+}
+
+/* Remove expensive gradient layers on map cards */
+.low-end-device img[src*="unsplash"] {
+  filter: none !important;
+}
+
+/* Disable img transitions that cause GPU thrashing */
+.low-end-device img {
+  transition: none !important;
+}

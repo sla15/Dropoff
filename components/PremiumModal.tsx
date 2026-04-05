@@ -32,7 +32,7 @@ export const PremiumModal = ({
 }: Props) => {
     if (!isOpen) return null;
 
-    const bgCard = theme === 'light' ? 'bg-white/90' : 'bg-[#1C1C1E]/90';
+    const bgCard = theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]';
     const textMain = theme === 'light' ? 'text-black' : 'text-white';
 
     const handleConfirm = () => {
@@ -51,9 +51,10 @@ export const PremiumModal = ({
 
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={handleCancel}></div>
+            {/* The overlay is extremely dark (80%) and blurred so the white/dark card stands out perfectly */}
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCancel}></div>
 
-            <div className={`${bgCard} backdrop-blur-2xl w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl border border-white/10 p-8 flex flex-col items-center text-center gap-6 animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 cubic-bezier(0.16, 1, 0.3, 1)`}>
+            <div className={`${bgCard} relative z-[1001] w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl border border-black/5 dark:border-white/10 p-8 flex flex-col items-center text-center gap-6 animate-in zoom-in-95 slide-in-from-bottom-10 duration-500`}>
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center ${type === 'success' ? 'bg-[#00D68F]/10 text-[#00D68F]' :
                     type === 'error' ? 'bg-red-500/10 text-red-500' :
                         'bg-blue-500/10 text-blue-500'

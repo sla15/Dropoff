@@ -158,10 +158,8 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
     };
 
     return (
-        <div className={`fixed inset-0 z-[100] bg-white/10 dark:bg-black/20 backdrop-blur-md ${textMain} flex flex-col animate-slide-in-up`}>
-            {/* Header */}
-            <div className={`pt-safe px-4 pb-4 flex items-center gap-4 bg-white/60 dark:bg-black/60 backdrop-blur-xl shadow-sm z-10 sticky top-0`}>
-                <button onClick={() => { triggerHaptic(); onClose(); }} className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}>
+        <div className={`fixed inset-0 z-[100] bg-white dark:bg-[#1C1C1E] backdrop-blur-3xl ${textMain} flex flex-col animate-slide-in-up`}>            {/* Header */}
+            <div className={`pt-safe px-4 pb-4 flex items-center gap-4 bg-white dark:bg-[#1C1C1E] backdrop-blur-3xl shadow-sm z-10 sticky top-0`}>                <button onClick={() => { triggerHaptic(); onClose(); }} className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors`}>
                     <ArrowLeft size={24} className="text-black dark:text-white" />
                 </button>
                 <h1 className="text-xl font-bold flex-1 text-center pr-10 text-black dark:text-white">Where to?</h1>
@@ -169,8 +167,7 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
 
             <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
                 {/* Inputs Area */}
-                <div className="bg-white/40 dark:bg-black/40 backdrop-blur-xl p-6 shadow-sm">
-                    <div className="space-y-4">
+                <div className="bg-white dark:bg-[#1C1C1E] backdrop-blur-3xl p-6 shadow-sm">                    <div className="space-y-4">
                         <div className="relative flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center flex-shrink-0">
                                 <Locate size={18} className="text-[#00D68F]" onClick={() => handleLocateMe(false)} />
@@ -275,8 +272,7 @@ export const LocationSearchOverlay: React.FC<LocationSearchOverlayProps> = ({
             </div>
 
             {/* Footer Action */}
-            <div className={`p-6 bg-white/80 dark:bg-black/80 backdrop-blur-2xl pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t border-gray-100 dark:border-gray-800`}>
-                <button
+            <div className={`p-6 bg-white dark:bg-[#1C1C1E] backdrop-blur-3xl pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t border-gray-100 dark:border-gray-800`}>                <button
                     onClick={handleConfirm}
                     disabled={!destinations.some(d => d.trim() !== '')}
                     className="w-full bg-[#00D68F] text-black py-4 rounded-full font-bold text-lg shadow-xl disabled:opacity-50 active:scale-[0.98] transition-transform"

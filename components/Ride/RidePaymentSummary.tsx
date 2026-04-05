@@ -39,8 +39,7 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
     const priceInfo = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-scale-in">
-            <div className={`${bgCard} w-full max-w-md rounded-[32px] p-6 relative overflow-hidden`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md animate-scale-in">            <div className={`${bgCard} w-full max-w-md rounded-[32px] p-6 relative overflow-hidden`}>
                 <div className="absolute top-0 left-0 w-full h-1 bg-[#00D68F]"></div>
 
                 <div className="flex flex-col items-center mb-6">

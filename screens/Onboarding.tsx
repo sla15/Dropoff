@@ -190,7 +190,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { t
          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
          <div
             ref={drawerRef}
-            className={`w-full ${theme === 'light' ? 'bg-white/85' : 'bg-[#1C1C1E]/85'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] min-h-[80vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+            className={`w-full ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] min-h-[80vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
             style={{
                transform: `translateY(${dragY}px)`,
                transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'

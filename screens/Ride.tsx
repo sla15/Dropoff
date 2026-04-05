@@ -327,15 +327,36 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             const defaultCenter = { lat: 13.4432, lng: -16.5916 };
             const targetCenter = userLocation || (user.last_lat && user.last_lng ? { lat: user.last_lat, lng: user.last_lng } : defaultCenter);
 
+            // Detect low-end device for performance-friendly map options
+            const cores = navigator.hardwareConcurrency || 4;
+            const memGB = (navigator as any).deviceMemory || 4;
+            const isLowEnd = cores <= 4 || memGB <= 2;
+
             try {
-                const newMap = new google.maps.Map(mapContainerRef.current, {
+                const mapOptions: any = {
                     center: targetCenter,
                     zoom: 13,
                     disableDefaultUI: true,
                     clickableIcons: false,
                     gestureHandling: 'greedy',
                     styles: [] // Standard Light Theme
-                });
+                };
+
+                // On low-end devices, disable Google Maps' internal animations
+                // and use a minimal style to reduce GPU load
+                if (isLowEnd) {
+                    mapOptions.disableDoubleClickZoom = false;
+                    // Use a very minimal map style - no labels, no points of interest
+                    // The fewer elements rendered, the faster the map draws
+                    mapOptions.styles = [
+                        { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
+                        { featureType: 'transit', elementType: 'all', stylers: [{ visibility: 'off' }] },
+                        { featureType: 'landscape.man_made', elementType: 'all', stylers: [{ visibility: 'simplified' }] },
+                    ];
+                    console.log('📱 Low-end mode: using minimal map style');
+                }
+
+                const newMap = new google.maps.Map(mapContainerRef.current, mapOptions);
 
                 newMap.addListener('dragstart', () => {
                     mapInteractionRef.current = true;
@@ -350,8 +371,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     suppressMarkers: true,
                     polylineOptions: {
                         strokeColor: '#00D68F',
-                        strokeWeight: 5,
-                        strokeOpacity: 0.8
+                        strokeWeight: isLowEnd ? 4 : 5,
+                        strokeOpacity: 0.9
                     }
                 });
 
@@ -1938,7 +1959,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {/* Bottom Card / Draggable Sheet */}
             <div
-                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/70' : 'bg-[#1C1C1E]/70'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] min-h-[350px] transition-transform duration-300 ease-out`}
+                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] min-h-[350px] transition-transform duration-300 ease-out`}
                 style={{
                     transform: sheetTransform,
                     transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'

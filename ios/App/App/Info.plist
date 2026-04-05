@@ -27,7 +27,7 @@
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is used to show available drivers nearby, calculate accurate ETAs, and ensure safe ride tracking from pickup to dropoff.</string>
+	<string>Dropoff uses your location to calculate accurate delivery pricing, track your driver's arrival time, and navigate drivers to your exact pickup spot.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Allowing background location ensures your ride or delivery continues to track accurately even if you switch apps or lock your screen.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -271,6 +271,14 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
 
     const Config = statusConfig[status];
 
+    const clearOrderAndGoHome = () => {
+        setActiveOrderId(null);
+        setActiveBatchId(null);
+        localStorage.removeItem('active_order_id');
+        localStorage.removeItem('active_batch_id');
+        navigate('dashboard');
+    };
+
     const handleSubmitReview = async () => {
         if (!reviewBusiness || isSubmittingReview) return;
         setIsSubmittingReview(true);
@@ -288,12 +296,31 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
 
             if (error) throw error;
 
-            setReviewedIds(prev => [...prev, reviewBusiness.id]);
+            const newReviewedIds = [...reviewedIds, reviewBusiness.id];
+            setReviewedIds(newReviewedIds);
             setShowReviewModal(false);
             setUserComment('');
             setUserRating(5);
             setReviewBusiness(null);
-            showAlert("Success", "Thank you for your review!", "success");
+
+            // Determine if all businesses have been reviewed
+            const allBusinessIds = activeBatchId
+                ? batchOrders.map(o => o.business_id)
+                : [orderInfo?.business_id];
+            const allReviewed = allBusinessIds.every(
+                id => id && newReviewedIds.includes(id)
+            );
+
+            if (allReviewed) {
+                showAlert(
+                    "Thank you! 🎉",
+                    "Your review has been submitted. Hope to see you again soon!",
+                    "success",
+                    clearOrderAndGoHome
+                );
+            } else {
+                showAlert("Review Submitted", "Thank you for your feedback!", "success");
+            }
         } catch (err: any) {
             console.error("Review Submission Error:", err);
             showAlert("Error", "Could not submit review. Please try again.", "error");
@@ -317,7 +344,12 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
             <div className="pt-safe px-6 pb-6 flex items-center justify-between z-10">
                 <button
                     onClick={() => {
-                        if (status === 'delivered') setActiveOrderId(null);
+                        if (status === 'delivered') {
+                            setActiveOrderId(null);
+                            setActiveBatchId(null);
+                            localStorage.removeItem('active_order_id');
+                            localStorage.removeItem('active_batch_id');
+                        }
                         navigate('dashboard');
                     }}
                     className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center active:scale-95 transition-transform`}
@@ -527,7 +559,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     </div>
                 )}
 
-                {(orderInfo?.status === 'pending' || orderInfo?.status === 'accepted') && (
+                {orderInfo?.status === 'pending' && (
                     <button
                         onClick={handleCancelOrder}
                         className="mt-8 w-full py-4 rounded-2xl border-2 border-red-500/20 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 active:bg-red-500/10 transition-all shadow-sm"
@@ -541,8 +573,8 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
             {/* Review Modal */}
             {showReviewModal && reviewBusiness && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}></div>
-                    <div className={`${theme === 'light' ? 'bg-white/80' : 'bg-[#1C1C1E]/80'} backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 relative z-10 animate-scale-in`}>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}></div>
+                    <div className={`${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} w-full max-w-sm rounded-[32px] p-8 relative z-[101] animate-scale-in shadow-2xl`}>
                         <h2 className="text-2xl font-bold mb-2">Rate {reviewBusiness.name}</h2>
                         <p className={`text-sm ${textSec} mb-6`}>How was your experience today?</p>
 

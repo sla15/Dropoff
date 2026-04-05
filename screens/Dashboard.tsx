@@ -336,7 +336,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
   return (
     <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden`}>
-      <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} backdrop-blur-sm transition-all`}>
+      <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white' : 'bg-black'} backdrop-blur-sm transition-all`}>
         <div className="flex justify-between items-center mt-2">
           <div id="walkthrough-profile" className="flex items-center gap-3">
             <div className="relative">

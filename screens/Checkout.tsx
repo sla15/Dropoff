@@ -42,12 +42,14 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [deliveryNote, setDeliveryNote] = useState('');
     const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
 
+    const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
+
     const uniqueBusinessIds = Array.from(new Set(cart.map(item => item.businessId)));
 
     // Calculate Delivery Fee
     const getDeliveryFee = () => {
         if (!settings) return 0;
-        const minFee = Number(settings.min_delivery_fee);
+        const minFee = Number(settings.min_delivery_fee || 0);
         const pricePerStop = Number(settings.price_per_stop || 0);
 
         // Multi-stop addition: (N-1) * price_per_stop
@@ -55,15 +57,15 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
         if (deliveryDistance === null) return minFee + stopAddition;
 
-        const pricePerKm = Number(settings.price_per_km);
+        const pricePerKm = Number(settings.price_per_km || 0);
         const distanceKm = deliveryDistance / 1000;
         const calculatedFee = distanceKm * pricePerKm;
 
-        return Math.max(minFee, calculatedFee) + stopAddition;
+        return minFee + calculatedFee + stopAddition;
     };
 
-    const deliveryFee = getDeliveryFee();
-    const subtotal = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+    const deliveryFee = Math.ceil(getDeliveryFee());
+    const subtotal = Math.ceil(cart.reduce((acc, i) => acc + (i.price * i.quantity), 0));
     const total = subtotal + deliveryFee;
 
     const groupedCart = cart.reduce((acc, item) => {
@@ -108,28 +110,31 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     // Distance Matrix Calculation
     React.useEffect(() => {
         const calculateRouteDistance = async () => {
-            if (uniqueBusinessIds.length === 0 || !merchants || Object.keys(merchants).length < uniqueBusinessIds.length) return;
-            if (!window.google) return;
+            // Wait for all merchants coordinates to be loaded
+            if (uniqueBusinessIds.length === 0 || !merchants || Object.keys(merchants).length < uniqueBusinessIds.length) {
+                // not ready to calculate yet
+                setIsCalculatingDistance(true);
+                return;
+            }
 
-            const service = new window.google.maps.DistanceMatrixService();
+            if (!window.google) {
+                console.warn("Google Maps not loaded. Falling back to base fees.");
+                setIsCalculatingDistance(false);
+                return;
+            }
 
-            // For a multi-merchant order, the route is:
-            // Pickup 1 -> Pickup 2 -> ... -> Customer Dropoff
-            // We want the total distance.
+            try {
+                const service = new window.google.maps.DistanceMatrixService();
+                const waypoints = uniqueBusinessIds.map(id => merchants[id]).filter(m => m && m.lat && m.lng);
+                if (waypoints.length === 0) {
+                    setIsCalculatingDistance(false);
+                    return;
+                }
 
-            // Sort merchants to optimize route? For now, we'll just follow cart order or merchant order
-            const waypoints = uniqueBusinessIds.map(id => merchants[id]).filter(m => m && m.lat && m.lng);
-            if (waypoints.length === 0) return;
+                let totalMeters = 0;
+                const points = [...waypoints, { lat: deliveryLocation.lat, lng: deliveryLocation.lng }];
 
-            // Sequential distance:
-            // Driver (approx from first merchant) -> Merchant 1 -> Merchant 2 -> Customer
-            // Simplified: distance from M1 to M2 + M2 to M3 ... + Last M to Customer
-
-            let totalMeters = 0;
-            const points = [...waypoints, { lat: deliveryLocation.lat, lng: deliveryLocation.lng }];
-
-            for (let i = 0; i < points.length - 1; i++) {
-                try {
+                for (let i = 0; i < points.length - 1; i++) {
                     const result = await new Promise<any>((resolve, reject) => {
                         service.getDistanceMatrix({
                             origins: [{ lat: points[i].lat, lng: points[i].lng }],
@@ -144,14 +149,17 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         });
                     });
                     totalMeters += result;
-                } catch (e) {
-                    console.error("Distance Matrix Error:", e);
                 }
-            }
 
-            setDeliveryDistance(totalMeters);
+                setDeliveryDistance(totalMeters);
+            } catch (e) {
+                console.error("Distance Matrix Error:", e);
+            } finally {
+                setIsCalculatingDistance(false);
+            }
         };
 
+        setIsCalculatingDistance(true);
         calculateRouteDistance();
     }, [merchants, deliveryLocation, uniqueBusinessIds.length]);
 
@@ -270,7 +278,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         customer_id: customerId,
                         business_id: bizId,
                         batch_id: batchId,
-                        total_amount: Number(orderTotal.toFixed(2)),
+                        total_amount: Math.ceil(orderTotal),
                         status: 'pending',
                         delivery_instructions: deliveryNote,
                         delivery_address: deliveryLocation.address
@@ -392,7 +400,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                                             <div key={item.id} className="flex flex-col gap-2">
                                                 <div className="flex justify-between items-start">
                                                     <span className="font-bold text-sm max-w-[200px]">{item.name}</span>
-                                                    <span className="font-bold text-sm">D{(item.price * item.quantity).toFixed(2)}</span>
+                                                    <span className="font-bold text-sm">D{Math.ceil(item.price * item.quantity)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
                                                     <p className={`text-xs ${textSec}`}>D{item.price} each</p>
@@ -416,7 +424,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                                         ))}
                                     </div>
                                     <div className="flex justify-end pt-2">
-                                        <p className="text-xs font-bold opacity-60">Merchant Subtotal: D{items.reduce((s, i) => s + (i.price * i.quantity), 0).toFixed(2)}</p>
+                                        <p className="text-xs font-bold opacity-60">Merchant Subtotal: D{Math.ceil(items.reduce((s, i) => s + (i.price * i.quantity), 0))}</p>
                                     </div>
                                 </div>
                             ))}
@@ -426,7 +434,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                     <div className="space-y-2 mt-8 pt-4 border-t border-gray-100 dark:border-white/5">
                         <div className="flex justify-between items-center text-sm">
                             <span className={textSec}>Items Subtotal</span>
-                            <span className="font-medium">D{subtotal.toFixed(2)}</span>
+                            <span className="font-medium">D{subtotal}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
                             <div className="flex items-center gap-1.5">
@@ -435,12 +443,16 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                                     <span className="text-[10px] bg-[#00D68F]/10 text-[#00D68F] px-1.5 py-0.5 rounded font-black uppercase">Multi-Stop</span>
                                 )}
                             </div>
-                            <span className="font-medium">D{deliveryFee.toFixed(2)}</span>
+                            <span className="font-medium">
+                                {isCalculatingDistance ? <span className="text-[10px] opacity-50 animate-pulse">Calculating...</span> : `D${deliveryFee}`}
+                            </span>
                         </div>
                         <div className={`h-px ${separator} my-2`}></div>
                         <div className="flex justify-between items-center font-bold text-lg">
                             <span>Total</span>
-                            <span className="text-[#00D68F]">D{total.toFixed(2)}</span>
+                            <span className="text-[#00D68F]">
+                                {isCalculatingDistance ? <span className="text-sm opacity-50 animate-pulse">Calculating...</span> : `D${total}`}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -451,7 +463,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         <Check size={16} /> Pay Cash on Delivery
                     </h2>
                     <p className="text-sm font-medium leading-relaxed opacity-80">
-                        Please have <span className="font-black text-[#00D68F]">D{total.toFixed(2)}</span> ready to pay the driver in cash when they arrive with your order.
+                        Please have <span className="font-black text-[#00D68F]">{isCalculatingDistance ? 'Calculating...' : `D${total}`}</span> ready to pay the driver in cash when they arrive with your order.
                     </p>
                     <div className={`mt-4 p-3 rounded-xl ${inputBg} text-[10px] font-bold flex items-center gap-2`}>
                         <Info size={14} className="shrink-0" />
@@ -463,11 +475,11 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             <div className={`p-4 ${bgCard} pb-safe border-t ${separator}`}>
                 <button
                     onClick={handlePlaceOrder}
-                    disabled={cart.length === 0 || isSubmitting}
+                    disabled={cart.length === 0 || isSubmitting || isCalculatingDistance}
                     className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-full font-bold text-lg shadow-lg active:scale-[0.98] transition-transform flex justify-between px-6 items-center disabled:opacity-50"
                 >
                     <span>{isSubmitting ? 'Processing...' : 'Place Order'}</span>
-                    <span>D{total.toFixed(2)}</span>
+                    <span>{isCalculatingDistance ? <span className="text-sm animate-pulse">Wait...</span> : `D${total}`}</span>
                 </button>
             </div>
 

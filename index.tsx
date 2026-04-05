@@ -47,6 +47,25 @@ const App = () => {
     setupGlobalErrorHandlers();
   }, []);
 
+  // 🚀 Low-End Device Detection
+  // Applies 'low-end-device' class to <html> to enable CSS performance mode.
+  // This disables heavy GPU effects (shadows, backdrop-blur, animations) on
+  // budget/entry-level Android devices while keeping all functionality intact.
+  useEffect(() => {
+    const cores = navigator.hardwareConcurrency || 4;
+    const memoryGB = (navigator as any).deviceMemory || 4; // GB, not available on iOS
+
+    const isLowEnd = cores <= 4 || memoryGB <= 2;
+
+    if (isLowEnd) {
+      console.log(`📱 Low-end device detected (cores: ${cores}, RAM: ${memoryGB}GB). Enabling performance mode.`);
+      document.documentElement.classList.add('low-end-device');
+    } else {
+      document.documentElement.classList.remove('low-end-device');
+    }
+  }, []);
+
+
   // 🌓 Theme Management (Apple-style)
   const [theme, setThemeState] = useState<Theme>('dark');
 
@@ -100,6 +119,7 @@ const App = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
+  const isOfflineRef = useRef(false); // Mirror for closures
   const [screen, setScreenState] = useState<Screen>('splash');
   const screenRef = useRef<Screen>('splash');
   const setScreen = (scr: Screen | ((prev: Screen) => Screen)) => {
@@ -813,6 +833,13 @@ const App = () => {
           }
           handleUserAuthenticated(session).catch(err => console.error("Background sync error:", err)); // Sync in background
         } else if (event === 'SIGNED_OUT') {
+          // ⚡ Network-drop guard: Supabase emits SIGNED_OUT when offline due to
+          // token refresh failure. We suppress the navigation to onboarding
+          // in that case — the network-restore handler will re-sync properly.
+          if (isOfflineRef.current) {
+            console.warn("🔐 SIGNED_OUT received while offline — ignoring to prevent onboarding redirect.");
+            return;
+          }
           Preferences.remove({ key: 'has_ever_logged_in' });
           setScreen('onboarding');
           setHistory([]);
@@ -924,9 +951,17 @@ const App = () => {
     // 2. Network Listener — also re-syncs profile when connection is restored
     Network.addListener('networkStatusChange', async (netStatus) => {
       console.log("🌐 Network status changed:", netStatus);
+
+      // Keep the offline ref in sync
+      if (!netStatus.connected) {
+        isOfflineRef.current = true;
+      }
+
       setIsOffline(!netStatus.connected);
 
       if (netStatus.connected) {
+        // Brief delay — network is reported as up but isn't always stable immediately
+        setTimeout(() => { isOfflineRef.current = false; }, 3000);
         console.log("🌐 Network restored — re-syncing session & profile...");
         try {
           // Force-reset the sync guard so network restore is never blocked by a stale lock
@@ -1006,7 +1041,7 @@ const App = () => {
     let backListener: any;
     import('@capacitor/app').then(({ App: CapApp }) => {
       CapApp.addListener('backButton', () => {
-        console.log("📱 Native Back Button Pressed, current screen:", screen);
+        console.log("📱 Native Back Button Pressed, current screen:", screenRef.current);
         
         // Prevent exiting the app if on main screens
         if (screenRef.current === 'dashboard' || screenRef.current === 'onboarding' || screenRef.current === 'marketplace') {
@@ -1015,14 +1050,30 @@ const App = () => {
           return;
         }
         
-        goBack();
+        // Functional update for complete reliability across re-renders
+        triggerHaptic();
+        setHistory(prev => {
+          if (prev.length > 0) {
+            const newHistory = [...prev];
+            const previousScreen = newHistory.pop();
+            if (previousScreen) {
+              setScreenState(previousScreen); // use setScreenState to prevent breaking ref
+              screenRef.current = previousScreen;
+            }
+            return newHistory;
+          } else {
+            setScreenState('dashboard');
+            screenRef.current = 'dashboard';
+            return prev;
+          }
+        });
       }).then(l => backListener = l);
     });
 
     return () => {
       if (backListener) backListener.remove();
     };
-  }, [screen, history]); // Re-register or update if screen changes if needed, but goBack handles history
+  }, []); // Run ONLY once to prevent memory leaks
 
   // --- Real-time Local Persistence ---
   useEffect(() => {
