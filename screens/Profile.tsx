@@ -863,7 +863,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.8.9 (Build 218)</p>
+                        <p>Version 1.9.3 (Build 220)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>

@@ -663,6 +663,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
 
             drivers.forEach(d => {
+                // Ensure valid coordinates to prevent Google Maps InvalidValueError
+                if (typeof d.current_lat !== 'number' || typeof d.current_lng !== 'number' || isNaN(d.current_lat) || isNaN(d.current_lng)) {
+                    return; // Skip this driver if location is invalid or haven't gotten GPS lock yet
+                }
+
                 const position = { lat: d.current_lat, lng: d.current_lng };
                 let marker = markersMap.get(d.id);
 
