@@ -233,6 +233,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [loading, setLoading] = useState(false);
    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
+   const isIOS = Capacitor.getPlatform() === 'ios';
+
    useEffect(() => {
       if (Capacitor.isNativePlatform()) {
          Keyboard.addListener('keyboardWillShow', info => {
@@ -241,11 +243,17 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          Keyboard.addListener('keyboardWillHide', () => {
             setKeyboardHeight(0);
          });
+
+         if (isIOS) {
+            // Prevent iOS from trying to scroll/shift the webview itself
+            Keyboard.setScroll({ isDisabled: true }).catch(console.warn);
+         }
+
          return () => {
             Keyboard.removeAllListeners();
          };
       }
-   }, []);
+   }, [isIOS]);
 
    // Resume Onboarding if user is already logged in but profile is incomplete
    useEffect(() => {
@@ -331,15 +339,20 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    };
 
    const sendOTP = async () => {
+      const sanitizedPhone = phone.trim().replace(/\D/g, '');
+      if (sanitizedPhone.length < selectedCountry.maxLen - 2) {
+         showAlert("Invalid Number", "Please enter a valid phone number.", "info");
+         return;
+      }
+
       triggerHaptic();
       setLoading(true);
 
-      const fullPhone = `${selectedCountry.code}${phone}`;
+      const fullPhone = `${selectedCountry.code}${sanitizedPhone}`;
       console.log("Sending OTP to:", fullPhone);
 
       const { error } = await supabase.auth.signInWithOtp({
          phone: fullPhone,
-         // options: { shouldCreateUser: true } // Optional: Force/ensure user creation
       });
 
       setLoading(false);
@@ -348,6 +361,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          console.error("OTP Error:", error);
          showAlert("Error", error.message, "error");
       } else {
+         setPhone(sanitizedPhone); // Store sanitized version
          setStep(3);
       }
    };
@@ -450,19 +464,25 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    };
 
    const handleCompleteProfile = async () => {
+      const sanitizedName = name.trim().slice(0, 50);
+      const sanitizedEmail = email.trim().toLowerCase();
+      const sanitizedReferral = referralInput.trim().toUpperCase().slice(0, 10);
+
       triggerHaptic();
-      if (!name.trim() || /<[^>]*>/.test(name)) {
-         showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed).", "info");
+      if (!sanitizedName || /<[^>]*>/.test(sanitizedName)) {
+         showAlert("Invalid Name", "Please enter a valid name (no HTML tags allowed, max 50 chars).", "info");
          return;
       }
-      if (email && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || /<[^>]*>/.test(email))) {
+      if (sanitizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
          showAlert("Invalid Email", "Please enter a valid email address.", "info");
          return;
       }
       setLoading(true);
 
-      // 1. Update Local State (Immediate UI feedback)
-      setUser(prev => ({ ...prev, name, phone, email, photo }));
+      // Update state with sanitized values
+      setName(sanitizedName);
+      setEmail(sanitizedEmail);
+      setReferralInput(sanitizedReferral);
 
       try {
          // 2. Insert into Supabase 'profiles' table using the LIVE session
@@ -760,7 +780,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 2) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+         <div 
+            className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+         >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-between items-center z-[100]">
                <button
@@ -917,7 +940,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 3) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+         <div 
+            className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+         >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
                <button
@@ -990,7 +1016,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 4) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+         <div 
+            className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+         >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
                <button

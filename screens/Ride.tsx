@@ -1252,13 +1252,36 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         }
                     }
 
-                    // Radius Expansion
+                    // Radius Expansion Logic
                     if (currentSearchRadius < SEARCH_MAX_RADIUS) {
                         currentSearchRadius += 2;
                         setSearchRadius(currentSearchRadius);
-                    } else if (currentSearchRadius >= HARD_STOP_LIMIT) {
-                        handleCancellation({ status: 'cancelled' });
-                        showAlert("Search Ended", "No drivers found within service limit. Please try again.", "info");
+                    } else {
+                        // Max Radius Reached — Double check DB one last time before prompting
+                        const { data: latestRide } = await supabase.from('rides').select('status').eq('id', currentRideId).single();
+                        if (latestRide && latestRide.status === 'searching') {
+                            if (currentSearchRadius >= HARD_STOP_LIMIT) {
+                                handleCancellation({ status: 'cancelled' });
+                                showAlert("Search Ended", "No drivers found within 120km limit. Please try again later.", "info");
+                            } else {
+                                // Prompt user to expand
+                                showAlert(
+                                    "No Drivers Found",
+                                    `No drivers found within ${currentSearchRadius}km. Would you like to expand the search by another 20km?`,
+                                    "info",
+                                    () => {
+                                        // Expand
+                                        const newMax = Math.min(HARD_STOP_LIMIT, SEARCH_MAX_RADIUS + 20);
+                                        // Note: We don't have a direct setter for SEARCH_MAX_RADIUS as it comes from settings,
+                                        // so we'll just manually override the local variable for the next pulse
+                                        currentSearchRadius += 2;
+                                        setSearchRadius(currentSearchRadius);
+                                    },
+                                    true, "Expand Search", "Cancel",
+                                    () => handleCancelRide()
+                                );
+                            }
+                        }
                     }
                 }
             } catch (err) { console.error('[Heartbeat] Pulse error:', err); }
@@ -1472,122 +1495,6 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         // Transition to searching status — the unified Heartbeat useEffect will handle the loop
         setStatus('searching');
         setBookingStep('selecting');
-
-        const interval = setInterval(async () => {
-            // First, guarantee the ride is strictly still in 'searching' state
-            // This prevents the loop from acting or prompting if the driver already accepted (even if real-time drops the event)
-            const { data: rideCheck } = await supabase.from('rides').select('status').eq('id', ride.id).single();
-            if (rideCheck && rideCheck.status !== 'searching') {
-                console.log(`🛑 Stopping search loop. Ride status is now: ${rideCheck.status}`);
-                clearInterval(interval);
-                return;
-            }
-
-            // Radial search for drivers
-            if (!userLocation) {
-                console.log("⚠️ Cannot search: userLocation is null.");
-                return;
-            }
-
-            const categoryMap: Record<string, string> = {
-                'eco': 'economic',
-                'prem': 'premium',
-                'moto': 'scooter'
-            };
-
-            let currentRadius = 2; // Should really be pulled from state
-            const HARD_STOP_LIMIT = 120;
-
-            console.log(`📡 Searching for drivers in ${currentRadius}km radius... (Up to ${maxRadius}km)`);
-            const { data: nearbyDrivers, error: rpcError } = await supabase.rpc('get_nearby_drivers', {
-                user_lat: userLocation.lat,
-                user_lng: userLocation.lng,
-                radius_km: currentRadius,
-                required_category: rideType === 'delivery' ? 'any' : (categoryMap[selectedTier] || 'economic')
-            });
-
-            if (nearbyDrivers && nearbyDrivers.length > 0) {
-                console.log(`Found ${nearbyDrivers.length} nearby drivers.`);
-
-                // Actually notify drivers who haven't been notified yet
-                const driversToNotify = nearbyDrivers
-                    .filter(d => !notifiedDriversRef.current.has(d.driver_id))
-                    .map(d => d.driver_id);
-
-                if (driversToNotify.length > 0) {
-                    driversToNotify.forEach(id => notifiedDriversRef.current.add(id));
-
-                    // Call Edge Function to send notification to all device tokens of these drivers
-                    try {
-                        await supabase.functions.invoke('send-fcm-notification', {
-                            body: {
-                                userIds: driversToNotify,
-                                title: `New Ride Request! 🚗 #${ride.id.slice(0, 4)}`,
-                                message: 'A new request is waiting near you.',
-                                target: 'driver',
-                                tag: ride.id, // Explicit tag for grouping/stacking
-                                id: ride.id,
-                                data: { ride_id: ride.id, type: 'RIDE_REQUEST', tag: ride.id }
-                            }
-                        });
-                        console.log(`✅ Requested notifications for ${driversToNotify.length} drivers`);
-                    } catch (err) {
-                        console.warn(`Failed to notify drivers:`, err);
-                    }
-                }
-            }
-
-            // Hard stop at 120km
-            if (currentRadius >= HARD_STOP_LIMIT) {
-                clearInterval(interval);
-                console.log(`🛑 Auto-stopped at ${HARD_STOP_LIMIT}km limit.`);
-                showAlert(
-                    "Search Ended",
-                    "No drivers found within 120km. Please try again later.",
-                    "info",
-                    () => handleCancelRide()
-                );
-                return;
-            }
-
-            if (currentRadius >= maxRadius) {
-                clearInterval(interval);
-
-                // Double check status before showing the expansion/cancel alert
-                const { data: latestRide } = await supabase.from('rides').select('status').eq('id', ride.id).single();
-                if (latestRide && latestRide.status !== 'searching') {
-                    console.log(`🛑 Skipping prompt. Ride is already ${latestRide.status}`);
-                    return; 
-                }
-
-                // Ask user if they want to continue
-                showAlert(
-                    "No Drivers Found",
-                    `No drivers found within ${maxRadius}km. Would you like to expand the search by another 20km?`,
-                    "info",
-                    () => {
-                        // User chose to expand
-                        const newMax = maxRadius + 20;
-                        console.log(`User chose to expand. New max: ${newMax}km.`);
-                        if (searchIntervalRef.current) clearInterval(searchIntervalRef.current);
-                        handleBookRide(ride.id, newMax, currentRadius + 2);
-                    },
-                    true, // showCancel
-                    "Expand Search",
-                    "Cancel",
-                    () => {
-                        // User chose to cancel
-                        console.log("User cancelled expansion.");
-                        handleCancelRide();
-                    }
-                );
-            } else {
-                currentRadius += 2;
-                setSearchRadius(currentRadius);
-            }
-        }, 4000);
-
-        searchIntervalRef.current = interval;
     };
 
     const handleMapClick = (e: any) => {

@@ -120,13 +120,14 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Set driver to offline when using user app
-      await supabase
-        .from('drivers')
-        .update({ is_online: false })
-        .eq('id', session.user.id);
-
-      console.log("Quiet Mode: Driver set to offline");
+      // Set driver to offline when using user app (only if they are actually a driver)
+      if (user.role === 'driver' || user.role === 'both') {
+         await supabase
+            .from('drivers')
+            .update({ is_online: false })
+            .eq('id', session.user.id);
+         console.log("Quiet Mode: Driver set to offline");
+      }
     } catch (err) {
       console.error("Quiet Mode Error:", err);
     }
