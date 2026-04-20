@@ -978,7 +978,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                               verifyOTP();
                            }
                         }}
-                        autoFocus
                      />
                   </div>
                </div>
