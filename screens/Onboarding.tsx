@@ -779,8 +779,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             </div>
 
             <div
-               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-[15vh] px-4 no-scrollbar"
-               style={{ paddingBottom: Math.max(20, keyboardHeight + 20) }}
+               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-32 px-4 no-scrollbar"
+               style={{ paddingBottom: '120px' }}
             >
                <div className="w-full max-w-sm mx-auto">
                   <div className="flex justify-center mb-8">
@@ -935,8 +935,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             </div>
 
             <div
-               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-[15vh] px-4 no-scrollbar"
-               style={{ paddingBottom: Math.max(20, keyboardHeight + 20) }}
+               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-32 px-4 no-scrollbar"
+               style={{ paddingBottom: '120px' }}
             >
                <div className="w-full max-w-sm mx-auto">
                   <div className="flex justify-center mb-10">
@@ -1009,7 +1009,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </button>
             </div>
 
-            <div className="flex-1 flex flex-col justify-start items-center overflow-y-auto pt-[8vh] px-4 no-scrollbar pb-10">
+            <div className="flex-1 flex flex-col justify-start items-center overflow-y-auto pt-28 px-4 no-scrollbar pb-10">
                <div className="w-full max-w-sm mx-auto">
                   <div className="flex justify-center mb-6">
                      <ProgressBar currentStep={4} />
