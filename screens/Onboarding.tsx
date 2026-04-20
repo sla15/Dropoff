@@ -760,9 +760,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 2) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-            {/* Header Navigation: Top-Right Action Button */}
-            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+            {/* Header Navigation */}
+            <div className="w-full px-6 pt-safe pb-4 flex justify-between items-center z-[100]">
                <button
                   onClick={() => setStep(1)}
                   className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
@@ -778,11 +778,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </button>
             </div>
 
-            <div
-               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-32 px-4 no-scrollbar"
-               style={{ paddingBottom: '120px' }}
-            >
-               <div className="w-full max-w-sm mx-auto">
+            <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-20">
+               <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center pt-8">
                   <div className="flex justify-center mb-8">
                      <ProgressBar currentStep={2} />
                   </div>
@@ -920,8 +917,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 3) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+            {/* Header Navigation */}
+            <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -931,11 +929,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </button>
             </div>
 
-            <div
-               className="flex-1 flex flex-col justify-start items-center text-center overflow-y-auto pt-32 px-4 no-scrollbar"
-               style={{ paddingBottom: '120px' }}
-            >
-               <div className="w-full max-w-sm mx-auto">
+            <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-20">
+               <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center pt-8">
                   <div className="flex justify-center mb-10">
                      <ProgressBar currentStep={3} />
                   </div>
@@ -995,8 +990,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 4) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+            {/* Header Navigation */}
+            <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}
@@ -1006,8 +1002,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </button>
             </div>
 
-            <div className="flex-1 flex flex-col justify-start items-center overflow-y-auto pt-28 px-4 no-scrollbar pb-10">
-               <div className="w-full max-w-sm mx-auto">
+            <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-20">
+               <div className="w-full max-w-sm mx-auto flex flex-col items-center pt-8">
                   <div className="flex justify-center mb-6">
                      <ProgressBar currentStep={4} />
                   </div>
@@ -1113,8 +1109,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 5) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
-            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden`}>
+            {/* Header Navigation */}
+            <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
                <button
                   onClick={() => navigate('dashboard')}
                   className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"
@@ -1123,8 +1120,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </button>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center items-center text-center overflow-y-auto pt-20 pb-4 no-scrollbar">
-               <div className="w-full max-w-sm mx-auto">
+            <div className="flex-1 overflow-y-auto px-6 no-scrollbar pb-20">
+               <div className="w-full max-w-sm mx-auto flex flex-col items-center text-center pt-12">
                   <div className="flex justify-center mb-8">
                      <ProgressBar currentStep={5} />
                   </div>
