@@ -23,7 +23,8 @@ export const sendPushNotification = async (title: string, message: string, targe
                 userIds: [finalUserId],
                 title,
                 message,
-                target
+                target,
+                data: { target } // Include target in data for robust filtering
             }
         });
 

@@ -980,17 +980,17 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         }}
                      />
                   </div>
+                  
+                  <div className="flex justify-center mt-12 mb-10">
+                     <button
+                        onClick={sendOTP}
+                        disabled={loading}
+                        className="text-[#00D68F] font-bold text-sm text-center hover:opacity-70 transition-opacity disabled:opacity-50"
+                     >
+                        Resend Code
+                     </button>
+                  </div>
                </div>
-            </div>
-
-            <div className="mt-auto flex flex-col gap-4 px-2 pb-10 transition-all duration-300" style={{ marginBottom: keyboardHeight > 0 ? `${keyboardHeight + 24}px` : '0px' }}>
-               <button
-                  onClick={sendOTP}
-                  disabled={loading}
-                  className="text-[#00D68F] font-bold text-sm text-center hover:opacity-70 transition-opacity disabled:opacity-50"
-               >
-                  Resend Code
-               </button>
             </div>
          </div>
       );
