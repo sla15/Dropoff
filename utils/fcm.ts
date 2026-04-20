@@ -77,9 +77,22 @@ const initNativePush = async (userId?: string) => {
         // This listener is for when we want to do something EXTRA with the data.
         FirebaseMessaging.addListener('notificationReceived', (event) => {
             console.log('🔔 FCM: Foreground notification received:', JSON.stringify(event.notification));
-            // The notification is already shown by the plugin thanks to 
-            // notification_foreground: "true" in the data payload.
-            // No need for LocalNotifications.
+            const data = event.notification?.data as Record<string, any> | undefined;
+
+            // IMPORTANT: Filter out notifications strictly meant for other apps
+            if (data?.target && data.target !== 'customer') {
+                console.log('🚫 FCM: Ignoring non-customer notification');
+                return;
+            }
+
+            // Dispatch event for index.tsx to show in-app alert
+            window.dispatchEvent(new CustomEvent('foreground_notification', {
+                detail: {
+                    title: event.notification?.title || 'Notification',
+                    body: event.notification?.body || '',
+                    data: data
+                }
+            }));
         });
 
         // When user taps on a notification
@@ -166,6 +179,14 @@ const initWebPush = async (userId?: string) => {
         // Web foreground: show browser notification
         onMessage(messaging, (payload) => {
             console.log("🔔 FCM: Web foreground message:", payload);
+            const data = payload.data;
+
+            // IMPORTANT: Filter out notifications strictly meant for other apps
+            if (data?.target && data.target !== 'customer') {
+                console.log('🚫 FCM: Ignoring non-customer notification (Web)');
+                return;
+            }
+
             const title = payload.notification?.title || payload.data?.notification_title || 'DROPOFF';
             const options: NotificationOptions = {
                 body: payload.notification?.body || payload.data?.notification_body || '',
@@ -178,6 +199,15 @@ const initWebPush = async (userId?: string) => {
                 const n = new Notification(title, options);
                 n.onclick = () => { window.focus(); n.close(); };
             }
+
+            // Also dispatch event for index.tsx
+            window.dispatchEvent(new CustomEvent('foreground_notification', {
+                detail: {
+                    title,
+                    body: options.body,
+                    data
+                }
+            }));
         });
 
     } catch (err) {

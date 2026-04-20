@@ -584,14 +584,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     }, [prefilledDestination, prefilledTier, map, directionsRenderer]);
 
-    // Re-center Map when screen becomes active
+    // Re-center Map when screen becomes active — with a 1-minute delay to allow initial orientation
     useEffect(() => {
         if (active && map && userLocation && !mapInteractionRef.current) {
-            console.log("Ride screen active, initial re-centering map...");
-            map.panTo(userLocation);
-            // We only auto-pan once or until the user interacts
+            const delayFocus = setTimeout(() => {
+                if (!mapInteractionRef.current) { // Final check before panning
+                    console.log("Ride screen active, delayed re-centering map (60s timer)...");
+                    map.panTo(userLocation);
+                }
+            }, 60000); // 1 minute wait
+            return () => clearTimeout(delayFocus);
         }
-    }, [active, map, !!userLocation]); // Re-center when location first arrives
+    }, [active, map, !!userLocation]);
 
     // --- REAL-TIME DRIVER TRACKING ---
     const iconCache = useRef<Map<string, string>>(new Map());
