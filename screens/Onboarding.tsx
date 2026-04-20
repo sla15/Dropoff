@@ -822,9 +822,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                   sendOTP();
                                }
                             }}
-                            onFocus={(e) => {
-                               setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                            }}
                             className={`flex-1 min-w-0 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700 ${theme === 'light' ? 'text-black' : 'text-white'}`}
                          />
                       </div>
