@@ -14,6 +14,7 @@ import { RideStatusPanel } from '../components/Ride/RideStatusPanel';
 import { RideCancellationSummary } from '../components/Ride/RideCancellationSummary';
 import { RidePaymentSummary } from '../components/Ride/RidePaymentSummary';
 import { LocationSearchOverlay } from '../components/Ride/LocationSearchOverlay';
+import { RequestErrorModal } from '../components/RequestErrorModal';
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
@@ -27,6 +28,7 @@ interface Props {
     active?: boolean;
     handleScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
     settings: AppSettings;
+    refreshSettings: () => Promise<void>;
     showAlert: (
         title: string,
         message: string,
@@ -41,7 +43,7 @@ interface Props {
     indexLocation?: { lat: number, lng: number } | null;
 }
 
-export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, showAlert, onSearchingChange, indexLocation }: Props) => {
+export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
     const [driverCancelledModal, setDriverCancelledModal] = useState(false);
     const [driverCancelledName, setDriverCancelledName] = useState('');
@@ -81,6 +83,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [isLocating, setIsLocating] = useState(false);
     const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
     const [currentRideId, setCurrentRideId] = useState<string | null>(null);
+    const [isPriceErrorModalOpen, setIsPriceErrorModalOpen] = useState(false);
 
     // Tiers Definition
     const tiers = [
@@ -124,6 +127,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const assignedDriverRef = useRef<any>(assignedDriver);
     const directionsRendererRef = useRef<any>(directionsRenderer);
     const currentRideIdRef = useRef<string | null>(currentRideId);
+    const searchTimeout = useRef<any>(null);
 
     // Keep refs in sync with state
     useEffect(() => { statusRef.current = status; }, [status]);
@@ -860,11 +864,33 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         const endAddr = validDestinations[validDestinations.length - 1];
 
         try {
-            // 1. Check Supabase distance_cache first
-            // Note: Since we don't have destination coordinates yet, 
-            // a full coordinate cache hit is only possible if we geocode first.
-            // For now, we rely on the Direction service and save to cache.
-            // We'll skip the pre-check to avoid incorrect hits until geocoding is integrated.
+            // 1. Check if we have coordinates for the final destination
+            const finalCoord = destinationCoords[validDestinations.length - 1];
+            if (finalCoord && userLocation) {
+                const roundedOrigin = { 
+                    lat: parseFloat(userLocation.lat.toFixed(4)), 
+                    lng: parseFloat(userLocation.lng.toFixed(4)) 
+                };
+                const roundedDest = { 
+                    lat: parseFloat(finalCoord.lat.toFixed(4)), 
+                    lng: parseFloat(finalCoord.lng.toFixed(4)) 
+                };
+
+                const { data: cachedData } = await supabase
+                    .from('distance_cache')
+                    .select('distance_km')
+                    .eq('origin_lat', roundedOrigin.lat)
+                    .eq('origin_lng', roundedOrigin.lng)
+                    .eq('dest_lat', roundedDest.lat)
+                    .eq('dest_lng', roundedDest.lng)
+                    .maybeSingle();
+
+                if (cachedData) {
+                    console.log("🚀 Cache Hit! Using cached distance:", cachedData.distance_km, "km");
+                    setRealDistanceKm(cachedData.distance_km);
+                    // We still proceed to draw the route visually, but the price is ready instantly
+                }
+            }
         } catch (e) {
             console.error("Supabase Cache Read Error:", e);
         }
@@ -1069,39 +1095,33 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     updateDestination(i, '');
                     triggerHaptic();
                 });
-
                 markersRef.current[i] = marker;
             }
         });
     }, [map, bookingStep, destinationCoords]);
 
-    // ✅ ROBUST RIDE SUBSCRIPTION — Uses refs to avoid stale closure reads.
-    // Real-time subscription + aggressive polling fallback that detects ANY status change.
+    // ✅ UNIFIED RIDE HEARTBEAT — Centralized Status, Search, and Failsafe Polling
+    // Merges searchInterval, pollingTimer, and failsafeTimer into one state-aware pulse.
     useEffect(() => {
-        if (!currentRideId) return;
+        if (!currentRideId || status === 'idle' || status === 'completed') return;
 
-        let lastKnownDbStatus: string | null = null; // Track what we've already processed
-        let isHandling = false; // Prevent concurrent handling
+        let lastKnownDbStatus = status;
+        let currentSearchRadius = searchRadius || 2;
+        const SEARCH_MAX_RADIUS = Number(settings.driver_search_radius_km) || 10;
+        const HARD_STOP_LIMIT = 120;
+        let isHandling = false;
 
-        const handleRideUpdate = async (updatedRide: any) => {
-            // Deduplicate: don't re-process the same status
-            if (updatedRide.status === lastKnownDbStatus) return;
-            if (isHandling) return;
+        const handleUpdate = async (ride: any) => {
+            if (isHandling || ride.status === lastKnownDbStatus) return;
             isHandling = true;
-            lastKnownDbStatus = updatedRide.status;
-
-            console.log('[RideSub] 🔔 Status change detected:', updatedRide.status, '| driver_id:', updatedRide.driver_id);
-
+            console.log('[Heartbeat] 🔔 Status change:', lastKnownDbStatus, '→', ride.status);
+            
             try {
-                if (updatedRide.status === 'accepted' && updatedRide.driver_id) {
-                    if (searchIntervalRef.current) {
-                        clearInterval(searchIntervalRef.current);
-                        searchIntervalRef.current = null;
-                    }
+                if (ride.status === 'accepted' && ride.driver_id) {
                     const { data: driverData } = await supabase
                         .from('drivers')
                         .select('*, profile:profiles(full_name, phone, average_rating)')
-                        .eq('id', updatedRide.driver_id)
+                        .eq('id', ride.driver_id)
                         .single();
                     if (driverData) {
                         const formattedDriver = {
@@ -1110,234 +1130,141 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             phone: (driverData.profile as any)?.phone || '',
                             rating: (driverData.profile as any)?.average_rating || 5.0
                         };
-                        setAssignedDriverId(updatedRide.driver_id);
+                        setAssignedDriverId(ride.driver_id);
                         setAssignedDriver(formattedDriver);
                         setStatus('accepted');
-                        sendPush("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                        sendPushNotification("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
                         triggerHaptic();
                     }
-                } else if (updatedRide.status === 'arrived') {
+                } else if (ride.status === 'arrived') {
                     setStatus('arrived');
-                    sendPush("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
+                    sendPushNotification("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
                     triggerHaptic();
-                } else if (updatedRide.status === 'in-progress') {
+                } else if (ride.status === 'in-progress') {
                     setStatus('in-progress');
                     triggerHaptic();
-                } else if (updatedRide.status === 'completed') {
+                } else if (ride.status === 'completed') {
                     setCurrentRideId(null);
-                    sendPush("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
+                    sendPushNotification("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
                     completeTrip();
-                } else if (
-                    updatedRide.status === 'cancelled' || 
-                    updatedRide.status === 'cancelled_by_driver' ||
-                    (updatedRide.status === 'searching' && !updatedRide.driver_id && ['accepted', 'arrived', 'in-progress'].includes(statusRef.current))
-                ) {
-                    console.log('[RideSub] 🚨 CANCELLATION DETECTED — processing immediately');
-
-                    // If the backend sent it back to the search pool, aggressively cancel it 
-                    // so another driver doesn't accept it while the user decides what to do.
-                    if (updatedRide.status === 'searching') {
-                        supabase.from('rides').update({ status: 'cancelled' }).eq('id', updatedRide.id).then();
-                    }
-
-                    // Read CURRENT values from refs (not stale closure state)
-                    const curDestinations = destinationsRef.current;
-                    const curCoords = destinationCoordsRef.current;
-                    const curDistance = realDistanceKmRef.current;
-                    const curTier = selectedTierRef.current;
-                    const curRideType = rideTypeRef.current;
-                    const curDriver = assignedDriverRef.current;
-                    const curRenderer = directionsRendererRef.current;
-
-                    // Snapshot trip data BEFORE clearing — so "Find Another Driver" can re-use it
-                    cancelledTripRef.current = {
-                        destinations: [...curDestinations],
-                        destinationCoords: [...curCoords],
-                        realDistanceKm: curDistance,
-                        selectedTier: curTier,
-                        rideType: curRideType
-                    };
-
-                    // Immediately clean up state
-                    setCurrentRideId(null);
-                    if (searchIntervalRef.current) {
-                        clearInterval(searchIntervalRef.current);
-                        searchIntervalRef.current = null;
-                    }
-                    if (curRenderer) {
-                        try { curRenderer.setDirections({ routes: [] }); } catch (e) { }
-                    }
-                    markersRef.current.forEach(m => m?.setMap(null));
-                    markersRef.current = [];
-                    setDestinations(['']);
-                    setDestinationCoords([null]);
-                    setRealDistanceKm(0);
-                    setEtaSeconds(300);
-                    notifiedDriversRef.current.clear();
-                    setBookingStep('planning');
-
-                    if (updatedRide.driver_id || updatedRide.status === 'cancelled_by_driver') {
-                        // Driver cancelled — show action modal
-                        const cancelledByName = curDriver?.name || 'Your driver';
-                        const isDelivery = curRideType === 'delivery';
-                        setAssignedDriverId(null);
-                        setAssignedDriver(null);
-                        setStatus('idle');
-                        setDriverCancelledName(cancelledByName);
-                        setDriverCancelledModal(true);
+                } else if (ride.status === 'searching') {
+                    if (lastKnownDbStatus !== 'idle' && lastKnownDbStatus !== 'searching') {
+                        sendPushNotification("DROPOFF: Driver Update", "Your driver had to unassign. We are finding you a new driver right now!");
                         triggerHaptic();
-                        sendPush(
-                            isDelivery ? 'DROPOFF: Delivery Cancelled' : 'DROPOFF: Ride Cancelled',
-                            `${cancelledByName} has cancelled your ${isDelivery ? 'delivery' : 'ride'}.`
-                        );
-                    } else {
-                        setAssignedDriverId(null);
-                        setAssignedDriver(null);
-                        setStatus('idle');
-                        navigate('dashboard');
                     }
+                    setAssignedDriverId(null);
+                    setAssignedDriver(null);
+                    setStatus('searching');
+                    notifiedDriversRef.current.clear();
+                } else if (ride.status === 'cancelled' || ride.status === 'cancelled_by_driver') {
+                    if (ride.status === 'cancelled_by_driver' || (ride.status === 'cancelled' && ride.driver_id)) {
+                        sendPushNotification("DROPOFF: Ride Cancelled", "Your driver has cancelled the trip.");
+                        triggerHaptic();
+                    }
+                    handleCancellation(ride);
                 }
+                lastKnownDbStatus = ride.status;
             } finally {
                 isHandling = false;
             }
         };
 
-        // 1. Real-time subscription
+        const handleCancellation = (ride: any) => {
+            const curDestinations = destinationsRef.current;
+            const curCoords = destinationCoordsRef.current;
+            cancelledTripRef.current = {
+                destinations: [...curDestinations],
+                destinationCoords: [...curCoords],
+                realDistanceKm: realDistanceKmRef.current,
+                selectedTier: selectedTierRef.current,
+                rideType: rideTypeRef.current
+            };
+
+            setCurrentRideId(null);
+            setDestinations(['']);
+            setDestinationCoords([null]);
+            setRealDistanceKm(0);
+            notifiedDriversRef.current.clear();
+            setBookingStep('planning');
+
+            if (ride.driver_id || ride.status === 'cancelled_by_driver') {
+                setAssignedDriverId(null);
+                setAssignedDriver(null);
+                setStatus('idle');
+                setDriverCancelledName(assignedDriverRef.current?.name || 'Your driver');
+                setDriverCancelledModal(true);
+                triggerHaptic();
+            } else {
+                setAssignedDriverId(null);
+                setAssignedDriver(null);
+                setStatus('idle');
+                navigate('dashboard');
+            }
+        };
+
+        // 1. Real-time Channel (For instant push-style updates)
         const channel = supabase
-            .channel(`ride-status-${currentRideId}`)
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${currentRideId}` },
-                (payload) => {
-                    console.log('[RideSub] Real-time event received:', payload.new);
-                    handleRideUpdate(payload.new);
-                }
-            )
-            .subscribe((subStatus) => {
-                console.log('[RideSub] Channel status:', subStatus);
-            });
+            .channel(`ride-heartbeat-${currentRideId}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${currentRideId}` }, (p) => handleUpdate(p.new))
+            .subscribe();
 
-        // 2. Aggressive polling fallback — catches ANY status change real-time may miss.
-        // Polls every 3 seconds. Compares against lastKnownDbStatus to avoid duplicate processing.
-        const pollingTimer = setInterval(async () => {
+        // 2. The Heartbeat Pulse (Authoritative polling + Search logic)
+        const heartbeat = setInterval(async () => {
             try {
-                const { data, error } = await supabase
-                    .from('rides')
-                    .select('id, status, driver_id')
-                    .eq('id', currentRideId)
-                    .single();
-
-                if (error) {
-                    console.warn('[RideSub] Polling query error:', error.message);
+                const { data: ride } = await supabase.from('rides').select('*').eq('id', currentRideId).single();
+                if (!ride) {
+                    console.warn('[Heartbeat] Ride record not found. Cleaning up.');
+                    setStatus('idle');
+                    setCurrentRideId(null);
                     return;
                 }
 
-                if (data && data.status !== lastKnownDbStatus) {
-                    console.log('[RideSub] 📡 Polling detected status change:', lastKnownDbStatus, '→', data.status);
-                    handleRideUpdate(data);
+                // A. Sync status if real-time missed it
+                if (ride.status !== lastKnownDbStatus) handleUpdate(ride);
+
+                // B. SEARCH LOGIC: If still searching, notify more drivers
+                if (ride.status === 'searching') {
+                    if (!userLocation) return;
+                    
+                    const categoryMap: Record<string, string> = { 'eco': 'economic', 'prem': 'premium', 'moto': 'scooter' };
+                    const { data: nearbyDrivers } = await supabase.rpc('get_nearby_drivers', {
+                        user_lat: userLocation.lat, user_lng: userLocation.lng, radius_km: currentSearchRadius,
+                        required_category: rideTypeRef.current === 'delivery' ? 'any' : (categoryMap[selectedTierRef.current] || 'economic')
+                    });
+
+                    if (nearbyDrivers?.length > 0) {
+                        const driversToNotify = nearbyDrivers.filter(d => !notifiedDriversRef.current.has(d.driver_id)).map(d => d.driver_id);
+                        if (driversToNotify.length > 0) {
+                            driversToNotify.forEach(id => notifiedDriversRef.current.add(id));
+                            supabase.functions.invoke('send-fcm-notification', {
+                                body: {
+                                    userIds: driversToNotify,
+                                    title: `New Ride Request! 🚗 #${ride.id.slice(0, 4)}`,
+                                    message: 'A new request is waiting near you.',
+                                    target: 'driver',
+                                    data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
+                                }
+                            }).catch(console.warn);
+                        }
+                    }
+
+                    // Radius Expansion
+                    if (currentSearchRadius < SEARCH_MAX_RADIUS) {
+                        currentSearchRadius += 2;
+                        setSearchRadius(currentSearchRadius);
+                    } else if (currentSearchRadius >= HARD_STOP_LIMIT) {
+                        handleCancellation({ status: 'cancelled' });
+                        showAlert("Search Ended", "No drivers found within service limit. Please try again.", "info");
+                    }
                 }
-            } catch (err) {
-                console.warn('[RideSub] Polling exception:', err);
-            }
-        }, 3000);
+            } catch (err) { console.error('[Heartbeat] Pulse error:', err); }
+        }, 4000);
 
         return () => {
-            console.log('[RideSub] Cleaning up subscription for', currentRideId);
             supabase.removeChannel(channel);
-            clearInterval(pollingTimer);
+            clearInterval(heartbeat);
         };
-    }, [currentRideId]);
-
-    // 🛡️ FAILSAFE: Independent customer-level polling.
-    // Catches cancellations even if currentRideId was cleared or the subscription dropped.
-    // Runs while the user is on a non-idle ride status.
-    useEffect(() => {
-        if (!user.id || status === 'idle' || status === 'completed' || status === 'cancelled') return;
-
-        const failsafeTimer = setInterval(async () => {
-            try {
-                // Check if there are ANY active rides for this customer
-                const { data: activeRides, error } = await supabase
-                    .from('rides')
-                    .select('id, status, driver_id')
-                    .eq('customer_id', user.id)
-                    .in('status', ['searching', 'accepted', 'arrived', 'in-progress'])
-                    .neq('type', 'MERCHANT_DELIVERY')
-                    .limit(1);
-
-                if (error) return;
-
-                // If status shows we have an active ride but DB says none exist → ride was cancelled/completed externally
-                const activeRide = activeRides?.[0];
-                const ghostAssignedRide = activeRide && activeRide.status === 'searching' && !activeRide.driver_id && ['accepted', 'arrived', 'in-progress'].includes(statusRef.current);
-
-                if ( ((!activeRides || activeRides.length === 0) || ghostAssignedRide) && statusRef.current !== 'idle' && statusRef.current !== 'completed') {
-                    console.log('[Failsafe] ⚠️ No active rides found (or orphaned search detected) — forcing cleanup');
-
-                    // If it was a ghost search (driver dropped it), actively cancel it so no other driver picks it up
-                    if (ghostAssignedRide && activeRide?.id) {
-                        supabase.from('rides').update({ status: 'cancelled' }).eq('id', activeRide.id).then();
-                    }
-
-                    // Read CURRENT values from refs
-                    const curDestinations = destinationsRef.current;
-                    const curCoords = destinationCoordsRef.current;
-                    const curDistance = realDistanceKmRef.current;
-                    const curTier = selectedTierRef.current;
-                    const curRideType = rideTypeRef.current;
-                    const curDriver = assignedDriverRef.current;
-                    const curRenderer = directionsRendererRef.current;
-
-                    // Save trip data for potential re-search
-                    if (curDestinations[0]) {
-                        cancelledTripRef.current = {
-                            destinations: [...curDestinations],
-                            destinationCoords: [...curCoords],
-                            realDistanceKm: curDistance,
-                            selectedTier: curTier,
-                            rideType: curRideType
-                        };
-                    }
-
-                    // Clean up
-                    setCurrentRideId(null);
-                    if (searchIntervalRef.current) {
-                        clearInterval(searchIntervalRef.current);
-                        searchIntervalRef.current = null;
-                    }
-                    if (curRenderer) {
-                        try { curRenderer.setDirections({ routes: [] }); } catch (e) { }
-                    }
-                    markersRef.current.forEach(m => m?.setMap(null));
-                    markersRef.current = [];
-                    setDestinations(['']);
-                    setDestinationCoords([null]);
-                    setRealDistanceKm(0);
-                    setEtaSeconds(300);
-                    notifiedDriversRef.current.clear();
-                    setBookingStep('planning');
-
-                    // Show the driver-cancelled modal
-                    const cancelledByName = curDriver?.name || 'Your driver';
-                    const isDelivery = curRideType === 'delivery';
-                    setAssignedDriverId(null);
-                    setAssignedDriver(null);
-                    setStatus('idle');
-                    setDriverCancelledName(cancelledByName);
-                    setDriverCancelledModal(true);
-                    triggerHaptic();
-                    sendPush(
-                        isDelivery ? 'DROPOFF: Delivery Cancelled' : 'DROPOFF: Ride Cancelled',
-                        `${cancelledByName} has cancelled your ${isDelivery ? 'delivery' : 'ride'}.`
-                    );
-                }
-            } catch (err) {
-                console.warn('[Failsafe] Polling error:', err);
-            }
-        }, 5000);
-
-        return () => clearInterval(failsafeTimer);
-    }, [user.id, status]);
+    }, [currentRideId, status]);
 
 
 
@@ -1371,27 +1298,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
 
         if (autocompleteService) {
-            // Start session if not exists
-            if (!sessionToken.current) {
-                const google = (window as any).google;
-                if (google) {
-                    sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-                    console.log("Maps Ride: Started new session");
+            if (searchTimeout.current) clearTimeout(searchTimeout.current);
+            searchTimeout.current = setTimeout(() => {
+                // Start session if not exists
+                if (!sessionToken.current) {
+                    const google = (window as any).google;
+                    if (google) {
+                        sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+                        console.log("Maps Ride: Started new session");
+                    }
                 }
-            }
 
-            const google = (window as any).google;
-            autocompleteService.getPlacePredictions({
-                input: val,
-                sessionToken: sessionToken.current,
-                componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] }, // Prioritize Gambia and surrounding West African countries
-                locationBias: {
-                    center: { lat: 13.4432, lng: -15.3101 }, // Banjul, Gambia
-                    radius: 100000 // 100km covers the majority of Gambia
-                }
-            }, (results: any) => {
-                setPredictions(results || []);
-            });
+                const google = (window as any).google;
+                autocompleteService.getPlacePredictions({
+                    input: val,
+                    sessionToken: sessionToken.current,
+                    componentRestrictions: { country: ['gm', 'sn', 'gw', 'gn'] },
+                    locationBias: {
+                        center: { lat: 13.4432, lng: -15.3101 },
+                        radius: 100000
+                    }
+                }, (results: any) => {
+                    setPredictions(results || []);
+                });
+            }, 500);
         }
     };
 
@@ -1418,6 +1348,17 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 showAlert("Location Error", "We couldn't accurately find this place. Please try another search.", "error");
             }
         });
+    };
+
+    const handleRetryPricing = async () => {
+        setIsPriceErrorModalOpen(false);
+        setIsCalculating(true);
+        try {
+            await refreshSettings();
+            // After refresh, the handleBookRide will be called again by the user or automatically
+        } finally {
+            setIsCalculating(false);
+        }
     };
 
     const handleNextStep = async () => {
@@ -1524,9 +1465,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         if (!ride) return;
         setCurrentRideId(ride.id);
 
-        // 3. Start Search Loop with Dynamic Radius and Actual Notifications
-        let currentRadius = startRadius;
-        const HARD_STOP_LIMIT = 120; // Auto-stop at 120km
+        // Transition to searching status — the unified Heartbeat useEffect will handle the loop
+        setStatus('searching');
+        setBookingStep('selecting');
+
         const interval = setInterval(async () => {
             // First, guarantee the ride is strictly still in 'searching' state
             // This prevents the loop from acting or prompting if the driver already accepted (even if real-time drops the event)
@@ -1548,6 +1490,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 'prem': 'premium',
                 'moto': 'scooter'
             };
+
+            let currentRadius = 2; // Should really be pulled from state
+            const HARD_STOP_LIMIT = 120;
 
             console.log(`📡 Searching for drivers in ${currentRadius}km radius... (Up to ${maxRadius}km)`);
             const { data: nearbyDrivers, error: rpcError } = await supabase.rpc('get_nearby_drivers', {
@@ -2176,6 +2121,15 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             )}
 
 
+            {/* ── Request Error Modal for Pricing/Fail-Closed ── */}
+            <RequestErrorModal
+                isOpen={isPriceErrorModalOpen}
+                onClose={() => setIsPriceErrorModalOpen(false)}
+                onRetry={handleRetryPricing}
+                title="Configuration Error"
+                message="We're unable to retrieve current pricing settings. Please check your connection and try again to ensure your fare is calculated accurately."
+                theme={theme}
+            />
         </div>
     );
 };

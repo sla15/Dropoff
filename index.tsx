@@ -1229,6 +1229,7 @@ const App = () => {
               active={screen === 'ride'}
               handleScroll={handleScroll}
               settings={settings}
+              refreshSettings={fetchSettings}
               showAlert={showAlert}
               onSearchingChange={setIsRideSearching}
               indexLocation={userLocation}

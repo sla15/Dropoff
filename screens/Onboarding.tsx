@@ -27,104 +27,104 @@ interface Props {
 }
 
 const COUNTRIES = [
-   { code: '+220', flag: '🇬🇲', name: 'Gambia', maxLen: 7 },
-   { code: '+221', flag: '🇸🇳', name: 'Senegal', maxLen: 9 },
-   { code: '+234', flag: '🇳🇬', name: 'Nigeria', maxLen: 10 },
-   { code: '+233', flag: '🇬🇭', name: 'Ghana', maxLen: 9 },
-   { code: '+225', flag: '🇨🇮', name: "Côte d'Ivoire", maxLen: 10 },
-   { code: '+231', flag: '🇱🇷', name: 'Liberia', maxLen: 9 },
-   { code: '+232', flag: '🇸🇱', name: 'Sierra Leone', maxLen: 8 },
-   { code: '+224', flag: '🇬🇳', name: 'Guinea', maxLen: 9 },
-   { code: '+223', flag: '🇲🇱', name: 'Mali', maxLen: 8 },
-   { code: '+226', flag: '🇧🇫', name: 'Burkina Faso', maxLen: 10 },
-   { code: '+222', flag: '🇲🇷', name: 'Mauritania', maxLen: 8 },
-   { code: '+227', flag: '🇳🇪', name: 'Niger', maxLen: 8 },
-   { code: '+235', flag: '🇹🇩', name: 'Chad', maxLen: 8 },
-   { code: '+237', flag: '🇨🇲', name: 'Cameroon', maxLen: 9 },
-   { code: '+241', flag: '🇬🇦', name: 'Gabon', maxLen: 7 },
-   { code: '+242', flag: '🇨🇬', name: 'Congo', maxLen: 9 },
-   { code: '+243', flag: '🇨🇩', name: 'DR Congo', maxLen: 9 },
-   { code: '+236', flag: '🇨🇫', name: 'CAR', maxLen: 8 },
-   { code: '+240', flag: '🇬🇶', name: 'Equatorial Guinea', maxLen: 9 },
-   { code: '+244', flag: '🇦🇴', name: 'Angola', maxLen: 9 },
-   { code: '+264', flag: '🇳🇦', name: 'Namibia', maxLen: 9 },
-   { code: '+267', flag: '🇧🇼', name: 'Botswana', maxLen: 8 },
-   { code: '+268', flag: '🇸🇿', name: 'Eswatini', maxLen: 9 },
-   { code: '+266', flag: '🇱🇸', name: 'Lesotho', maxLen: 8 },
-   { code: '+263', flag: '🇿🇼', name: 'Zimbabwe', maxLen: 10 },
-   { code: '+260', flag: '🇿🇲', name: 'Zambia', maxLen: 9 },
-   { code: '+261', flag: '🇲🇬', name: 'Madagascar', maxLen: 9 },
-   { code: '+265', flag: '🇲🇼', name: 'Malawi', maxLen: 9 },
-   { code: '+254', flag: '🇰🇪', name: 'Kenya', maxLen: 10 },
-   { code: '+255', flag: '🇹🇿', name: 'Tanzania', maxLen: 9 },
-   { code: '+256', flag: '🇺🇬', name: 'Uganda', maxLen: 9 },
-   { code: '+250', flag: '🇷🇼', name: 'Rwanda', maxLen: 9 },
-   { code: '+257', flag: '🇧🇮', name: 'Burundi', maxLen: 8 },
-   { code: '+251', flag: '🇪🇹', name: 'Ethiopia', maxLen: 9 },
-   { code: '+252', flag: '🇸🇴', name: 'Somalia', maxLen: 9 },
-   { code: '+253', flag: '🇩🇯', name: 'Djibouti', maxLen: 8 },
-   { code: '+249', flag: '🇸🇩', name: 'Sudan', maxLen: 9 },
-   { code: '+211', flag: '🇸🇸', name: 'South Sudan', maxLen: 9 },
-   { code: '+20', flag: '🇪🇬', name: 'Egypt', maxLen: 10 },
-   { code: '+212', flag: '🇲🇦', name: 'Morocco', maxLen: 9 },
-   { code: '+213', flag: '🇩🇿', name: 'Algeria', maxLen: 9 },
-   { code: '+216', flag: '🇹🇳', name: 'Tunisia', maxLen: 8 },
-   { code: '+218', flag: '🇱🇾', name: 'Libya', maxLen: 9 },
-   { code: '+44', flag: '🇬🇧', name: 'UK', maxLen: 10 },
-   { code: '+1', flag: '🇺🇸', name: 'USA', maxLen: 10 },
-   { code: '+33', flag: '🇫🇷', name: 'France', maxLen: 9 },
-   { code: '+49', flag: '🇩🇪', name: 'Germany', maxLen: 11 },
-   { code: '+34', flag: '🇪🇸', name: 'Spain', maxLen: 9 },
-   { code: '+39', flag: '🇮🇹', name: 'Italy', maxLen: 10 },
-   { code: '+31', flag: '🇳🇱', name: 'Netherlands', maxLen: 9 },
-   { code: '+32', flag: '🇧🇪', name: 'Belgium', maxLen: 9 },
-   { code: '+41', flag: '🇨🇭', name: 'Switzerland', maxLen: 9 },
-   { code: '+43', flag: '🇦🇹', name: 'Austria', maxLen: 10 },
-   { code: '+46', flag: '🇸🇪', name: 'Sweden', maxLen: 9 },
-   { code: '+47', flag: '🇳🇴', name: 'Norway', maxLen: 8 },
-   { code: '+45', flag: '🇩🇰', name: 'Denmark', maxLen: 8 },
-   { code: '+358', flag: '🇫🇮', name: 'Finland', maxLen: 9 },
-   { code: '+353', flag: '🇮🇪', name: 'Ireland', maxLen: 9 },
-   { code: '+351', flag: '🇵🇹', name: 'Portugal', maxLen: 9 },
-   { code: '+30', flag: '🇬🇷', name: 'Greece', maxLen: 10 },
-   { code: '+90', flag: '🇹🇷', name: 'Turkey', maxLen: 10 },
-   { code: '+7', flag: '🇷🇺', name: 'Russia', maxLen: 10 },
-   { code: '+86', flag: '🇨🇳', name: 'China', maxLen: 11 },
-   { code: '+91', flag: '🇮🇳', name: 'India', maxLen: 10 },
-   { code: '+81', flag: '🇯🇵', name: 'Japan', maxLen: 10 },
-   { code: '+82', flag: '🇰🇷', name: 'South Korea', maxLen: 10 },
-   { code: '+61', flag: '🇦🇺', name: 'Australia', maxLen: 9 },
-   { code: '+64', flag: '🇳🇿', name: 'New Zealand', maxLen: 9 },
-   { code: '+1', flag: '🇨🇦', name: 'Canada', maxLen: 10 },
-   { code: '+55', flag: '🇧🇷', name: 'Brazil', maxLen: 11 },
-   { code: '+54', flag: '🇦🇷', name: 'Argentina', maxLen: 10 },
-   { code: '+56', flag: '🇨🇱', name: 'Chile', maxLen: 9 },
-   { code: '+57', flag: '🇨🇴', name: 'Colombia', maxLen: 10 },
-   { code: '+58', flag: '🇻🇪', name: 'Venezuela', maxLen: 10 },
-   { code: '+51', flag: '🇵🇪', name: 'Peru', maxLen: 9 },
-   { code: '+52', flag: '🇲🇽', name: 'Mexico', maxLen: 10 },
-   { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia', maxLen: 9 },
-   { code: '+971', flag: '🇦🇪', name: 'UAE', maxLen: 9 },
-   { code: '+974', flag: '🇶🇦', name: 'Qatar', maxLen: 8 },
-   { code: '+965', flag: '🇰🇼', name: 'Kuwait', maxLen: 8 },
-   { code: '+968', flag: '🇴🇲', name: 'Oman', maxLen: 8 },
-   { code: '+973', flag: '🇧🇭', name: 'Bahrain', maxLen: 8 },
-   { code: '+972', flag: '🇮🇱', name: 'Israel', maxLen: 9 },
-   { code: '+962', flag: '🇯🇴', name: 'Jordan', maxLen: 9 },
-   { code: '+961', flag: '🇱🇧', name: 'Lebanon', maxLen: 8 },
-   { code: '+963', flag: '🇸🇾', name: 'Syria', maxLen: 9 },
-   { code: '+964', flag: '🇮🇶', name: 'Iraq', maxLen: 10 },
-   { code: '+98', flag: '🇮🇷', name: 'Iran', maxLen: 10 },
-   { code: '+92', flag: '🇵🇰', name: 'Pakistan', maxLen: 10 },
-   { code: '+880', flag: '🇧🇩', name: 'Bangladesh', maxLen: 10 },
-   { code: '+94', flag: '🇱🇰', name: 'Sri Lanka', maxLen: 9 },
-   { code: '+66', flag: '🇹🇭', name: 'Thailand', maxLen: 9 },
-   { code: '+84', flag: '🇻🇳', name: 'Vietnam', maxLen: 9 },
-   { code: '+60', flag: '🇲🇾', name: 'Malaysia', maxLen: 9 },
-   { code: '+65', flag: '🇸🇬', name: 'Singapore', maxLen: 8 },
-   { code: '+62', flag: '🇮🇩', name: 'Indonesia', maxLen: 11 },
-   { code: '+63', flag: '🇵🇭', name: 'Philippines', maxLen: 10 },
-   { code: '+27', flag: '🇿🇦', name: 'South Africa', maxLen: 9 },
+   { code: '+220', iso: 'GM', flag: '🇬🇲', name: 'Gambia', maxLen: 7 },
+   { code: '+221', iso: 'SN', flag: '🇸🇳', name: 'Senegal', maxLen: 9 },
+   { code: '+234', iso: 'NG', flag: '🇳🇬', name: 'Nigeria', maxLen: 10 },
+   { code: '+233', iso: 'GH', flag: '🇬🇭', name: 'Ghana', maxLen: 9 },
+   { code: '+225', iso: 'CI', flag: '🇨🇮', name: "Côte d'Ivoire", maxLen: 10 },
+   { code: '+231', iso: 'LR', flag: '🇱🇷', name: 'Liberia', maxLen: 9 },
+   { code: '+232', iso: 'SL', flag: '🇸🇱', name: 'Sierra Leone', maxLen: 8 },
+   { code: '+224', iso: 'GN', flag: '🇬🇳', name: 'Guinea', maxLen: 9 },
+   { code: '+223', iso: 'ML', flag: '🇲🇱', name: 'Mali', maxLen: 8 },
+   { code: '+226', iso: 'BF', flag: '🇧🇫', name: 'Burkina Faso', maxLen: 10 },
+   { code: '+222', iso: 'MR', flag: '🇲🇷', name: 'Mauritania', maxLen: 8 },
+   { code: '+227', iso: 'NE', flag: '🇳🇪', name: 'Niger', maxLen: 8 },
+   { code: '+235', iso: 'TD', flag: '🇹🇩', name: 'Chad', maxLen: 8 },
+   { code: '+237', iso: 'CM', flag: '🇨🇲', name: 'Cameroon', maxLen: 9 },
+   { code: '+241', iso: 'GA', flag: '🇬🇦', name: 'Gabon', maxLen: 7 },
+   { code: '+242', iso: 'CG', flag: '🇨🇬', name: 'Congo', maxLen: 9 },
+   { code: '+243', iso: 'CD', flag: '🇨🇩', name: 'DR Congo', maxLen: 9 },
+   { code: '+236', iso: 'CF', flag: '🇨🇫', name: 'CAR', maxLen: 8 },
+   { code: '+240', iso: 'GQ', flag: '🇬🇶', name: 'Equatorial Guinea', maxLen: 9 },
+   { code: '+244', iso: 'AO', flag: '🇦🇴', name: 'Angola', maxLen: 9 },
+   { code: '+264', iso: 'NA', flag: '🇳🇦', name: 'Namibia', maxLen: 9 },
+   { code: '+267', iso: 'BW', flag: '🇧🇼', name: 'Botswana', maxLen: 8 },
+   { code: '+268', iso: 'SZ', flag: '🇸🇿', name: 'Eswatini', maxLen: 9 },
+   { code: '+266', iso: 'LS', flag: '🇱🇸', name: 'Lesotho', maxLen: 8 },
+   { code: '+263', iso: 'ZW', flag: '🇿🇼', name: 'Zimbabwe', maxLen: 10 },
+   { code: '+260', iso: 'ZM', flag: '🇿🇲', name: 'Zambia', maxLen: 9 },
+   { code: '+261', iso: 'MG', flag: '🇲🇬', name: 'Madagascar', maxLen: 9 },
+   { code: '+265', iso: 'MW', flag: '🇲🇼', name: 'Malawi', maxLen: 9 },
+   { code: '+254', iso: 'KE', flag: '🇰🇪', name: 'Kenya', maxLen: 10 },
+   { code: '+255', iso: 'TZ', flag: '🇹🇿', name: 'Tanzania', maxLen: 9 },
+   { code: '+256', iso: 'UG', flag: '🇺🇬', name: 'Uganda', maxLen: 9 },
+   { code: '+250', iso: 'RW', flag: '🇷🇼', name: 'Rwanda', maxLen: 9 },
+   { code: '+257', iso: 'BI', flag: '🇧🇮', name: 'Burundi', maxLen: 8 },
+   { code: '+251', iso: 'ET', flag: '🇪🇹', name: 'Ethiopia', maxLen: 9 },
+   { code: '+252', iso: 'SO', flag: '🇸🇴', name: 'Somalia', maxLen: 9 },
+   { code: '+253', iso: 'DJ', flag: '🇩🇯', name: 'Djibouti', maxLen: 8 },
+   { code: '+249', iso: 'SD', flag: '🇸🇩', name: 'Sudan', maxLen: 9 },
+   { code: '+211', iso: 'SS', flag: '🇸🇸', name: 'South Sudan', maxLen: 9 },
+   { code: '+20',  iso: 'EG', flag: '🇪🇬', name: 'Egypt', maxLen: 10 },
+   { code: '+212', iso: 'MA', flag: '🇲🇦', name: 'Morocco', maxLen: 9 },
+   { code: '+213', iso: 'DZ', flag: '🇩🇿', name: 'Algeria', maxLen: 9 },
+   { code: '+216', iso: 'TN', flag: '🇹🇳', name: 'Tunisia', maxLen: 8 },
+   { code: '+218', iso: 'LY', flag: '🇱🇾', name: 'Libya', maxLen: 9 },
+   { code: '+44',  iso: 'GB', flag: '🇬🇧', name: 'UK', maxLen: 10 },
+   { code: '+1',   iso: 'US', flag: '🇺🇸', name: 'USA', maxLen: 10 },
+   { code: '+33',  iso: 'FR', flag: '🇫🇷', name: 'France', maxLen: 9 },
+   { code: '+49',  iso: 'DE', flag: '🇩🇪', name: 'Germany', maxLen: 11 },
+   { code: '+34',  iso: 'ES', flag: '🇪🇸', name: 'Spain', maxLen: 9 },
+   { code: '+39',  iso: 'IT', flag: '🇮🇹', name: 'Italy', maxLen: 10 },
+   { code: '+31',  iso: 'NL', flag: '🇳🇱', name: 'Netherlands', maxLen: 9 },
+   { code: '+32',  iso: 'BE', flag: '🇧🇪', name: 'Belgium', maxLen: 9 },
+   { code: '+41',  iso: 'CH', flag: '🇨🇭', name: 'Switzerland', maxLen: 9 },
+   { code: '+43',  iso: 'AT', flag: '🇦🇹', name: 'Austria', maxLen: 10 },
+   { code: '+46',  iso: 'SE', flag: '🇸🇪', name: 'Sweden', maxLen: 9 },
+   { code: '+47',  iso: 'NO', flag: '🇳🇴', name: 'Norway', maxLen: 8 },
+   { code: '+45',  iso: 'DK', flag: '🇩🇰', name: 'Denmark', maxLen: 8 },
+   { code: '+358', iso: 'FI', flag: '🇫🇮', name: 'Finland', maxLen: 9 },
+   { code: '+353', iso: 'IE', flag: '🇮🇪', name: 'Ireland', maxLen: 9 },
+   { code: '+351', iso: 'PT', flag: '🇵🇹', name: 'Portugal', maxLen: 9 },
+   { code: '+30',  iso: 'GR', flag: '🇬🇷', name: 'Greece', maxLen: 10 },
+   { code: '+90',  iso: 'TR', flag: '🇹🇷', name: 'Turkey', maxLen: 10 },
+   { code: '+7',   iso: 'RU', flag: '🇷🇺', name: 'Russia', maxLen: 10 },
+   { code: '+86',  iso: 'CN', flag: '🇨🇳', name: 'China', maxLen: 11 },
+   { code: '+91',  iso: 'IN', flag: '🇮🇳', name: 'India', maxLen: 10 },
+   { code: '+81',  iso: 'JP', flag: '🇯🇵', name: 'Japan', maxLen: 10 },
+   { code: '+82',  iso: 'KR', flag: '🇰🇷', name: 'South Korea', maxLen: 10 },
+   { code: '+61',  iso: 'AU', flag: '🇦🇺', name: 'Australia', maxLen: 9 },
+   { code: '+64',  iso: 'NZ', flag: '🇳🇿', name: 'New Zealand', maxLen: 9 },
+   { code: '+1',   iso: 'CA', flag: '🇨🇦', name: 'Canada', maxLen: 10 },
+   { code: '+55',  iso: 'BR', flag: '🇧🇷', name: 'Brazil', maxLen: 11 },
+   { code: '+54',  iso: 'AR', flag: '🇦🇷', name: 'Argentina', maxLen: 10 },
+   { code: '+56',  iso: 'CL', flag: '🇨🇱', name: 'Chile', maxLen: 9 },
+   { code: '+57',  iso: 'CO', flag: '🇨🇴', name: 'Colombia', maxLen: 10 },
+   { code: '+58',  iso: 'VE', flag: '🇻🇪', name: 'Venezuela', maxLen: 10 },
+   { code: '+51',  iso: 'PE', flag: '🇵🇪', name: 'Peru', maxLen: 9 },
+   { code: '+52',  iso: 'MX', flag: '🇲🇽', name: 'Mexico', maxLen: 10 },
+   { code: '+966', iso: 'SA', flag: '🇸🇦', name: 'Saudi Arabia', maxLen: 9 },
+   { code: '+971', iso: 'AE', flag: '🇦🇪', name: 'UAE', maxLen: 9 },
+   { code: '+974', iso: 'QA', flag: '🇶🇦', name: 'Qatar', maxLen: 8 },
+   { code: '+965', iso: 'KW', flag: '🇰🇼', name: 'Kuwait', maxLen: 8 },
+   { code: '+968', iso: 'OM', flag: '🇴🇲', name: 'Oman', maxLen: 8 },
+   { code: '+973', iso: 'BH', flag: '🇧🇭', name: 'Bahrain', maxLen: 8 },
+   { code: '+972', iso: 'IL', flag: '🇮🇱', name: 'Israel', maxLen: 9 },
+   { code: '+962', iso: 'JO', flag: '🇯🇴', name: 'Jordan', maxLen: 9 },
+   { code: '+961', iso: 'LB', flag: '🇱🇧', name: 'Lebanon', maxLen: 8 },
+   { code: '+963', iso: 'SY', flag: '🇸🇾', name: 'Syria', maxLen: 9 },
+   { code: '+964', iso: 'IQ', flag: '🇮🇶', name: 'Iraq', maxLen: 10 },
+   { code: '+98',  iso: 'IR', flag: '🇮🇷', name: 'Iran', maxLen: 10 },
+   { code: '+92',  iso: 'PK', flag: '🇵🇰', name: 'Pakistan', maxLen: 10 },
+   { code: '+880', iso: 'BD', flag: '🇧🇩', name: 'Bangladesh', maxLen: 10 },
+   { code: '+94',  iso: 'LK', flag: '🇱🇰', name: 'Sri Lanka', maxLen: 9 },
+   { code: '+66',  iso: 'TH', flag: '🇹🇭', name: 'Thailand', maxLen: 9 },
+   { code: '+84',  iso: 'VN', flag: '🇻🇳', name: 'Vietnam', maxLen: 9 },
+   { code: '+60',  iso: 'MY', flag: '🇲🇾', name: 'Malaysia', maxLen: 9 },
+   { code: '+65',  iso: 'SG', flag: '🇸🇬', name: 'Singapore', maxLen: 8 },
+   { code: '+62',  iso: 'ID', flag: '🇮🇩', name: 'Indonesia', maxLen: 11 },
+   { code: '+63',  iso: 'PH', flag: '🇵🇭', name: 'Philippines', maxLen: 10 },
+   { code: '+27',  iso: 'ZA', flag: '🇿🇦', name: 'South Africa', maxLen: 9 },
 ];
 
 
@@ -190,7 +190,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { t
          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
          <div
             ref={drawerRef}
-            className={`w-full ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[95vh] min-h-[80vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+            className={`w-full ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 h-[90vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
             style={{
                transform: `translateY(${dragY}px)`,
                transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'
@@ -762,7 +762,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
             {/* Header Navigation: Top-Right Action Button */}
-            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
+            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-between items-center bg-transparent">
                <button
                   onClick={() => setStep(1)}
                   className={`p-3 rounded-full ${theme === 'light' ? 'bg-white shadow-md' : 'bg-white/10'} active:scale-90 transition-all`}
@@ -789,34 +789,46 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
                   <h2 className="text-3xl font-bold tracking-tight mb-8">Enter your number</h2>
 
-                  <div className={`flex items-center justify-center gap-3 pb-4 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors focus-within:border-[#00D68F]`}>
-                     <div
-                        className="font-bold text-2xl flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 transition-transform"
-                        onClick={() => { triggerHaptic(); setShowCountryPicker(true); }}
-                     >
-                        <span>{selectedCountry.flag}</span> {selectedCountry.code}
-                        <ChevronDown size={20} className={`${textSec} opacity-70`} />
-                     </div>
-                     <input
-                        id="phone-input"
-                        type="tel"
-                        placeholder="### ####"
-                        value={phone}
-                        onChange={(e) => {
-                           const val = e.target.value.replace(/\D/g, '');
-                           if (val.length <= selectedCountry.maxLen) setPhone(val);
-                        }}
-                        onKeyDown={(e) => {
-                           if (e.key === 'Enter' && phone.length >= (selectedCountry.maxLen - 2) && !loading) {
-                              sendOTP();
-                           }
-                        }}
-                        onFocus={(e) => {
-                           setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                        }}
-                        className={`flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-800 ${theme === 'light' ? 'text-black' : 'text-white'}`}
-                     />
-                  </div>
+                  <div className={`flex items-center pb-3 border-b-2 ${theme === 'light' ? 'border-black' : 'border-[#00D68F]'} mb-6 w-full max-w-[320px] mx-auto transition-colors focus-within:border-[#00D68F]`}>
+                      {/* Country selector — fixed, never expands */}
+                      <button
+                         type="button"
+                         className="flex items-center gap-2 shrink-0 pr-3 mr-3 border-r border-gray-300 dark:border-gray-700 active:scale-95 transition-transform"
+                         onClick={() => { triggerHaptic(); setShowCountryPicker(true); }}
+                      >
+                         <img 
+                            src={`https://flagcdn.com/w40/${selectedCountry.iso.toLowerCase()}.png`} 
+                            alt={selectedCountry.name}
+                            className="w-7 h-[20px] rounded-[2px] object-cover shadow-sm"
+                         />
+                         <span className="font-black text-sm tracking-widest">{selectedCountry.iso}</span>
+                         <ChevronDown size={15} className={`${textSec} opacity-70`} />
+                      </button>
+                      {/* Dial code + number input */}
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                         <span className={`text-2xl font-bold shrink-0 ${theme === 'light' ? 'text-black' : 'text-white'}`}>{selectedCountry.code}</span>
+                         <input
+                            id="phone-input"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="### ####"
+                            value={phone}
+                            onChange={(e) => {
+                               const val = e.target.value.replace(/\D/g, '');
+                               if (val.length <= selectedCountry.maxLen) setPhone(val);
+                            }}
+                            onKeyDown={(e) => {
+                               if (e.key === 'Enter' && phone.length >= (selectedCountry.maxLen - 2) && !loading) {
+                                  sendOTP();
+                               }
+                            }}
+                            onFocus={(e) => {
+                               setTimeout(() => (e.target as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                            }}
+                            className={`flex-1 min-w-0 bg-transparent text-2xl font-bold outline-none placeholder:text-gray-300 dark:placeholder:text-gray-700 ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                         />
+                      </div>
+                   </div>
                   <p className={`text-sm ${textSec} font-medium opacity-60`}>We'll text you a 6-digit verification code.</p>
                </div>
             </div>
@@ -865,7 +877,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            c.code.includes(countrySearch)
                         ).map((c, index) => (
                            <div
-                              key={`${c.name}-${c.code}-${index}`}
+                              key={`${c.iso}-${index}`}
                               onClick={() => {
                                  triggerHaptic();
                                  setSelectedCountry(c);
@@ -877,14 +889,19 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                                     setTimeout(() => document.getElementById('phone-input')?.focus(), 100);
                                  }, 300);
                               }}
-                              className={`flex items-center gap-4 py-4 border-b ${theme === 'light' ? 'border-gray-100' : 'border-gray-800/50'} cursor-pointer active:bg-gray-100 dark:active:bg-white/5 transition-colors`}
+                              className={`flex items-center gap-3 py-3.5 border-b ${theme === 'light' ? 'border-gray-100' : 'border-gray-800/50'} cursor-pointer active:bg-gray-100 dark:active:bg-white/5 transition-colors`}
                            >
-                              <span className="text-3xl">{c.flag}</span>
-                              <span className="font-bold text-lg flex-1">{c.name}</span>
-                              <span className={`${textSec} font-bold`}>{c.code}</span>
-                              {selectedCountry.code === c.code && (
-                                 <div className="w-6 h-6 rounded-full bg-[#00D68F] flex items-center justify-center text-black">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-black"></div>
+                              <img 
+                                 src={`https://flagcdn.com/w40/${c.iso.toLowerCase()}.png`} 
+                                 alt={c.name}
+                                 className="w-7 h-[20px] rounded-[2px] object-cover shadow-sm shrink-0"
+                              />
+                              <span className={`text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded shrink-0 ${theme === 'light' ? 'bg-gray-100 text-gray-500' : 'bg-white/10 text-gray-400'}`}>{c.iso}</span>
+                              <span className="font-semibold text-base flex-1 truncate">{c.name}</span>
+                              <span className={`${textSec} font-bold text-sm shrink-0`}>{c.code}</span>
+                              {selectedCountry.iso === c.iso && (
+                                 <div className="w-5 h-5 rounded-full bg-[#00D68F] flex items-center justify-center shrink-0">
+                                    <div className="w-2 h-2 rounded-full bg-black"></div>
                                  </div>
                               )}
                            </div>
@@ -907,7 +924,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    if (step === 3) {
       return (
          <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in relative overflow-hidden`}>
-            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={() => verifyOTP()}
                   disabled={otp.length < 6 || loading}
@@ -982,8 +999,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 4) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
+            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={handleCompleteProfile}
                   disabled={loading || !name}
@@ -1103,8 +1120,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 5) {
       return (
-         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden`}>
-            <div className="fixed top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
+         <div className={`h-full w-full flex flex-col ${bgMain} ${textMain} px-6 pt-safe pb-safe animate-slide-in overflow-hidden relative`}>
+            <div className="absolute top-[calc(env(safe-area-inset-top,0px)+2rem)] left-6 right-6 z-[100] flex justify-end items-center bg-transparent">
                <button
                   onClick={() => navigate('dashboard')}
                   className="px-6 py-3 rounded-full font-black text-sm active:scale-95 transition-all flex items-center gap-2 bg-gray-800 text-gray-500 opacity-60"

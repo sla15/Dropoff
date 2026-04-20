@@ -185,6 +185,24 @@ const initWebPush = async (userId?: string) => {
     }
 };
 
+/**
+ * Exponential backoff retry helper
+ */
+async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 5, baseDelay = 1000): Promise<T> {
+    let lastError: any;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await operation();
+        } catch (err) {
+            lastError = err;
+            const delay = baseDelay * Math.pow(2, i);
+            console.warn(`[FCM] Operation failed, retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    throw lastError;
+}
+
 export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
     try {
         if (!userId || !token) return;
@@ -195,29 +213,25 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
             return;
         }
 
-        const { error } = await supabase.rpc('add_fcm_token', {
-            p_user_id: userId,
-            p_token: token
+        await retryOperation(async () => {
+            const { error } = await supabase.rpc('add_fcm_token', {
+                p_user_id: userId,
+                p_token: token
+            });
+            if (error) throw error;
+
+            // Also update the singular token as a fallback for legacy triggers
+            const { error: fallbackError } = await supabase
+                .from('profiles')
+                .update({ fcm_token: token })
+                .eq('id', userId);
+            if (fallbackError) console.warn('[FCM] Fallback sync warning:', fallbackError);
         });
 
-        // Also update the singular token as a fallback for legacy triggers
-        const { error: fallbackError } = await supabase
-            .from('profiles')
-            .update({ fcm_token: token })
-            .eq('id', userId);
-            
-        if (fallbackError) {
-            console.error('❌ FCM: Fallback singular token sync failed:', fallbackError);
-        }
-
-        if (error) {
-            console.error('❌ FCM: Sync failed:', error);
-        } else {
-            console.log('✅ FCM: Token synced to Supabase');
-            localStorage.setItem('customer_last_fcm_sync_token_v2', token);
-            localStorage.setItem('customer_last_fcm_sync_user_v2', userId);
-        }
+        console.log('✅ FCM: Token synced to Supabase');
+        localStorage.setItem('customer_last_fcm_sync_token_v2', token);
+        localStorage.setItem('customer_last_fcm_sync_user_v2', userId);
     } catch (err) {
-        console.error('❌ FCM: Sync exception:', err);
+        console.error('❌ FCM: Permanent sync failure:', err);
     }
 };

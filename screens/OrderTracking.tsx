@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2, X, Plus } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2, X, Plus, RefreshCcw } from 'lucide-react';
 import { Theme, Screen, UserData, Activity } from '../types';
 import { triggerHaptic, sendPushNotification, getInitialAvatar } from '../utils/helpers';
 import { GreenGlow } from '../components/GreenGlow';
@@ -45,6 +45,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     const [userComment, setUserComment] = useState('');
     const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     const [reviewedIds, setReviewedIds] = useState<string[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
     const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -55,7 +56,13 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     useEffect(() => {
         if (!activeOrderId && !activeBatchId) return;
         fetchOrderAndDriver();
+        const cleanup = setupSubscription();
+        return () => {
+            if (cleanup) cleanup();
+        };
+    }, [activeOrderId, activeBatchId]);
 
+    const setupSubscription = () => {
         const channelId = activeBatchId ? `batch-tracking-${activeBatchId}` : `order-tracking-${activeOrderId}`;
         const filterStr = activeBatchId ? `batch_id=eq.${activeBatchId}` : `id=eq.${activeOrderId}`;
 
@@ -83,7 +90,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [activeOrderId, activeBatchId]);
+    };
 
     useEffect(() => {
         if (activeBatchId && batchOrders.length > 0) {
@@ -143,6 +150,18 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
             showAlert("Error", "Could not fetch order details", "error");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        if (isRefreshing) return;
+        setIsRefreshing(true);
+        triggerHaptic();
+        try {
+            await fetchOrderAndDriver();
+            setupSubscription(); // Re-kick subscription
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -362,7 +381,12 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                         {activeBatchId ? `Batch #${activeBatchId.slice(0, 8)}` : `Order #${activeOrderId?.slice(0, 8)}`}
                     </p>
                 </div>
-                <div className="w-10"></div>
+                <button
+                    onClick={handleRefresh}
+                    className={`w-10 h-10 rounded-full ${bgCard} shadow-lg flex items-center justify-center active:scale-95 transition-all`}
+                >
+                    <RefreshCcw size={18} className={`${isRefreshing ? 'animate-spin' : ''} text-[#00D68F]`} />
+                </button>
             </div>
 
             <div className="flex-1 px-6 pb-40 overflow-y-auto z-10">
