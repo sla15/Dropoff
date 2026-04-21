@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 
+# Secrets and Keystores
+*.keystore
+*.jks
+keystore_base64.txt
