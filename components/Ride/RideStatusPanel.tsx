@@ -115,13 +115,13 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
                     <p className={`${textSec} text-sm mb-6`}>What nearby {rideType === 'delivery' ? 'scooters' : 'drivers'} see:</p>
 
                     <div className={`w-full ${inputBg} p-4 rounded-2xl flex items-center justify-between`}>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
                                 <User size={18} className="text-[#00D68F]" />
                             </div>
-                            <div>
-                                <p className="font-bold">{user.name}</p>
-                                <p className="text-[10px] uppercase font-black text-[#00D68F] tracking-widest">Customer</p>
+                            <div className="min-w-0">
+                                <p className="font-bold truncate max-w-[140px]">{user.name}</p>
+                                <p className="text-[10px] uppercase font-black text-[#00D68F] tracking-widest truncate">Customer</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/20">
