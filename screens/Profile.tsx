@@ -308,6 +308,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
             if (updateError) throw updateError;
 
+            if (editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail)) {
+                showAlert("Invalid Email", "Please enter a valid email address.", "error");
+                setLoading(false);
+                return;
+            }
+
             // 2.1 Update Saved Locations (Home)
             if (homeLocData) {
                 const { error: locError } = await supabase
@@ -410,7 +416,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         )}
                     </div>
 
-                    <h2 className="text-3xl font-black tracking-tight text-center">{user.name || 'User'}</h2>
+                    <h2 className="text-3xl font-black tracking-tight text-center truncate max-w-full px-6">{user.name || 'User'}</h2>
                     <p className={`${textSec} font-medium text-center mt-1`}>{safeFormatPhone(user.phone)}</p>
                 </div>
 
@@ -523,7 +529,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                             <div>
                                 <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>
-                                <input value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
+                                <input type="email" placeholder="name@example.com" value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
                             </div>
                             <div>
                                 <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
@@ -863,7 +869,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.9.3 (Build 220)</p>
+                        <p>Version 1.9.6 (Build 225)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>

@@ -2,7 +2,7 @@ const fs = require('fs');
 
 async function main() {
     console.log('Script started...');
-    const url = 'https://jndlmfxjaujjmksbacaz.supabase.co/rest/v1/';
+    const url = 'https://uuiqtfzgdisuuqtefrgb.supabase.co/rest/v1/';
     const apikey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpuZGxtZnhqYXVqam1rc2JhY2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyMTA5OTAsImV4cCI6MjA4Mzc4Njk5MH0.6I6QOI5ub_B4_gPFPYDzn76DpTnurB3f3ZWz2aJhx7w';
 
     try {

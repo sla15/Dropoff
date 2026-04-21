@@ -219,11 +219,26 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
                 }
             }
 
-            const pos = await Geolocation.getCurrentPosition({
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+            let pos;
+            try {
+                console.log("📍 LocationPicker: Attempting High-Accuracy Location...");
+                pos = await Geolocation.getCurrentPosition({
+                    enableHighAccuracy: true,
+                    timeout: 8000,
+                    maximumAge: 30000
+                });
+            } catch (err: any) {
+                if (err.code === 3) { // Timeout
+                    console.warn("📍 LocationPicker: High-accuracy timeout, retrying with balanced accuracy...");
+                    pos = await Geolocation.getCurrentPosition({
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 60000
+                    });
+                } else {
+                    throw err;
+                }
+            }
 
             clearTimeout(fallbackTimeout);
             const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -245,6 +260,7 @@ export const LocationPicker = ({ theme, onConfirm, onClose, title = "Select Loca
         } catch (err) {
             clearTimeout(fallbackTimeout);
             setLoading(false);
+            console.error("LocationPicker: Geolocation Error", err);
             // Final fallback if GPS fails
             if (!selectedCoords && user?.last_lat && user?.last_lng) {
                 const coords = { lat: user.last_lat, lng: user.last_lng };

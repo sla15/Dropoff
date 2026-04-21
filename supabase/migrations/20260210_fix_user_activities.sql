@@ -99,7 +99,7 @@ BEGIN
             END CASE;
 
             PERFORM net.http_post(
-                url := 'https://jndlmfxjaujjmksbacaz.supabase.co/functions/v1/send-onesignal-notification',
+                url := 'https://uuiqtfzgdisuuqtefrgb.supabase.co/functions/v1/send-onesignal-notification',
                 headers := jsonb_build_object('Content-Type', 'application/json'),
                 body := jsonb_build_object(
                     'player_ids', jsonb_build_array(customer_player_id),
@@ -159,7 +159,7 @@ BEGIN
             END CASE;
 
             PERFORM net.http_post(
-                url := 'https://jndlmfxjaujjmksbacaz.supabase.co/functions/v1/send-onesignal-notification',
+                url := 'https://uuiqtfzgdisuuqtefrgb.supabase.co/functions/v1/send-onesignal-notification',
                 headers := jsonb_build_object('Content-Type', 'application/json'),
                 body := jsonb_build_object(
                     'player_ids', jsonb_build_array(customer_player_id),
@@ -208,7 +208,7 @@ BEGIN
 
     IF player_ids_array IS NOT NULL AND array_length(player_ids_array, 1) > 0 THEN
         PERFORM net.http_post(
-            url := 'https://jndlmfxjaujjmksbacaz.supabase.co/functions/v1/send-onesignal-notification',
+            url := 'https://uuiqtfzgdisuuqtefrgb.supabase.co/functions/v1/send-onesignal-notification',
             headers := jsonb_build_object('Content-Type', 'application/json'),
             body := jsonb_build_object(
                 'player_ids', to_jsonb(player_ids_array),

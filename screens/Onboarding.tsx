@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
+import { Browser } from '@capacitor/browser';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X, Search } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
 import { triggerHaptic, sendPushNotification, compressImage } from '../utils/helpers';
@@ -615,14 +616,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       try {
          if (Capacitor.isNativePlatform()) {
             const permissions = await Geolocation.checkPermissions();
-            console.log("📍 Location permission status:", permissions.location);
-
             if (permissions.location === 'denied') {
                showAlert("Location Denied", "Please enable location permissions in your phone settings to use this feature.", "info");
                setLoading(false);
                return;
             }
-
             if (permissions.location === 'prompt' || permissions.location === 'prompt-with-rationale') {
                const request = await Geolocation.requestPermissions();
                if (request.location !== 'granted') {
@@ -632,14 +630,29 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             }
          }
 
-         const pos = await Geolocation.getCurrentPosition({
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
-         });
+         let pos;
+         try {
+            console.log("📍 Onboarding: Attempting High-Accuracy Location...");
+            pos = await Geolocation.getCurrentPosition({
+               enableHighAccuracy: true,
+               timeout: 10000,
+               maximumAge: 30000 // Use cached position if available (within 30s)
+            });
+         } catch (firstErr: any) {
+            if (firstErr.code === 3) { // Timeout
+               console.warn("📍 Onboarding: High-accuracy timeout, falling back to balanced accuracy...");
+               pos = await Geolocation.getCurrentPosition({
+                  enableHighAccuracy: false,
+                  timeout: 15000,
+                  maximumAge: 60000
+               });
+            } else {
+               throw firstErr;
+            }
+         }
 
          const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-         console.log("Onboarding: Location detected", coords);
+         console.log("✅ Onboarding: Location detected", coords);
 
          const google = (window as any).google;
          if (!google) {
@@ -660,9 +673,10 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             }
          });
       } catch (err: any) {
-         console.error("Onboarding: Geolocation Error", err);
+         console.error("❌ Onboarding: Geolocation Error", err);
          setLoading(false);
-         showAlert("Location Error", "Could not get your location. Please check your settings.", "error");
+         const msg = err.code === 3 ? "Location request timed out. Please try again or set manually." : "Could not get your location. Please check your settings.";
+         showAlert("Location Error", msg, "error");
       }
    };
 
@@ -758,9 +772,23 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
                <p className={`text-center text-[12px] leading-relaxed px-6 font-semibold ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
                   By continuing, you verify you are at least 18 and agree to our{' '}
-                  <span onClick={() => window.open('/terms', '_blank')} className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30">Terms</span>
+                  <span 
+                     onClick={async () => {
+                        await Browser.open({ url: 'https://dropoffgambia.com/terms' });
+                     }} 
+                     className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30"
+                  >
+                     Terms
+                  </span>
                   {' & '}
-                  <span onClick={() => window.open('/privacy', '_blank')} className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30">Privacy</span>.
+                  <span 
+                     onClick={async () => {
+                        await Browser.open({ url: 'https://dropoffgambia.com/privacy' });
+                     }} 
+                     className="text-[#00D68F] hover:text-[#00A06A] transition-colors cursor-pointer border-b border-[#00D68F]/30"
+                  >
+                     Privacy
+                  </span>.
                </p>
             </div>
 
@@ -1089,6 +1117,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                         <div className={`flex items-center gap-3 p-3.5 rounded-xl ${inputBg}`}>
                            <Mail size={18} className={textSec} />
                            <input
+                              type="email"
                               placeholder="name@example.com"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
