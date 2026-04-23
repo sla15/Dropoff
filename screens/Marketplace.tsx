@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Search, Star, MapPin, Heart, Phone } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { Search, Star, Heart, RefreshCw } from 'lucide-react';
 import { Theme, Screen, Business, Category, UserData } from '../types';
 import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
 
@@ -28,6 +28,8 @@ interface Props {
       cancelText?: string,
       onCancel?: () => void
    ) => void;
+   onRefresh: () => Promise<void>;
+   isRefreshing: boolean;
 }
 
 // Haversine formula to calculate distance in KM
@@ -44,8 +46,44 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
    return d;
 };
 
-export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user }: Props) => {
+export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user, onRefresh, isRefreshing }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
+
+   // Pull-to-refresh state
+   const [pullY, setPullY] = useState(0);
+   const [isPulling, setIsPulling] = useState(false);
+   const touchStartY = useRef(0);
+   const scrollContainerRef = useRef<HTMLDivElement>(null);
+   const PULL_THRESHOLD = 72; // px needed to trigger refresh
+
+   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+      // Only activate pull-to-refresh when scrolled to top
+      if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
+         touchStartY.current = e.touches[0].clientY;
+         setIsPulling(true);
+      }
+   }, []);
+
+   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+      if (!isPulling) return;
+      const delta = e.touches[0].clientY - touchStartY.current;
+      if (delta > 0 && scrollContainerRef.current?.scrollTop === 0) {
+         // Dampen the pull (rubber-band feel)
+         setPullY(Math.min(delta * 0.45, PULL_THRESHOLD + 20));
+      }
+   }, [isPulling]);
+
+   const handleTouchEnd = useCallback(async () => {
+      if (!isPulling) return;
+      setIsPulling(false);
+      if (pullY >= PULL_THRESHOLD) {
+         triggerHaptic();
+         setPullY(0);
+         await onRefresh();
+      } else {
+         setPullY(0);
+      }
+   }, [isPulling, pullY, onRefresh]);
 
    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
    const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -98,7 +136,30 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
             </div>
          </div>
 
-         <div className="flex-1 overflow-y-auto min-h-0 px-6 pt-4 pb-32 space-y-8" onScroll={handleScroll}>
+         <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto min-h-0 px-6 pt-4 pb-32 space-y-8"
+            onScroll={handleScroll}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+         >
+            {/* Pull-to-refresh indicator */}
+            <div
+               className="flex items-center justify-center overflow-hidden transition-all duration-300"
+               style={{ height: isRefreshing ? 48 : pullY > 0 ? pullY : 0, opacity: isRefreshing || pullY > 0 ? 1 : 0 }}
+            >
+               <div className={`flex items-center gap-2 text-[#00D68F] text-xs font-black ${
+                  isRefreshing ? 'opacity-100' : pullY >= PULL_THRESHOLD ? 'opacity-100' : 'opacity-60'
+               }`}>
+                  <RefreshCw
+                     size={16}
+                     className={isRefreshing ? 'animate-spin' : ''}
+                     style={!isRefreshing ? { transform: `rotate(${(pullY / PULL_THRESHOLD) * 180}deg)` } : {}}
+                  />
+                  <span>{isRefreshing ? 'Refreshing...' : pullY >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+               </div>
+            </div>
             {/* Businesses Section */}
             {filteredBusinesses.length > 0 && (
                <div className="space-y-4 animate-scale-in">

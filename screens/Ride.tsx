@@ -115,6 +115,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
     const notifiedDriversRef = useRef<Set<string>>(new Set());
+    const gpsChannelRef = useRef<any>(null);       // Shared broadcast channel ref between effects
+    const lastBroadcastRef = useRef<number>(0);    // Timestamp of last GPS broadcast received (suppresses duplicate postgres_changes render)
 
     // 🔒 Refs that mirror state — used inside subscription/polling closures to avoid stale reads
     // Declared AFTER all state so there are no forward-reference issues.
@@ -752,26 +754,25 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         // Initial fetch
         fetchDrivers();
 
-        // 🟢 Scalability Optimization: Granular & Throttled Subscriptions
-        // If a driver is assigned, we only listen to THAT driver.
-        // If unassigned, we listen to all but throttle the UI refreshes to save DB compute.
+        // 🟢 CHANNEL 1: postgres_changes — fallback for partner app DB writes (all existing behaviour preserved)
         const filter = assignedDriverId ? `id=eq.${assignedDriverId}` : undefined;
         let lastFetchTime = 0;
-        const THROTTLE_MS = 5000; // Only refresh all drivers every 5s max
+        const THROTTLE_MS = 5000; // Throttle unassigned updates to max once every 5s
 
-        const channel = supabase
+        const pgChannel = supabase
             .channel('driver-locations')
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'drivers', filter },
                 async (payload) => {
                     const now = Date.now();
+                    // If a broadcast already handled this GPS update within the last second,
+                    // skip the DB fetch to avoid double-rendering the same position.
+                    if (now - lastBroadcastRef.current < 1000) return;
 
                     if (assignedDriverId) {
-                        // Priority update for assigned driver (No throttle)
-                        fetchDrivers();
+                        fetchDrivers(); // Assigned driver: always refresh immediately (no throttle)
                     } else if (now - lastFetchTime > THROTTLE_MS) {
-                        // Throttled update for general markers
                         lastFetchTime = now;
                         fetchDrivers();
                     }
@@ -779,8 +780,31 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             )
             .subscribe();
 
+        // 🚀 CHANNEL 2: Broadcast fast-path — instant GPS updates with zero DB reads
+        // Partner app sends: supabase.channel('driver-gps').send({ type: 'broadcast', event: 'location', payload: { id, current_lat, current_lng, heading, vehicle_category, is_online } })
+        // Customer receives it here and updates the map marker directly — no SELECT needed.
+        const broadcastChannel = supabase
+            .channel('driver-gps')
+            .on('broadcast', { event: 'location' }, ({ payload }) => {
+                if (!payload || typeof payload.current_lat !== 'number' || typeof payload.current_lng !== 'number') return;
+
+                const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
+
+                // Browsing: update any online driver | Active ride: only assigned driver
+                if (!isRequestActive || payload.id === assignedDriverId) {
+                    lastBroadcastRef.current = Date.now(); // Mark so postgres_changes skips its fetch
+                    refreshMarkers([payload]);
+                }
+            })
+            .subscribe();
+
+        // Store broadcast channel so the simulation effect can send to it
+        gpsChannelRef.current = broadcastChannel;
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(pgChannel);
+            supabase.removeChannel(broadcastChannel);
+            gpsChannelRef.current = null;
         };
     }, [map, status, assignedDriverId]);
 
@@ -799,50 +823,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         sendPushNotification(title, message);
     };
 
-    // Handle Driver Visibility based on Status
-    // Removed redundant useEffect, handled in stable effect above
-
-    // Simulated driver movement for dummy data demonstration
-    useEffect(() => {
-        if (status !== 'accepted' || !assignedDriverId || !userLocation) return;
-
-        console.log("Starting driver movement simulation...");
-        const simulationInterval = setInterval(async () => {
-            const { data: driver, error } = await supabase
-                .from('drivers')
-                .select('current_lat, current_lng')
-                .eq('id', assignedDriverId)
-                .single();
-
-            if (driver && !error) {
-                const latDiff = userLocation.lat - driver.current_lat;
-                const lngDiff = userLocation.lng - driver.current_lng;
-
-                // Step size roughly 100 meters per 3 seconds
-                const step = 0.0008;
-                const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-
-                if (distance > 0.0001) { // Stop when very very close
-                    const newLat = driver.current_lat + (latDiff / distance) * Math.min(step, distance);
-                    const newLng = driver.current_lng + (lngDiff / distance) * Math.min(step, distance);
-
-                    console.log(`Simulating movement for driver ${assignedDriverId} to ${newLat}, ${newLng}`);
-                    await supabase
-                        .from('drivers')
-                        .update({
-                            current_lat: newLat,
-                            current_lng: newLng
-                        })
-                        .eq('id', assignedDriverId);
-                }
-            }
-        }, 3000);
-
-        return () => {
-            console.log("Stopping driver movement simulation.");
-            clearInterval(simulationInterval);
-        };
-    }, [status, assignedDriverId, userLocation]);
+    // Driver location is managed entirely by the partner app.
+    // GPS updates reach the customer via two paths (see tracking useEffect above):
+    //   1. Broadcast channel 'driver-gps' — instant, zero DB reads (fast path)
+    //   2. postgres_changes on 'drivers' table   — fallback for DB-only updates
 
     const calculateRouteAndPrice = async (): Promise<boolean> => {
         if (!map || directionsRenderer === null || destinations.every(d => !d)) return false;

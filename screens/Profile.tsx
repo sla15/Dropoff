@@ -293,6 +293,13 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 console.log("Uploaded! URL:", finalAvatarUrl);
             }
 
+            // Validate email BEFORE writing to DB
+            if (editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail)) {
+                showAlert("Invalid Email", "Please enter a valid email address.", "error");
+                setLoading(false);
+                return;
+            }
+
             // 2. Update Profiles Table
             const { error: updateError } = await supabase
                 .from('profiles')
@@ -307,12 +314,6 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 .eq('id', userId);
 
             if (updateError) throw updateError;
-
-            if (editEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail)) {
-                showAlert("Invalid Email", "Please enter a valid email address.", "error");
-                setLoading(false);
-                return;
-            }
 
             // 2.1 Update Saved Locations (Home)
             if (homeLocData) {
@@ -869,7 +870,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.9.6 (Build 225)</p>
+                        <p>Version 1.9.8 (Build 226)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>

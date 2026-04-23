@@ -166,6 +166,7 @@ const App = () => {
   const [isActivitiesLoading, setIsActivitiesLoading] = useState(false);
   const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const [locationPromptDone, setLocationPromptDone] = useState(false);
+  const [isRefreshingMarket, setIsRefreshingMarket] = useState(false);
 
   const [updateConfig, setUpdateConfig] = useState<{
     show: boolean,
@@ -705,8 +706,10 @@ const App = () => {
       const channel = supabase.channel('app-changes');
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchSettings());
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'business_categories' }, () => fetchCategories());
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, () => fetchBusinesses());
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => fetchBusinesses());
+      // 🟢 Scalability: Removed global 'businesses' and 'products' subscriptions.
+      // Previously these triggered fetchBusinesses() for ALL connected users whenever ANY merchant
+      // updated a product — a thundering herd DDoS against our own DB at scale.
+      // Businesses are fetched once on startup and on-demand via pull-to-refresh in Marketplace.
 
       if (userId) {
         channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_activities', filter: `user_id=eq.${userId}` }, () => fetchActivities(userId));
@@ -1186,7 +1189,7 @@ const App = () => {
         isFavoritesLoading={isFavoritesLoading}
         locationPromptDone={locationPromptDone}
       />;
-      case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} />;
+      case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} onRefresh={async () => { setIsRefreshingMarket(true); try { await fetchBusinesses(); } finally { setIsRefreshingMarket(false); } }} isRefreshing={isRefreshingMarket} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
       case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;

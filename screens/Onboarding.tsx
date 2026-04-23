@@ -526,9 +526,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
             const { error } = await supabase.from('profiles').upsert({
                id: userId,
-               full_name: name,
+               full_name: sanitizedName,
                phone: `${selectedCountry.code}${phone}`,
-               email: email,
+               email: sanitizedEmail,
                avatar_url: finalAvatarUrl,
                role: 'customer',
                updated_at: new Date().toISOString()
