@@ -15,6 +15,7 @@ import { RideCancellationSummary } from '../components/Ride/RideCancellationSumm
 import { RidePaymentSummary } from '../components/Ride/RidePaymentSummary';
 import { LocationSearchOverlay } from '../components/Ride/LocationSearchOverlay';
 import { RequestErrorModal } from '../components/RequestErrorModal';
+import { LocationPermissionGate } from '../components/LocationPermissionGate';
 interface Props {
     theme: Theme;
     navigate: (scr: Screen) => void;
@@ -61,6 +62,12 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             onSearchingChange(status === 'searching');
         }
     }, [status]);
+
+    // --- LOCATION PERMISSION GATE ---
+    // 'checking' = still resolving, 'granted' = good to go,
+    // 'denied' = user refused permission, 'unavailable' = device GPS off
+    const [locationPermissionState, setLocationPermissionState] = useState<'checking' | 'granted' | 'denied' | 'unavailable'>('checking');
+
     const [rideType, setRideType] = useState<'ride' | 'delivery'>('ride');
     const [destinations, setDestinations] = useState<string[]>(['']);
     const [selectedTier, setSelectedTier] = useState('eco');
@@ -84,6 +91,70 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
     const [currentRideId, setCurrentRideId] = useState<string | null>(null);
     const [isPriceErrorModalOpen, setIsPriceErrorModalOpen] = useState(false);
+
+    // --- CHECK LOCATION PERMISSION on mount and whenever screen becomes active ---
+    const checkLocationPermission = async () => {
+        setLocationPermissionState('checking');
+        try {
+            if (Capacitor.isNativePlatform()) {
+                const perm = await Geolocation.checkPermissions();
+                if (perm.location === 'granted' || perm.coarseLocation === 'granted') {
+                    setLocationPermissionState('granted');
+                } else if (perm.location === 'denied') {
+                    setLocationPermissionState('denied');
+                } else {
+                    // 'prompt' or 'prompt-with-rationale' — request now
+                    const result = await Geolocation.requestPermissions();
+                    if (result.location === 'granted' || result.coarseLocation === 'granted') {
+                        setLocationPermissionState('granted');
+                    } else {
+                        setLocationPermissionState('denied');
+                    }
+                }
+            } else {
+                // Web: use the Permissions API
+                if ('permissions' in navigator) {
+                    const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+                    if (status.state === 'granted') {
+                        setLocationPermissionState('granted');
+                    } else if (status.state === 'denied') {
+                        setLocationPermissionState('denied');
+                    } else {
+                        // 'prompt' — try getting position to trigger the browser dialog
+                        navigator.geolocation.getCurrentPosition(
+                            () => setLocationPermissionState('granted'),
+                            (err) => {
+                                if (err.code === 1 /* PERMISSION_DENIED */) {
+                                    setLocationPermissionState('denied');
+                                } else {
+                                    // Timeout / unavailable — still allow the screen (GPS will warn naturally)
+                                    setLocationPermissionState('granted');
+                                }
+                            },
+                            { timeout: 8000, maximumAge: 60000 }
+                        );
+                    }
+                } else {
+                    // Permissions API not available — assume granted (older browsers)
+                    setLocationPermissionState('granted');
+                }
+            }
+        } catch (err) {
+            console.warn('RideScreen: Permission check error:', err);
+            // If we cannot even check, don't block the screen — fail open
+            setLocationPermissionState('granted');
+        }
+    };
+
+    useEffect(() => {
+        // Only check if not already resolved — prevents the overlay from flashing
+        // every time the user switches to this tab (especially noticeable on web/localhost
+        // where the Permissions API is async). On a real device with Capacitor,
+        // checkPermissions() resolves instantly from the OS cache.
+        if (locationPermissionState !== 'granted') {
+            checkLocationPermission();
+        }
+    }, [active]);
 
     // Tiers Definition
     const tiers = [
@@ -1534,7 +1605,23 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     };
 
     const confirmRide = () => {
-        if (!destinations[destinations.length - 1]) return;
+        if (!destinations[destinations.length - 1]) {
+            showAlert("No Destination", "Please enter a destination before booking.", "info");
+            return;
+        }
+
+        // Ensure the destination has resolved coordinates — typed text alone is not enough.
+        // Without coords, we cannot calculate the route or place the ride accurately.
+        const lastCoord = destinationCoords[destinationCoords.length - 1];
+        if (!lastCoord) {
+            showAlert(
+                "Select a Dropoff Location",
+                "Please select a destination from the suggestions list so we can pinpoint your dropoff location on the map.",
+                "info"
+            );
+            return;
+        }
+
         if (user.location && destinations[destinations.length - 1].toLowerCase().trim() === user.location.toLowerCase().trim()) {
             showAlert("Invalid Location", "Destination cannot be your current location!", "error");
             return;
@@ -1746,6 +1833,17 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden transition-colors duration-500`}>
+
+            {/* ── Location Permission Gate ── */}
+            {/* Shown when permission is denied or device GPS is off.
+                Completely replaces the map & booking form until resolved. */}
+            {locationPermissionState !== 'granted' && (
+                <LocationPermissionGate
+                    theme={theme}
+                    reason={locationPermissionState}
+                    onRetry={checkLocationPermission}
+                />
+            )}
             {isLocating && (
                 <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[20] animate-bounce-in">
                     <div className="bg-white dark:bg-[#1C1C1E] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-[#00D68F]/20">

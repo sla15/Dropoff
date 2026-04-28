@@ -34,6 +34,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPicker, setShowPicker] = useState(false);
+    const [hasPickedLocation, setHasPickedLocation] = useState(false); // Must be explicitly confirmed via the picker
     const [deliveryLocation, setDeliveryLocation] = useState<{ address: string; lat: number; lng: number }>({
         address: user.location || 'Banjul, The Gambia',
         lat: user.last_lat || 13.4432,
@@ -193,6 +194,18 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
     const handlePlaceOrder = async () => {
         if (cart.length === 0 || isSubmitting) return;
+
+        // ── Dropoff Location Gate ──
+        // The user MUST explicitly tap the picker and confirm a delivery location.
+        // Pre-filled profile defaults are not accepted for order placement.
+        if (!hasPickedLocation) {
+            showAlert(
+                "Select Your Dropoff Location",
+                "Please tap the delivery location above and confirm where you'd like your order delivered before proceeding.",
+                "info"
+            );
+            return;
+        }
 
         // One-order-at-a-time restriction
         if (activeOrderId || activeBatchId) {
@@ -365,6 +378,22 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                         <ChevronRight size={16} className="opacity-40" />
                     </div>
 
+                    {/* Prompt badge — shown until the user explicitly taps and confirms the picker */}
+                    {!hasPickedLocation && (
+                        <div className={`mt-2.5 flex items-center gap-2 px-3 py-2.5 rounded-xl
+                            ${theme === 'light'
+                                ? 'bg-amber-50 border border-amber-200/70'
+                                : 'bg-amber-900/20 border border-amber-700/30'}`}
+                        >
+                            <span className="text-amber-500 text-base animate-pulse">📍</span>
+                            <p className={`text-xs font-semibold ${
+                                theme === 'light' ? 'text-amber-700' : 'text-amber-400'
+                            }`}>
+                                Tap above to confirm your delivery location before ordering
+                            </p>
+                        </div>
+                    )}
+
 
                     <div className="mt-4">
                         <label className={`text-xs font-bold ${textSec} mb-2 block`}>Delivery Instructions</label>
@@ -475,10 +504,10 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             <div className={`p-4 ${bgCard} pb-safe border-t ${separator}`}>
                 <button
                     onClick={handlePlaceOrder}
-                    disabled={cart.length === 0 || isSubmitting || isCalculatingDistance}
+                    disabled={cart.length === 0 || isSubmitting || isCalculatingDistance || !hasPickedLocation}
                     className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-full font-bold text-lg shadow-lg active:scale-[0.98] transition-transform flex justify-between px-6 items-center disabled:opacity-50"
                 >
-                    <span>{isSubmitting ? 'Processing...' : 'Place Order'}</span>
+                    <span>{isSubmitting ? 'Processing...' : !hasPickedLocation ? 'Select Dropoff First' : 'Place Order'}</span>
                     <span>{isCalculatingDistance ? <span className="text-sm animate-pulse">Wait...</span> : `D${total}`}</span>
                 </button>
             </div>
@@ -486,7 +515,11 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             {showPicker && (
                 <LocationPicker
                     theme={theme}
-                    onConfirm={(loc) => { setDeliveryLocation(loc); setShowPicker(false); }}
+                    onConfirm={(loc) => {
+                        setDeliveryLocation(loc);
+                        setHasPickedLocation(true);
+                        setShowPicker(false);
+                    }}
                     onClose={() => setShowPicker(false)}
                     title="Set Delivery Location"
                     initialLocation={{ lat: deliveryLocation.lat, lng: deliveryLocation.lng }}
