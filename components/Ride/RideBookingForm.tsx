@@ -165,14 +165,12 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    console.log("Info icon clicked");
                                     const tier = tiers.find(t => t.id === selectedTier);
                                     const mult = tier?.mult || 1;
                                     const price = calculatePrice(mult);
-                                    console.log("Calculated price for info:", price);
                                     showAlert(
-                                        "Fare Calculation",
-                                        `Your fare is calculated as:\n\n• Min Fare: D${minFare}\n• Rate per KM: D${settings.price_per_km}\n• Multiplier: ${mult}x (${tier?.label})\n\nFormula:\nMin Fare + (Distance × Rate × Multiplier)\n\nYour Total: D${price.finalPrice}`,
+                                        "Fare Breakdown",
+                                        `• Min Fare: D${minFare}\n• Rate per KM: D${settings.price_per_km}\n• Multiplier: ${mult}x (${tier?.label})\n\nBase Fare: D${price.originalPrice}\nGift Applied: -D${price.amountUsed}\n──────────────\nYou Pay: D${price.finalPrice}`,
                                         "info"
                                     );
                                 }}

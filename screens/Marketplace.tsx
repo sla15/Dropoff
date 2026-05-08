@@ -149,9 +149,8 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                className="flex items-center justify-center overflow-hidden transition-all duration-300"
                style={{ height: isRefreshing ? 48 : pullY > 0 ? pullY : 0, opacity: isRefreshing || pullY > 0 ? 1 : 0 }}
             >
-               <div className={`flex items-center gap-2 text-[#00D68F] text-xs font-black ${
-                  isRefreshing ? 'opacity-100' : pullY >= PULL_THRESHOLD ? 'opacity-100' : 'opacity-60'
-               }`}>
+               <div className={`flex items-center gap-2 text-[#00D68F] text-xs font-black ${isRefreshing ? 'opacity-100' : pullY >= PULL_THRESHOLD ? 'opacity-100' : 'opacity-60'
+                  }`}>
                   <RefreshCw
                      size={16}
                      className={isRefreshing ? 'animate-spin' : ''}
@@ -245,7 +244,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                   </div>
                   <h3 className="text-xl font-black mb-2">No results found</h3>
                   <p className={`text-sm ${textSec} font-medium`}>We couldn't find any spots or products matching "{searchQuery}"</p>
-                  <button 
+                  <button
                      onClick={() => setSearchQuery('')}
                      className="mt-6 px-6 py-2 bg-[#00D68F] text-black rounded-full font-black text-xs active:scale-95 transition-all"
                   >

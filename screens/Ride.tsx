@@ -1510,6 +1510,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 return;
             }
 
+            const _priceInfo = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
+
             const { data, error: insertError } = await supabase.from('rides').insert({
                 customer_id: session.user.id,
                 pickup_address: 'Current Location',
@@ -1523,7 +1525,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     lat: destinationCoords[i]?.lat,
                     lng: destinationCoords[i]?.lng
                 })) : [],
-                price: calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1).finalPrice,
+                price: _priceInfo.finalPrice,
+                original_fare: _priceInfo.originalPrice,
+                discount_amount: _priceInfo.amountUsed,
                 status: 'searching',
                 ride_type: rideType,
                 requested_vehicle_type: categoryMap[selectedTier] || 'economic',
