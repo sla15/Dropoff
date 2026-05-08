@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera as CameraIcon, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 
 import { Theme, Screen, UserData, Activity, Business, AppSettings, SavedLocation } from '../types';
-import { triggerHaptic, sendPushNotification, compressImage } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 import { Capacitor } from '@capacitor/core';
@@ -347,7 +347,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         } catch (err: any) {
             console.error("Failed to update profile:", err);
             setLoading(false);
-            showAlert("Update Failed", err.message, "error");
+            showAlert("Update Failed", friendlyError(err), "error");
         }
     };
 
@@ -388,8 +388,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
-            <div className="flex-1 overflow-y-auto pt-safe px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
-                <h1 className="text-3xl font-bold mb-6">Profile</h1>
+            {/* Fixed Header */}
+            <div className={`pt-safe px-6 pb-4 flex-shrink-0 ${bgMain}`} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <h1 className="text-3xl font-bold">Profile</h1>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
                 <div className="flex flex-col items-center justify-center mb-10 mt-2">
                     <div className="relative mb-5">
                         <div

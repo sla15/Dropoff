@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck, Phone } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, SavedLocation, AppSettings } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, friendlyError } from '../utils/helpers';
 
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -226,7 +226,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       fetchLocations();
       showAlert("Success", "Location saved successfully!", "success");
     } catch (err: any) {
-      showAlert("Error", `Could not save location: ${err.message}`, "error");
+      console.error("Save Location Error:", err);
+      showAlert("Save Failed", friendlyError(err), "error");
     } finally {
       setIsLoading(false);
     }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, MapPin, ChevronRight, Truck, Plus, Minus, Trash2, Copy, Check, Info } from 'lucide-react';
 import { Theme, Screen, CartItem, UserData, AppSettings } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 
@@ -301,7 +301,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
                 if (orderError) {
                     console.error("Order Insert Error Details:", orderError);
-                    throw new Error(`Order failed at ${merchants[bizId]?.name || 'Merchant'}: ${orderError.message}`);
+                    throw new Error(`Order failed for ${merchants[bizId]?.name || 'one of the merchants'}. Please try again.`);
                 }
                 if (!orderData) throw new Error("Could not create order row. Please try again.");
 
@@ -321,7 +321,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
 
                 if (itemsError) {
                     console.error("Order Items Insert Error Details:", itemsError);
-                    throw new Error(`Items failed for ${merchants[bizId]?.name || 'Merchant'}: ${itemsError.message}`);
+                    throw new Error(`Some items could not be added to your order. Please try again.`);
                 }
             }
 
@@ -339,7 +339,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
             navigate('order-tracking');
         } catch (err: any) {
             console.error("Order Placement Final Catch:", err);
-            showAlert("Order Failed", err.message || "An unexpected error occurred. Please try again.", "error");
+            showAlert("Order Failed", friendlyError(err), "error");
         } finally {
             setIsSubmitting(false);
         }

@@ -37,6 +37,7 @@ interface RideBookingFormProps {
     showAlert: (title: string, message: string, type?: 'success' | 'error' | 'info') => void;
     expandSheet?: () => void;
     setShowSearchOverlay: (show: boolean) => void;
+    distanceKm?: number;
 }
 
 export const RideBookingForm: React.FC<RideBookingFormProps> = ({
@@ -72,7 +73,8 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
     settings,
     showAlert,
     expandSheet,
-    setShowSearchOverlay
+    setShowSearchOverlay,
+    distanceKm = 0
 }) => {
     const minFare = rideType === 'delivery' ? settings.min_delivery_fee : settings.min_ride_price;
 
@@ -170,7 +172,7 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                                     const price = calculatePrice(mult);
                                     showAlert(
                                         "Fare Breakdown",
-                                        `• Min Fare: D${minFare}\n• Rate per KM: D${settings.price_per_km}\n• Multiplier: ${mult}x (${tier?.label})\n\nBase Fare: D${price.originalPrice}\nGift Applied: -D${price.amountUsed}\n──────────────\nYou Pay: D${price.finalPrice}`,
+                                        `📍 Distance: ${distanceKm > 0 ? distanceKm.toFixed(1) + ' km' : 'Calculating...'}\n• Min Fare: D${minFare}\n• Rate per KM: D${settings.price_per_km}\n• Multiplier: ${mult}x (${tier?.label})\n\nBase Fare: D${price.originalPrice}\nGift Applied: -D${price.amountUsed}\n──────────────\nYou Pay: D${price.finalPrice}`,
                                         "info"
                                     );
                                 }}

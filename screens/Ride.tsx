@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
-import { triggerHaptic, sendPushNotification } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, friendlyError } from '../utils/helpers';
 
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
@@ -1712,6 +1712,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             const { error: reviewError } = await supabase
                 .from('reviews')
                 .insert({
+                    ride_id: currentRideId,
                     reviewer_id: session.user.id,
                     target_id: assignedDriverId,
                     rating: rating,
@@ -1732,7 +1733,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             finalizeTripCleanup();
         } catch (err: any) {
             console.error("Submit Review Error:", err);
-            showAlert("Error", `Feedback failed: ${err.message}`, "error");
+            showAlert("Feedback Failed", friendlyError(err), "error");
         } finally {
             setLoading(false);
         }
@@ -1957,6 +1958,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             settings={settings}
                             showAlert={showAlert}
                             setShowSearchOverlay={setShowSearchOverlay}
+                            distanceKm={realDistanceKm}
                             expandSheet={() => {
                                 setIsSheetMinimized(false);
                                 setSheetOffset(0);

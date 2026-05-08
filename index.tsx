@@ -590,7 +590,6 @@ const App = () => {
           location: b.location_address || '',
           isOpen: isBusinessOpen(b.working_hours, b.is_open),
           working_hours: b.working_hours,
-          distance: '2.5 km',
           products: (b.products || []).map((p: any) => ({
             id: p.id,
             name: p.name,

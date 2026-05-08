@@ -1,6 +1,74 @@
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 
+/**
+ * Translates a raw technical error (Supabase, Postgres, network, etc.)
+ * into a customer-friendly message. The original error is always logged
+ * to the console for debugging — only the UI-facing string is changed.
+ */
+export const friendlyError = (err: any): string => {
+    if (!err) return 'Something went wrong. Please try again.';
+
+    const msg: string = (err?.message || err?.error_description || String(err)).toLowerCase();
+    const code: string = (err?.code || '').toLowerCase();
+
+    // ── Postgres / Supabase RLS ──
+    if (code === '42501' || msg.includes('row-level security') || msg.includes('row level security') || msg.includes('violates row-level')) {
+        return 'You don\'t have permission to do that. Please try again or contact support.';
+    }
+    if (code === '23505' || msg.includes('duplicate key') || msg.includes('already exists')) {
+        return 'This already exists. Please check your details and try again.';
+    }
+    if (code === '23503' || msg.includes('foreign key') || msg.includes('violates foreign key')) {
+        return 'A required piece of information is missing. Please try again.';
+    }
+    if (code === '23514' || msg.includes('violates check constraint')) {
+        return 'The information you entered isn\'t valid. Please check and try again.';
+    }
+    if (code === 'pgrst116' || msg.includes('more than one row')) {
+        return 'An unexpected data error occurred. Please try again.';
+    }
+
+    // ── Auth ──
+    if (msg.includes('invalid login credentials') || msg.includes('invalid otp') || msg.includes('token has expired')) {
+        return 'Your verification code is incorrect or has expired. Please request a new one.';
+    }
+    if (msg.includes('email not confirmed')) {
+        return 'Please verify your email address before continuing.';
+    }
+    if (msg.includes('user already registered')) {
+        return 'An account with this phone number already exists.';
+    }
+    if (msg.includes('session') && msg.includes('expired')) {
+        return 'Your session has expired. Please log in again.';
+    }
+
+    // ── Network / connectivity ──
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch') || msg.includes('networkerror')) {
+        return 'Connection failed. Please check your internet and try again.';
+    }
+    if (msg.includes('timeout') || msg.includes('timed out')) {
+        return 'The request took too long. Please check your connection and try again.';
+    }
+
+    // ── Storage ──
+    if (msg.includes('payload too large') || msg.includes('file too large') || msg.includes('413')) {
+        return 'The file you selected is too large. Please choose a smaller one.';
+    }
+    if (msg.includes('invalid file type') || msg.includes('mime')) {
+        return 'This file type isn\'t supported. Please use a JPG or PNG image.';
+    }
+
+    // ── Ride-specific ──
+    if (msg.includes('safety_lock_no_self_riding')) {
+        return 'You can\'t book a ride for yourself as a driver.';
+    }
+
+    // ── Generic fallback — never show raw stack traces ──
+    // Return a generic message rather than leaking technical details
+    return 'Something went wrong. Please try again or contact support if the issue continues.';
+};
+
 export const triggerHaptic = () => {
     // Vibrations disabled per user request
 };

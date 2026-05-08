@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2 } from 'lucide-react';
 import { Theme, Screen, Business, Product, CartItem } from '../types';
-import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
+import { triggerHaptic, getInitialAvatar, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { StarRating } from '../components/StarRating';
 
@@ -351,7 +351,8 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                                     }, { onConflict: 'user_id,business_id' });
 
                                     if (error) {
-                                        showAlert("Error", error.message, "error");
+                                        console.error("Review Submit Error:", error);
+                                        showAlert("Review Failed", friendlyError(error), "error");
                                     } else {
                                         setShowReviewModal(false);
                                         setUserComment('');

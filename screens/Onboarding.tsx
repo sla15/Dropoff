@@ -5,7 +5,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Browser } from '@capacitor/browser';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X, Search } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
-import { triggerHaptic, sendPushNotification, compressImage } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage, friendlyError } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -360,7 +360,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
       if (error) {
          console.error("OTP Error:", error);
-         showAlert("Error", error.message, "error");
+         showAlert("Verification Failed", friendlyError(error), "error");
       } else {
          setPhone(sanitizedPhone); // Store sanitized version
          setStep(3);
@@ -393,7 +393,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          if (error) {
             setLoading(false);
             console.error("Verification Error:", error);
-            const errorMessage = error.message.includes("Expired") ? "OTP expired. Please request a new one." : error.message;
+            const errorMessage = friendlyError(error);
             showAlert("Error", errorMessage, "error");
             return;
          }
@@ -573,7 +573,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          }
       } catch (e: any) {
          console.error("Profile Save Error:", e);
-         showAlert("Save Error", e.message || "Could not save profile.", "error");
+         showAlert("Save Error", friendlyError(e), "error");
       } finally {
          setLoading(false);
       }
@@ -605,7 +605,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          navigate('dashboard');
       } catch (err: any) {
          console.error("Save Location Error:", err);
-         showAlert("Error", `Failed to save location: ${err.message}`, "error");
+         showAlert("Location Error", friendlyError(err), "error");
       } finally {
          setLoading(false);
       }
