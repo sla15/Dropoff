@@ -7,6 +7,8 @@ interface RidePaymentSummaryProps {
     assignedDriver: any;
     rating: number;
     setRating: (rating: number) => void;
+    reviewComment: string;
+    setReviewComment: (c: string) => void;
     calculatePrice: (multiplier: number) => { originalPrice: number; finalPrice: number; amountUsed: number };
     tiers: any[];
     selectedTier: string;
@@ -20,10 +22,21 @@ interface RidePaymentSummaryProps {
     user: UserData;
 }
 
+/** Strip anything that could be dangerous before it ever leaves the device */
+const sanitizeComment = (raw: string): string => {
+    return raw
+        .replace(/\0/g, '')           // remove null bytes
+        .replace(/<[^>]*>/g, '')      // strip any HTML/script tags
+        .slice(0, 1000)               // hard cap at 1000 chars (matches DB CHECK constraint)
+        .trim();
+};
+
 export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
     assignedDriver,
     rating,
     setRating,
+    reviewComment,
+    setReviewComment,
     calculatePrice,
     tiers,
     selectedTier,
@@ -37,9 +50,11 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
     user
 }) => {
     const priceInfo = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
+    const charsLeft = 1000 - reviewComment.length;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md animate-scale-in">            <div className={`${bgCard} w-full max-w-md rounded-[32px] p-6 relative overflow-hidden`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-md animate-scale-in">
+            <div className={`${bgCard} w-full max-w-md rounded-[32px] p-6 relative overflow-hidden`}>
                 <div className="absolute top-0 left-0 w-full h-1 bg-[#00D68F]"></div>
 
                 <div className="flex flex-col items-center mb-6">
@@ -57,17 +72,34 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
                     <p className={`text-sm ${textSec} font-bold`}>How was your ride with {assignedDriver?.name}?</p>
                 </div>
 
-                <div className="flex justify-center mb-8">
+                <div className="flex justify-center mb-5">
                     <StarRating rating={rating} setRating={setRating} size={36} />
                 </div>
 
-                <div className="flex items-center justify-between mb-6 px-2">
+                {/* Optional comment — sanitized, not required */}
+                <div className="mb-5 relative">
+                    <textarea
+                        value={reviewComment}
+                        onChange={e => setReviewComment(sanitizeComment(e.target.value))}
+                        placeholder="Leave a comment (optional)..."
+                        maxLength={1000}
+                        rows={3}
+                        className={`w-full px-4 py-3 rounded-2xl text-sm font-medium resize-none outline-none border border-transparent focus:border-[#00D68F]/40 transition-colors ${inputBg} ${textSec} placeholder:opacity-50`}
+                    />
+                    {reviewComment.length > 800 && (
+                        <span className={`absolute bottom-2 right-3 text-[10px] font-bold ${charsLeft < 50 ? 'text-red-400' : 'text-gray-400'}`}>
+                            {charsLeft}
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between mb-5 px-2">
                     <span className="font-bold text-gray-500">Total Paid ({ridePayMethod === 'wave' ? 'Wave' : 'Cash'})</span>
                     <span className="text-2xl font-black text-[#00D68F]">D{priceInfo.finalPrice}</span>
                 </div>
 
                 {priceInfo.amountUsed > 0 && (
-                    <div className="flex items-center justify-between mb-6 px-2 text-xs">
+                    <div className="flex items-center justify-between mb-5 px-2 text-xs">
                         <span className="font-bold text-gray-500">Discount Applied</span>
                         <span className="font-black text-[#00D68F]">-D{priceInfo.amountUsed}</span>
                     </div>
@@ -81,7 +113,7 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
                     >
                         {loading ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : 'Done'}
                     </button>
-                    
+
                     <button
                         onClick={onReviewSkip}
                         disabled={loading}

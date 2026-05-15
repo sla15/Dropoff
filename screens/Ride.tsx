@@ -1708,7 +1708,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             // 1. Calculate discount usage
             const { originalPrice, amountUsed } = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
 
-            // 2. Save to reviews table
+            // 2. Save to reviews table (comment is optional, sanitized on the component side)
             const { error: reviewError } = await supabase
                 .from('reviews')
                 .insert({
@@ -1716,7 +1716,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     reviewer_id: session.user.id,
                     target_id: assignedDriverId,
                     rating: rating,
-                    role_target: 'driver'
+                    role_target: 'driver',
+                    ...(reviewComment.trim() ? { comment: reviewComment.trim() } : {})
                 });
 
             if (reviewError) throw reviewError;
@@ -2111,6 +2112,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     selectedTier={selectedTier}
                     loading={loading}
                     submitReview={submitReview}
+                    onReviewSkip={skipReview}
                     ridePayMethod={ridePayMethod}
                     bgCard={bgCard}
                     inputBg={inputBg}
