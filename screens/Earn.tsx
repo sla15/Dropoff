@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Gift, Copy, Share2, ChevronRight, Award } from 'lucide-react';
+import { Gift, Copy, Share2, Award, Sparkles, Users, ChevronRight } from 'lucide-react';
 import { Theme, Screen, Reward, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
+import { Capacitor } from '@capacitor/core';
 
 interface Props {
     theme: Theme;
@@ -24,6 +25,15 @@ interface Props {
     ) => void;
 }
 
+const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dropoffgambia.customer';
+const APP_STORE_URL = 'https://apps.apple.com/app/dropoff-gambia/id6478229445';
+
+const getStoreUrl = (): string => {
+    const platform = Capacitor.getPlatform();
+    if (platform === 'ios') return APP_STORE_URL;
+    return PLAY_STORE_URL; // android + web fallback to Play Store
+};
+
 export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleScroll, settings, showAlert }: Props) => {
     const [copied, setCopied] = useState(false);
     const [referralCode, setReferralCode] = useState<string | null>(null);
@@ -31,10 +41,14 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
     const [activeRewards, setActiveRewards] = useState<Reward[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
-    const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
-    const textMain = theme === 'light' ? 'text-[#000000]' : 'text-[#FFFFFF]';
-    const textSec = theme === 'light' ? 'text-[#8E8E93]' : 'text-[#98989D]';
+    const isDark = theme === 'dark';
+    const bgMain = isDark ? 'bg-[#000000]' : 'bg-[#F2F2F7]';
+    const bgCard = isDark ? 'bg-[#1C1C1E]' : 'bg-white';
+    const textMain = isDark ? 'text-white' : 'text-[#000000]';
+    const textSec = isDark ? 'text-[#98989D]' : 'text-[#8E8E93]';
+
+    const rewardAmount = Number(settings?.referral_reward_amount || 0).toFixed(2);
+    const currSym = settings?.currency_symbol || 'D';
 
     useEffect(() => {
         const fetchData = async () => {
@@ -42,7 +56,6 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) return;
 
-                // 1. Fetch Profile for Code & Balance
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('referral_code, referral_balance, full_name')
@@ -55,21 +68,14 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                     if (profile.referral_code) {
                         setReferralCode(profile.referral_code);
                     } else {
-                        // Generate Code if missing: Firstname + 4 random digits
                         const namePart = (profile.full_name || 'USER').split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
                         const randomPart = Math.floor(1000 + Math.random() * 9000);
                         const newCode = `${namePart}${randomPart}`;
-
-                        await supabase
-                            .from('profiles')
-                            .update({ referral_code: newCode })
-                            .eq('id', session.user.id);
-
+                        await supabase.from('profiles').update({ referral_code: newCode }).eq('id', session.user.id);
                         setReferralCode(newCode);
                     }
                 }
 
-                // 2. Fetch Active Rewards
                 const { data: rewards } = await supabase
                     .from('user_rewards')
                     .select('*')
@@ -77,20 +83,15 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
                     .eq('is_used', false)
                     .gt('expiry_date', new Date().toISOString());
 
-                if (rewards) {
-                    setActiveRewards(rewards as Reward[]);
-                }
+                if (rewards) setActiveRewards(rewards as Reward[]);
 
             } catch (err) {
-                console.error("Earn Logic Error:", err);
+                console.error('Earn Logic Error:', err);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchData();
-
-        // Subscription would go here...
     }, []);
 
     const copyCode = () => {
@@ -102,73 +103,183 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
         }
     };
 
+    const shareCode = async () => {
+        triggerHaptic();
+        const storeUrl = getStoreUrl();
+        const shareText = `Join me on Dropoff! Use my code ${referralCode} when you sign up 🎉\n\nDownload the app: ${storeUrl}`;
+
+        // Use native Web Share API if available (works great on mobile)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Join Dropoff & earn rewards!',
+                    text: shareText,
+                    url: storeUrl,
+                });
+            } catch (e: any) {
+                // User dismissed — not an error
+                if (e?.name !== 'AbortError') console.warn('Share failed:', e);
+            }
+        } else {
+            // Fallback: copy the full message to clipboard
+            navigator.clipboard.writeText(shareText).then(() => {
+                showAlert('Link Copied!', 'Share link copied to clipboard.', 'success');
+            });
+        }
+    };
+
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
-            <div className="pt-safe px-6 pb-6">
-                <h1 className="text-3xl font-black tracking-tight">Gifts & Earn</h1>
+            {/* Header */}
+            <div className="pt-safe px-6 pb-4">
+                <h1 className="text-3xl font-black tracking-tight">Gifts &amp; Earn</h1>
+                <p className={`text-sm mt-1 font-medium ${textSec}`}>Share your code. Earn every time.</p>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 pb-32" onScroll={handleScroll}>
-                {/* Hero Card */}
-                <div className="bg-[#00D68F] rounded-[32px] p-6 text-black shadow-[0_20px_40px_-15px_rgba(0,214,143,0.5)] mb-6 relative overflow-hidden group">
-                    <div className="relative z-10">
-                        <div className="w-12 h-12 bg-black/10 rounded-full flex items-center justify-center mb-4 transition-transform group-hover:scale-110">
-                            <Gift size={24} className="text-black" />
-                        </div>
-                        <h2 className="text-3xl font-black tracking-tight mb-2 leading-tight">Invite friends,<br />get {settings.currency_symbol}{Number(settings.referral_reward_amount || 0).toFixed(2)}</h2>
-                        <p className="opacity-80 mb-6 text-sm font-bold tracking-wide">Share your code and earn rewards when your friends take their first ride or order.</p>
 
-                        <div className="flex gap-3">
-                            <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-xl p-3 flex items-center justify-between border border-black/5">
-                                <span className="font-mono font-bold tracking-widest">
-                                    {loading ? "..." : (referralCode || "Generating...")}
-                                </span>
-                                <button onClick={copyCode} className="p-1.5 hover:bg-black/10 rounded-lg transition-colors">
-                                    {copied ? <span className="text-xs font-bold">Copied!</span> : <Copy size={18} />}
+                {/* ── Hero Invite Card (Apple-style tilt + premium shadow) ── */}
+                <div
+                    className="mt-6 mb-8 relative"
+                    style={{ perspective: '1000px' }}
+                >
+                    {/* Ambient glow behind card */}
+                    <div
+                        className="absolute inset-0 rounded-[32px] blur-3xl opacity-30 scale-95"
+                        style={{ background: 'linear-gradient(135deg, #00D68F 0%, #00B8A9 50%, #00E5FF 100%)' }}
+                    />
+
+                    {/* The card itself — slightly tilted */}
+                    <div
+                        className="relative rounded-[32px] p-6 text-black overflow-hidden"
+                        style={{
+                            background: 'linear-gradient(135deg, #00D68F 0%, #00C49A 40%, #00B8D4 100%)',
+                            transform: 'rotate(-1.5deg) translateZ(0)',
+                            boxShadow: '0 24px 60px -10px rgba(0,214,143,0.55), 0 8px 20px -5px rgba(0,0,0,0.15)',
+                            willChange: 'transform',
+                        }}
+                    >
+                        {/* Decorative circles */}
+                        <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full" />
+                        <div className="absolute -bottom-14 -left-8 w-48 h-48 bg-black/5 rounded-full" />
+                        <div className="absolute top-4 right-4 w-20 h-20 bg-white/5 rounded-full" />
+
+                        {/* Content */}
+                        <div className="relative z-10">
+                            {/* Icon */}
+                            <div className="w-14 h-14 bg-black/10 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-5 shadow-inner">
+                                <Gift size={26} className="text-black" />
+                            </div>
+
+                            <p className="text-black/80 text-xs font-black uppercase tracking-widest mb-1">Referral Program</p>
+                            <h2 className="text-4xl font-black tracking-tight leading-none mb-1">
+                                {currSym}{rewardAmount}
+                            </h2>
+                            <p className="text-lg font-bold text-black/90 mb-1">reward for you</p>
+                            <p className="text-sm text-black/80 font-medium mb-6 leading-relaxed">
+                                Share your code. When a friend signs up and completes their first ride or delivery, you earn a reward.
+                            </p>
+
+                            {/* Code + Action Row */}
+                            <div className="flex gap-2">
+                                {/* Code pill */}
+                                <div className="flex-1 bg-black/15 backdrop-blur-sm rounded-2xl px-4 py-3 flex items-center justify-between border border-white/20">
+                                    <span className="font-mono font-black tracking-widest text-base">
+                                        {loading ? '••••••' : (referralCode || 'Generating...')}
+                                    </span>
+                                    <button
+                                        onClick={copyCode}
+                                        className="ml-2 w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 bg-white/20 hover:bg-white/30 active:scale-90 transition-all"
+                                    >
+                                        {copied
+                                            ? <span className="text-[10px] font-black">✓</span>
+                                            : <Copy size={15} />
+                                        }
+                                    </button>
+                                </div>
+
+                                {/* Share button */}
+                                <button
+                                    onClick={shareCode}
+                                    className="bg-black text-white px-5 rounded-2xl flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform font-bold text-sm"
+                                >
+                                    <Share2 size={16} />
+                                    <span>Share</span>
                                 </button>
                             </div>
-                            <button className="bg-black text-white px-4 rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-transform">
-                                <Share2 size={18} />
-                            </button>
                         </div>
                     </div>
-                    {/* Decor */}
-                    <div className="absolute -right-4 -bottom-12 w-40 h-40 bg-white/20 rounded-full blur-2xl"></div>
-                    <div className="absolute -top-12 -right-12 w-32 h-32 bg-yellow-300/30 rounded-full blur-xl"></div>
                 </div>
 
-                {/* Balance */}
-                <div className={`${bgCard} rounded-[24px] p-6 mb-8 flex items-center justify-between shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-black/5 dark:border-white/5`}>
-                    <div>
-                        <p className={`text-[10px] font-black tracking-widest uppercase ${textSec} mb-1`}>Rewards Balance</p>
-                        <h3 className="text-3xl font-black">D{(referralBalance || 0).toFixed(2)}</h3>
+                {/* ── How it Works strip ── */}
+                <div className={`${bgCard} rounded-[24px] p-5 mb-6 border ${isDark ? 'border-white/5' : 'border-black/5'} shadow-sm`}>
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-4`}>How It Works</p>
+                    <div className="flex items-start gap-4">
+                        {[
+                            { icon: Share2, label: 'Share your code with a friend', step: '1' },
+                            { icon: Users, label: 'They sign up & complete their first ride', step: '2' },
+                            { icon: Sparkles, label: `You get ${currSym}${rewardAmount} added to your balance`, step: '3' },
+                        ].map(({ icon: Icon, label, step }) => (
+                            <div key={step} className="flex-1 flex flex-col items-center text-center gap-2">
+                                <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center">
+                                    <Icon size={18} className="text-[#00D68F]" />
+                                </div>
+                                <p className={`text-[11px] font-semibold leading-snug ${textSec}`}>{label}</p>
+                            </div>
+                        ))}
                     </div>
-                    <button className={`${theme === 'light' ? 'bg-gray-100 hover:bg-gray-200' : 'bg-white/10 hover:bg-white/20'} px-5 py-2.5 rounded-full text-sm font-bold transition-colors active:scale-95`}>
-                        History
-                    </button>
                 </div>
 
-                {/* Active Rewards / Offers */}
-                <h3 className="font-bold text-lg mb-4">Active Rewards</h3>
+                {/* ── Rewards Balance Card ── */}
+                <div className={`${bgCard} rounded-[24px] p-6 mb-6 border ${isDark ? 'border-white/5' : 'border-black/5'} shadow-sm`}>
+                    <p className={`text-[10px] font-black tracking-widest uppercase ${textSec} mb-1`}>Your Rewards Balance</p>
+                    <div className="flex items-end justify-between">
+                        <div>
+                            <h3 className="text-4xl font-black tracking-tight">
+                                {currSym}{(referralBalance || 0).toFixed(2)}
+                            </h3>
+                            <p className={`text-xs font-semibold mt-1 ${textSec}`}>
+                                Available to use on your next ride or order
+                            </p>
+                        </div>
+                        {/* Badge indicator */}
+                        {referralBalance > 0 && (
+                            <div className="w-12 h-12 rounded-full bg-[#00D68F]/10 flex items-center justify-center">
+                                <Sparkles size={20} className="text-[#00D68F]" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Active Rewards / Vouchers ── */}
+                <h3 className={`font-black text-base mb-3 ${textSec} uppercase tracking-widest text-[10px]`}>Active Rewards</h3>
                 <div className="space-y-3">
-                    {activeRewards.length === 0 && !loading && (
-                        <div className={`p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center text-center opacity-60`}>
-                            <Gift size={32} className="mb-2" />
-                            <p className="font-bold">No active rewards</p>
-                            <p className="text-xs">Invite friends to earn some perks!</p>
+                    {!loading && activeRewards.length === 0 && (
+                        <div className={`${bgCard} p-8 rounded-[24px] border-2 border-dashed ${isDark ? 'border-white/10' : 'border-black/10'} flex flex-col items-center justify-center text-center`}>
+                            <div className="w-14 h-14 rounded-full bg-[#00D68F]/10 flex items-center justify-center mb-3">
+                                <Gift size={24} className="text-[#00D68F]" />
+                            </div>
+                            <p className={`font-bold text-sm ${textMain}`}>No active rewards yet</p>
+                            <p className={`text-xs mt-1 ${textSec}`}>Invite friends to earn perks &amp; vouchers!</p>
                         </div>
                     )}
 
                     {activeRewards.map(reward => (
-                        <div key={reward.id} className={`${bgCard} p-4 rounded-2xl flex items-center gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border border-transparent dark:border-white/5 cursor-pointer active:scale-[0.98] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(0,0,0,0.04)]`}>
-                            <div className={`w-12 h-12 rounded-full ${reward.type.includes('delivery') ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
-                                {reward.type.includes('delivery') ? <Award size={24} /> : <Gift size={24} />}
+                        <div
+                            key={reward.id}
+                            className={`${bgCard} p-4 rounded-[20px] flex items-center gap-4 border ${isDark ? 'border-white/5' : 'border-black/5'} shadow-sm cursor-pointer active:scale-[0.98] transition-all`}
+                        >
+                            <div className={`w-12 h-12 rounded-2xl ${reward.type.includes('delivery') ? 'bg-blue-500/10' : 'bg-orange-500/10'} flex items-center justify-center flex-shrink-0`}>
+                                {reward.type.includes('delivery')
+                                    ? <Award size={22} className="text-blue-500" />
+                                    : <Gift size={22} className="text-orange-500" />
+                                }
                             </div>
-                            <div className="flex-1">
-                                <h4 className="font-bold">{reward.title}</h4>
-                                <p className={`text-xs ${textSec} font-medium`}>{reward.description}</p>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-sm truncate">{reward.title}</h4>
+                                <p className={`text-xs ${textSec} font-medium truncate`}>{reward.description}</p>
                             </div>
-                            <ChevronRight size={16} className={`${textSec} opacity-50`} />
+                            <ChevronRight size={16} className={`${textSec} opacity-40 flex-shrink-0`} />
                         </div>
                     ))}
                 </div>

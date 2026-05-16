@@ -274,10 +274,7 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                     </div>
 
                     <div className="space-y-4 pt-2">
-                        <div className={`flex p-1 rounded-xl ${inputBg}`}>
-                            <button onClick={() => setRidePayMethod('wave')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${ridePayMethod === 'wave' ? 'bg-[#1E88E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Wave</button>
-                            <button onClick={() => setRidePayMethod('cash')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${ridePayMethod === 'cash' ? 'bg-[#00D68F] text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Cash</button>
-                        </div>
+
 
                         <button
                             onClick={confirmRide}

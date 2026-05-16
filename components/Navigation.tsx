@@ -15,7 +15,7 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
     if (active === 'checkout' || active === 'business-detail' || active === 'order-tracking') return null;
 
     return (
-        <div 
+        <div
             className={`fixed left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isNavVisible ? 'nav-visible' : 'nav-hidden'}`}
             style={{ bottom: `calc(1.5rem + var(--safe-area-inset-bottom, 0px))` }}
         >
@@ -23,8 +23,8 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
                 className={`
           pointer-events-auto
           ${theme === 'light' ? 'bg-white text-black border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]' : 'bg-[#1C1C1E] text-white border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
-          backdrop-blur-3xl rounded-[2rem] px-6 flex items-center justify-center gap-2 relative
-          w-fit mx-auto py-2 overflow-visible border-[1px] min-w-[280px]
+          backdrop-blur-3xl rounded-[2.5rem] px-5 flex items-center justify-center gap-3 relative
+          w-fit mx-auto py-2.5 overflow-visible border-[1px]
         `}
             >
                 {/* Liquid Top Highlighter */}
@@ -77,27 +77,35 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
 };
 
 const NavItem = ({ active, onClick, icon: Icon, label, theme, isHome }: { active: boolean, onClick: () => void, icon: any, label: string, theme: Theme, isHome?: boolean }) => {
-    const iconSize = isHome ? 24 : 26;
+    const iconSize = 26;
 
     return (
-        <div className="relative flex flex-col items-center">
+        <div className="relative flex flex-col items-center gap-0.5 w-12">
             <button
                 onClick={onClick}
                 className={`
-                    flex flex-col items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                    relative flex flex-col items-center justify-center transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+                    w-12 h-12 rounded-[18px] active:scale-90
                     ${active
-                        ? 'w-14 h-14 rounded-full bg-[#00D68F] text-black shadow-xl -translate-y-1.5 border-[4px]'
-                        : 'w-12 h-12 rounded-2xl text-current opacity-40 hover:opacity-100 active:scale-95'
+                        ? 'text-[#00D68F] -translate-y-0.5'
+                        : `${theme === 'light' ? 'text-black/30' : 'text-white/30'} hover:text-current`
                     }
-                    ${active && theme === 'light' ? 'border-white' : active ? 'border-[#1C1C1E]' : 'border-transparent'}
                 `}
             >
-                <Icon size={iconSize} strokeWidth={active ? 2.5 : 2} fill={active ? 'currentColor' : 'none'} />
+                {/* Active background pill */}
+                {active && (
+                    <span className={`absolute inset-0 rounded-[20px] ${theme === 'light' ? 'bg-[#00D68F]/10' : 'bg-[#00D68F]/15'
+                        } transition-all duration-300`} />
+                )}
+                <Icon
+                    size={iconSize}
+                    strokeWidth={active ? 2.2 : 1.8}
+                    className="relative z-10 transition-all duration-300"
+                />
             </button>
-            <span className={`
-                absolute -bottom-1 text-[10px] font-black transition-all duration-500
-                ${active ? 'opacity-100 translate-y-0 scale-100 text-[#00D68F]' : 'opacity-0 translate-y-2 scale-75'}
-            `}>
+            {/* Active label */}
+            <span className={`text-[10px] font-black transition-all duration-300 absolute -bottom-3 whitespace-nowrap ${active ? 'opacity-100 scale-100 text-[#00D68F]' : 'opacity-0 scale-50 text-transparent'
+                }`}>
                 {label}
             </span>
         </div>

@@ -389,91 +389,129 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
             {/* Fixed Header */}
-            <div className={`pt-safe px-6 pb-4 flex-shrink-0 ${bgMain}`} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <h1 className="text-3xl font-bold">Profile</h1>
+            {/* Fixed Header */}
+            <div className={`pt-safe px-6 pb-2 flex-shrink-0 ${bgMain}`} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                <h1 className="text-3xl font-black tracking-tight">Profile</h1>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
-                <div className="flex flex-col items-center justify-center mb-10 mt-2">
-                    <div className="relative mb-5">
+                {/* --- HERO SECTION --- */}
+                <div className="flex flex-col items-center justify-center mb-8 mt-4 relative">
+                    {/* Ambient Glow */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-[#00D68F] opacity-15 blur-[40px] rounded-full pointer-events-none" />
+
+                    <div className="relative mb-4">
                         <div
-                            className={`w-32 h-32 rounded-full ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/10 dark:bg-[#00D68F]/20 flex items-center justify-center'} shadow-[0_8px_30px_rgba(0,214,143,0.15)] border-4 ${theme === 'light' ? 'border-white' : 'border-[#1C1C1E]'} relative z-10`}
+                            className={`w-28 h-28 rounded-[36px] ${user.photo ? 'bg-cover bg-center' : 'bg-[#00D68F]/10 dark:bg-[#00D68F]/20 flex items-center justify-center'} shadow-xl border-2 ${theme === 'light' ? 'border-white' : 'border-[#1C1C1E]'} relative z-10`}
                             style={user.photo ? { backgroundImage: `url(${user.photo})` } : {}}
                         >
                             {!user.photo && (
-                                <span className="text-[#00D68F] font-black text-5xl">
+                                <span className="text-[#00D68F] font-black text-4xl">
                                     {user.name ? user.name.charAt(0).toUpperCase() : 'A'}
                                 </span>
                             )}
                         </div>
 
-                        {/* Rating Score Badge */}
+                        {/* Premium Rating Badge */}
                         {settings.is_rating_enabled && (
                             <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-20">
-                                <div className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full shadow-lg ${user.rating >= 4.5 ? 'bg-[#00D68F] text-black' :
-                                    user.rating >= 3.0 ? 'bg-orange-500 text-white' :
-                                        'bg-red-500 text-white'
-                                    } border-[3px] ${theme === 'light' ? 'border-white' : 'border-[#1C1C1E]'}`}>
-                                    <Star size={14} fill="currentColor" />
-                                    <span className="text-sm font-black tracking-tight">{(user.rating || 5.0).toFixed(1)}</span>
+                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[12px] shadow-lg backdrop-blur-md border ${theme === 'light' ? 'bg-white/90 border-black/5 text-black' : 'bg-[#2C2C2E]/90 border-white/10 text-white'}`}>
+                                    <Star size={12} fill="#00D68F" className="text-[#00D68F]" />
+                                    <span className="text-xs font-black tracking-tight">{(user.rating || 5.0).toFixed(1)}</span>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <h2 className="text-3xl font-black tracking-tight text-center truncate max-w-full px-6">{user.name || 'User'}</h2>
-                    <p className={`${textSec} font-medium text-center mt-1`}>{safeFormatPhone(user.phone)}</p>
+                    <h2 className="text-2xl font-black tracking-tight text-center truncate max-w-full px-6">{user.name || 'User'}</h2>
+                    <p className={`text-sm ${textSec} font-bold text-center mt-1`}>{safeFormatPhone(user.phone)}</p>
                 </div>
 
-                <div className={`${bgCard} rounded-[32px] overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.04)] dark:shadow-none dark:bg-white/[0.02] border border-gray-100/50 dark:border-white/5`}>
-                    <button onClick={() => openDrawer('account')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500 dark:bg-blue-500/10`}>
-                                <UserCog size={22} />
+                {/* --- GROUP 1: PERSONAL --- */}
+                <div className="mb-6">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-2 pl-4`}>Personal</p>
+                    <div className={`${bgCard} rounded-[24px] overflow-hidden shadow-sm border ${theme === 'light' ? 'border-gray-100/50' : 'border-white/5'}`}>
+                        <button onClick={() => openDrawer('account')} className={`w-full flex items-center justify-between p-4 border-b ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-black/5 dark:active:bg-white/5 transition-colors group`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center bg-blue-500 text-white shadow-inner`}>
+                                    <UserCog size={20} />
+                                </div>
+                                <span className="font-bold text-base">Account Settings</span>
                             </div>
-                            <span className="font-bold text-lg">Account Settings</span>
-                        </div>
-                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                            <ChevronRight size={18} className={`${textSec} opacity-40`} />
+                        </button>
+
+                        <button onClick={() => openDrawer('saved-locations')} className={`w-full flex items-center justify-between p-4 active:bg-black/5 dark:active:bg-white/5 transition-colors group`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center bg-emerald-500 text-white shadow-inner`}>
+                                    <MapPin size={20} />
+                                </div>
+                                <span className="font-bold text-base">Saved Locations</span>
+                            </div>
+                            <ChevronRight size={18} className={`${textSec} opacity-40`} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* --- GROUP 2: ACTIVITY --- */}
+                <div className="mb-6">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-2 pl-4`}>Activity</p>
+                    <div className={`${bgCard} rounded-[24px] overflow-hidden shadow-sm border ${theme === 'light' ? 'border-gray-100/50' : 'border-white/5'}`}>
+                        <button onClick={() => openDrawer('history')} className={`w-full flex items-center justify-between p-4 border-b ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-black/5 dark:active:bg-white/5 transition-colors group`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center bg-orange-500 text-white shadow-inner`}>
+                                    <History size={20} />
+                                </div>
+                                <span className="font-bold text-base">Ride & Order History</span>
+                            </div>
+                            <ChevronRight size={18} className={`${textSec} opacity-40`} />
+                        </button>
+
+                        <button onClick={() => openDrawer('favorites')} className={`w-full flex items-center justify-between p-4 active:bg-black/5 dark:active:bg-white/5 transition-colors group`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center bg-pink-500 text-white shadow-inner`}>
+                                    <Heart size={20} />
+                                </div>
+                                <span className="font-bold text-base">Favorites</span>
+                            </div>
+                            <ChevronRight size={18} className={`${textSec} opacity-40`} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* --- GROUP 3: SUPPORT --- */}
+                <div className="mb-8">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-2 pl-4`}>Support</p>
+                    <div className={`${bgCard} rounded-[24px] overflow-hidden shadow-sm border ${theme === 'light' ? 'border-gray-100/50' : 'border-white/5'}`}>
+                        <button onClick={() => openDrawer('support')} className={`w-full flex items-center justify-between p-4 active:bg-black/5 dark:active:bg-white/5 transition-colors group`}>
+                            <div className="flex items-center gap-4">
+                                <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center bg-purple-500 text-white shadow-inner`}>
+                                    <HelpCircle size={20} />
+                                </div>
+                                <span className="font-bold text-base">Help & Support</span>
+                            </div>
+                            <ChevronRight size={18} className={`${textSec} opacity-40`} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* --- DANGEROUS ACTIONS --- */}
+                <div className="mb-6 space-y-3 px-2">
+                    <button
+                        onClick={handleLogout}
+                        className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 ${theme === 'light' ? 'bg-gray-200/50 text-gray-500' : 'bg-white/5 text-gray-400'}`}
+                    >
+                        <LogOut size={18} /> Log Out
                     </button>
 
-                    <button onClick={() => openDrawer('saved-locations')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10`}>
-                                <MapPin size={22} />
-                            </div>
-                            <span className="font-bold text-lg">Saved Locations</span>
-                        </div>
-                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
-                    </button>
-
-                    <button onClick={() => openDrawer('history')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-orange-50 text-orange-500 dark:bg-orange-500/10`}>
-                                <History size={22} />
-                            </div>
-                            <span className="font-bold text-lg">Ride & Order History</span>
-                        </div>
-                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
-                    </button>
-
-                    <button onClick={() => openDrawer('favorites')} className={`w-full flex items-center justify-between p-5 border-b border-transparent ${theme === 'light' ? 'border-gray-100/50' : 'border-gray-800/50'} active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-red-50 text-red-500 dark:bg-red-500/10`}>
-                                <Heart size={22} />
-                            </div>
-                            <span className="font-bold text-lg">Favorites</span>
-                        </div>
-                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
-                    </button>
-
-                    <button onClick={() => openDrawer('support')} className={`w-full flex items-center justify-between p-5 active:bg-gray-50 dark:active:bg-white/5 transition-colors group`}>
-                        <div className="flex items-center gap-4 transition-transform group-active:scale-95 duration-200">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-purple-50 text-purple-500 dark:bg-purple-500/10`}>
-                                <HelpCircle size={22} />
-                            </div>
-                            <span className="font-bold text-lg">Help & Support</span>
-                        </div>
-                        <ChevronRight size={20} className={`${textSec} opacity-50 transition-transform group-active:translate-x-1 duration-200`} />
+                    <button
+                        onClick={() => {
+                            triggerHaptic();
+                            setShowDeleteModal(true);
+                        }}
+                        className="w-full py-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                    >
+                        <Trash2 size={18} /> Delete Account
                     </button>
                 </div>
             </div>
@@ -516,38 +554,46 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         </div>
 
-                        <div className="space-y-4 mb-8">
+                        <div className="mb-8">
                             {/* Status Message */}
                             {loading && (
-                                <div className="flex items-center gap-2 justify-center py-2 text-[#00D68F] animate-pulse">
+                                <div className="flex items-center gap-2 justify-center py-2 text-[#00D68F] animate-pulse mb-2">
                                     <Loader2 size={16} className="animate-spin" />
                                     <span className="text-xs font-bold uppercase tracking-widest">Saving Changes...</span>
                                 </div>
                             )}
-                            <div>
-                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Full Name</label>
-                                <input value={editName} onChange={e => setEditName(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
-                            </div>
-                            <div>
-                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Phone Number</label>
-                                <input value={safeFormatPhone(editPhone)} readOnly className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium opacity-50`} />
-                            </div>
-                            <div>
-                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Email</label>
-                                <input type="email" placeholder="name@example.com" value={editEmail} onChange={e => setEditEmail(e.target.value)} className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md outline-none font-medium`} />
-                            </div>
-                            <div>
-                                <label className={`text-xs font-bold ${textSec} mb-1 block`}>Home Location</label>
-                                <div
+
+                            <div className={`rounded-3xl overflow-hidden border ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}>
+                                {/* Full Name */}
+                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Full Name</label>
+                                    <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-transparent outline-none font-bold text-lg" />
+                                </div>
+                                
+                                {/* Phone Number */}
+                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Phone Number</label>
+                                    <input value={safeFormatPhone(editPhone)} readOnly className="w-full bg-transparent outline-none font-bold text-lg opacity-50" />
+                                </div>
+
+                                {/* Email */}
+                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Email</label>
+                                    <input type="email" placeholder="name@example.com" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full bg-transparent outline-none font-bold text-lg" />
+                                </div>
+
+                                {/* Home Location */}
+                                <div 
                                     onClick={() => setShowLP(true)}
-                                    className={`w-full p-3 rounded-xl ${theme === 'light' ? 'bg-[#E5E5EA]/50 border border-white/40' : 'bg-[#2C2C2E]/50 border border-white/5'} backdrop-blur-md cursor-pointer flex items-center justify-between group`}
+                                    className={`px-4 py-3 cursor-pointer group`}
                                 >
-                                    <span className={`flex-1 font-medium truncate ${!editLocation ? 'opacity-30' : ''}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Home Location</label>
+                                    <span className={`block w-full bg-transparent font-bold text-lg truncate ${!editLocation ? 'opacity-30' : ''}`}>
                                         {editLocation || 'Set Home Location'}
                                     </span>
-                                    <MapPin size={18} className="text-[#00D68F] opacity-50 group-active:opacity-100" />
                                 </div>
                             </div>
+                        </div>
 
                             {showLP && (
                                 <LocationPicker
@@ -562,33 +608,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                     }}
                                 />
                             )}
-                        </div>
-
                         <button
                             onClick={handleSaveProfile}
                             disabled={loading}
                             className={`w-full py-4 rounded-xl bg-[#00D68F] text-black font-bold text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
                         >
                             {loading ? <Loader2 className="animate-spin" /> : 'Save Changes'}
-                        </button>
-
-                        <div className={`h-px w-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-800'} my-4`}></div>
-
-                        <button
-                            onClick={handleLogout}
-                            className="w-full p-4 rounded-xl bg-gray-100 dark:bg-white/5 font-bold flex items-center justify-center gap-2 mb-4 active:scale-95 transition-transform"
-                        >
-                            <LogOut size={20} /> Log Out
-                        </button>
-
-                        <button
-                            onClick={() => {
-                                triggerHaptic();
-                                setShowDeleteModal(true);
-                            }}
-                            className="w-full p-4 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                        >
-                            <Trash2 size={20} /> Delete Account
                         </button>
                     </div>
                 </Drawer>
@@ -603,8 +628,8 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                         <div className="space-y-4">
                             {recentActivities.map(item => (
                                 <div key={item.id} className={`p-4 rounded-2xl ${inputBg} flex items-center gap-4 group/item`}>
-                                    <div className={`w-12 h-12 rounded-full ${item.type === 'ride' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
-                                        {item.type === 'ride' ? <Car size={20} /> : <ShoppingBag size={20} />}
+                                    <div className={`w-12 h-12 rounded-full ${item.type?.startsWith('ride') || item.type?.startsWith('delivery') ? 'bg-[#00D68F] text-black' : 'bg-orange-100 text-orange-600'} flex items-center justify-center`}>
+                                        {item.type?.startsWith('ride') ? <Car size={20} /> : item.type?.startsWith('delivery') ? <Car size={20} /> : <ShoppingBag size={20} />}
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex justify-between">
