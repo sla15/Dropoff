@@ -7,8 +7,8 @@ android {
         applicationId "com.dropoffgambia.customer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 40
-        versionName "1.10.0-beta2"
+        versionCode 41
+        versionName "1.11.0-beta2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

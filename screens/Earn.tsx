@@ -5,6 +5,7 @@ import { Theme, Screen, Reward, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 
 interface Props {
     theme: Theme;
@@ -108,23 +109,32 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
         const storeUrl = getStoreUrl();
         const shareText = `Join me on Dropoff! Use my code ${referralCode} when you sign up 🎉\n\nDownload the app: ${storeUrl}`;
 
-        // Use native Web Share API if available (works great on mobile)
-        if (navigator.share) {
-            try {
+        try {
+            if (Capacitor.isNativePlatform()) {
+                // Use official Capacitor native share plugin on iOS/Android
+                await Share.share({
+                    title: 'Join Dropoff & earn rewards!',
+                    text: shareText,
+                    url: storeUrl,
+                    dialogTitle: 'Share with friends',
+                });
+            } else if (navigator.share) {
+                // Use Web Share API on mobile browsers that support it
                 await navigator.share({
                     title: 'Join Dropoff & earn rewards!',
                     text: shareText,
                     url: storeUrl,
                 });
-            } catch (e: any) {
-                // User dismissed — not an error
-                if (e?.name !== 'AbortError') console.warn('Share failed:', e);
+            } else {
+                // Fallback for desktop browsers: copy to clipboard
+                navigator.clipboard.writeText(shareText).then(() => {
+                    showAlert('Link Copied!', 'Share link copied to clipboard.', 'success');
+                });
             }
-        } else {
-            // Fallback: copy the full message to clipboard
-            navigator.clipboard.writeText(shareText).then(() => {
-                showAlert('Link Copied!', 'Share link copied to clipboard.', 'success');
-            });
+        } catch (e: any) {
+            if (e?.name !== 'AbortError') {
+                console.warn('Share failed:', e);
+            }
         }
     };
 

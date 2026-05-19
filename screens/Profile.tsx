@@ -44,7 +44,7 @@ type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support' | 'sa
 
 // Drawer Component Defined Outside to fix Input Focus issues
 // Added Swipe-to-close logic
-const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, bgCard: string }) => {
+const Drawer = ({ title, children, onClose, isClosing, theme, bgCard, maxHeightClass = 'max-h-[92vh]' }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, bgCard: string, maxHeightClass?: string }) => {
     const [dragY, setDragY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isPeeked, setIsPeeked] = useState(false);
@@ -101,7 +101,7 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard }: { title:
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} style={{ opacity: Math.max(0, 1 - dragY / 500) }}></div>
             <div
                 ref={drawerRef}
-                className={`w-full ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 max-h-[92vh] flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
+                className={`w-full ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[40px] pb-safe relative z-10 ${maxHeightClass} flex flex-col shadow-2xl ${isClosing ? 'ios-slide-down' : 'ios-slide-up'}`}
                 style={{
                     transform: `translateY(${dragY}px)`,
                     transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.1)'
@@ -520,7 +520,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
             {/* Account Settings Drawer */}
             {activeDrawer === 'account' && (
-                <Drawer title="Account Settings" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard}>
+                <Drawer title="Account Settings" onClose={closeDrawer} isClosing={isClosing} theme={theme} bgCard={bgCard} maxHeightClass="max-h-[96vh]">
                     <div className="pb-20">
                         <div className="flex justify-center mb-8">
                             <input
@@ -563,31 +563,31 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                 </div>
                             )}
 
-                            <div className={`rounded-3xl overflow-hidden border ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}>
+                            <div className="space-y-4">
                                 {/* Full Name */}
-                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
-                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Full Name</label>
+                                <div className={`px-5 py-4 rounded-2xl border ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-1 block`}>Full Name</label>
                                     <input value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-transparent outline-none font-bold text-lg" />
                                 </div>
-                                
+
                                 {/* Phone Number */}
-                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
-                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Phone Number</label>
+                                <div className={`px-5 py-4 rounded-2xl border ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-1 block`}>Phone Number</label>
                                     <input value={safeFormatPhone(editPhone)} readOnly className="w-full bg-transparent outline-none font-bold text-lg opacity-50" />
                                 </div>
 
                                 {/* Email */}
-                                <div className={`px-4 py-3 border-b ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
-                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Email</label>
+                                <div className={`px-5 py-4 rounded-2xl border ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-1 block`}>Email</label>
                                     <input type="email" placeholder="name@example.com" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full bg-transparent outline-none font-bold text-lg" />
                                 </div>
 
                                 {/* Home Location */}
-                                <div 
+                                <div
                                     onClick={() => setShowLP(true)}
-                                    className={`px-4 py-3 cursor-pointer group`}
+                                    className={`px-5 py-4 rounded-2xl border cursor-pointer group ${theme === 'light' ? 'bg-[#F2F2F7]/50 border-black/5' : 'bg-[#1C1C1E]/50 border-white/5'}`}
                                 >
-                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-0.5 block`}>Home Location</label>
+                                    <label className={`text-[10px] font-black uppercase tracking-widest ${textSec} mb-1 block`}>Home Location</label>
                                     <span className={`block w-full bg-transparent font-bold text-lg truncate ${!editLocation ? 'opacity-30' : ''}`}>
                                         {editLocation || 'Set Home Location'}
                                     </span>
@@ -595,19 +595,19 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                             </div>
                         </div>
 
-                            {showLP && (
-                                <LocationPicker
-                                    theme={theme}
-                                    title="Home Address"
-                                    user={user}
-                                    onClose={() => setShowLP(false)}
-                                    onConfirm={(loc) => {
-                                        setHomeLocData(loc);
-                                        setEditLocation(loc.address);
-                                        setShowLP(false);
-                                    }}
-                                />
-                            )}
+                        {showLP && (
+                            <LocationPicker
+                                theme={theme}
+                                title="Home Address"
+                                user={user}
+                                onClose={() => setShowLP(false)}
+                                onConfirm={(loc) => {
+                                    setHomeLocData(loc);
+                                    setEditLocation(loc.address);
+                                    setShowLP(false);
+                                }}
+                            />
+                        )}
                         <button
                             onClick={handleSaveProfile}
                             disabled={loading}
@@ -899,7 +899,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.10.0-beta2 (Build 229)</p>
+                        <p>Version 1.11.0-beta2 (Build 230)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>
