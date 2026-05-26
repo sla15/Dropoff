@@ -615,6 +615,18 @@ const App = () => {
   const handleLogout = async () => {
     try {
       console.log("📂 Performing complete app data purge...");
+      
+      try {
+         const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+         const tokenResult = await FirebaseMessaging.getToken();
+         if (tokenResult?.token) {
+            await supabase.rpc('remove_fcm_token', { p_token: tokenResult.token });
+            console.log("🧹 FCM token explicitly removed on logout");
+         }
+      } catch (fcmErr) {
+         console.warn("⚠️ Could not remove FCM token on logout:", fcmErr);
+      }
+
       // 1. Supabase SignOut
       await supabase.auth.signOut();
       

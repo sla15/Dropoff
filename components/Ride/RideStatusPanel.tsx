@@ -111,7 +111,7 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
                             )}
                         </div>
                     </div>
-                    <h3 className="text-xl font-bold mb-1">Finding your {rideType === 'delivery' ? 'courier' : 'driver'}...</h3>
+                    <h3 className="text-xl font-bold mb-1">{rideType === 'delivery' ? 'Couriers' : 'Drivers'} are reviewing your request...</h3>
                     <p className={`${textSec} text-sm mb-6`}>What nearby {rideType === 'delivery' ? 'scooters' : 'drivers'} see:</p>
 
                     <div className={`w-full ${inputBg} p-4 rounded-2xl flex items-center justify-between`}>

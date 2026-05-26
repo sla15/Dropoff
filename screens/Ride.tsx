@@ -387,7 +387,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         const initMap = () => {
             if (!mapContainerRef.current) return;
-            
+
             // Safety check: Ensure Google Maps API is fully loaded
             if (!(window as any).google || !(window as any).google.maps || !(window as any).google.maps.Map) {
                 if (retryCount < maxRetries) {
@@ -700,7 +700,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             img.src = imageUrl;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                canvas.width = 128; 
+                canvas.width = 128;
                 canvas.height = 128;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
@@ -712,7 +712,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 const aspect = img.width / img.height;
                 const maxDim = 110; // Max dimension to comfortably fit diagonal in 128
                 let drawW, drawH;
-                
+
                 if (aspect > 1) {
                     drawW = maxDim;
                     drawH = maxDim / aspect;
@@ -756,7 +756,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     marker.setPosition(position);
                     marker.setVisible(!isRequestActive || d.id === assignedDriverId);
                     marker.setMap(map);
-                    
+
                     // Update rotation if changed
                     const currentHeading = Math.round(d.heading || 0);
                     getVehicleIcon(d.vehicle_category || 'economic', currentHeading, (newIcon) => {
@@ -810,7 +810,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         const fetchDrivers = async () => {
             const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
-            
+
             if (isRequestActive && assignedDriverId) {
                 // If a driver is assigned, discard all other drivers and ONLY fetch the assigned one
                 const { data } = await supabase.from('drivers').select('*').eq('id', assignedDriverId);
@@ -926,13 +926,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             // 1. Check if we have coordinates for the final destination
             const finalCoord = destinationCoords[validDestinations.length - 1];
             if (finalCoord && userLocation) {
-                const roundedOrigin = { 
-                    lat: parseFloat(userLocation.lat.toFixed(4)), 
-                    lng: parseFloat(userLocation.lng.toFixed(4)) 
+                const roundedOrigin = {
+                    lat: parseFloat(userLocation.lat.toFixed(4)),
+                    lng: parseFloat(userLocation.lng.toFixed(4))
                 };
-                const roundedDest = { 
-                    lat: parseFloat(finalCoord.lat.toFixed(4)), 
-                    lng: parseFloat(finalCoord.lng.toFixed(4)) 
+                const roundedDest = {
+                    lat: parseFloat(finalCoord.lat.toFixed(4)),
+                    lng: parseFloat(finalCoord.lng.toFixed(4))
                 };
 
                 const { data: cachedData } = await supabase
@@ -1174,7 +1174,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             if (isHandling || ride.status === lastKnownDbStatus) return;
             isHandling = true;
             console.log('[Heartbeat] 🔔 Status change:', lastKnownDbStatus, '→', ride.status);
-            
+
             try {
                 if (ride.status === 'accepted' && ride.driver_id) {
                     const { data: driverData } = await supabase
@@ -1284,7 +1284,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 // B. SEARCH LOGIC: If still searching, notify more drivers
                 if (ride.status === 'searching') {
                     if (!userLocation) return;
-                    
+
                     const categoryMap: Record<string, string> = { 'eco': 'economic', 'prem': 'premium', 'moto': 'scooter' };
                     const { data: nearbyDrivers } = await supabase.rpc('get_nearby_drivers', {
                         user_lat: userLocation.lat, user_lng: userLocation.lng, radius_km: currentSearchRadius,
@@ -1301,7 +1301,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                                     title: `New Ride Request! 🚗 #${ride.id.slice(0, 4)}`,
                                     message: 'A new request is waiting near you.',
                                     target: 'driver',
-                                    data: { ride_id: ride.id, type: 'RIDE_REQUEST' }
+                                    data: { ride_id: ride.id, type: 'RIDE_REQUEST', target: 'driver' }
                                 }
                             }).catch(console.warn);
                         }
@@ -1988,10 +1988,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {showCancellationSummary && (
                 <RideCancellationSummary
-                    onClose={() => { 
-                        setShowCancellationSummary(false); 
-                        setStatus('idle'); 
-                        navigate('dashboard'); 
+                    onClose={() => {
+                        setShowCancellationSummary(false);
+                        setStatus('idle');
+                        navigate('dashboard');
                         notifiedDriversRef.current.clear(); // Ensure fresh start for next ride attempt
                     }}
                     bgCard={bgCard}

@@ -249,13 +249,9 @@ export const syncFCMTokenToSupabase = async (userId: string, token: string) => {
                 p_token: token
             });
             if (error) throw error;
-
-            // Also update the singular token as a fallback for legacy triggers
-            const { error: fallbackError } = await supabase
-                .from('profiles')
-                .update({ fcm_token: token })
-                .eq('id', userId);
-            if (fallbackError) console.warn('[FCM] Fallback sync warning:', fallbackError);
+            
+            // Fallback for older edge functions (like reengagement) that query singular fcm_token
+            await supabase.from('profiles').update({ fcm_token: token }).eq('id', userId);
         });
 
         console.log('✅ FCM: Token synced to Supabase');
