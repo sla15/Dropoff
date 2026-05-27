@@ -1203,7 +1203,6 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     setStatus('in-progress');
                     triggerHaptic();
                 } else if (ride.status === 'completed') {
-                    setCurrentRideId(null);
                     sendPushNotification("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
                     completeTrip();
                 } else if (ride.status === 'searching') {
@@ -1716,7 +1715,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     reviewer_id: session.user.id,
                     target_id: assignedDriverId,
                     rating: rating,
-                    role_target: 'driver',
+                    role_target: 'DRIVER',
                     ...(reviewComment.trim() ? { comment: reviewComment.trim() } : {})
                 });
 
@@ -1768,6 +1767,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const finalizeTripCleanup = () => {
         setRating(5);
         setStatus('idle');
+        setCurrentRideId(null);
         setAssignedDriverId(null);
         setAssignedDriver(null);
         setShowPaymentSummary(false);
