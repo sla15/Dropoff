@@ -86,6 +86,11 @@ workflows:
         script: npx cap sync ios
       - name: Build iOS
         script: |
+          # Force Codemagic to use the Code Signing Identities you uploaded to the UI
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+
           # Use Codemagic's built-in tool for automatic signing and building
           xcode-project build-ipa \
             --project "ios/App/App.xcodeproj" \
