@@ -68,6 +68,9 @@ workflows:
     environment:
       node: 22
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.dropoffgambia.customer
       groups:
         - supabase_config
         - google_maps
@@ -81,8 +84,12 @@ workflows:
         script: npx cap sync ios
       - name: Build iOS
         script: |
-          cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath App.xcarchive archive
-          xcodebuild -exportArchive -archivePath App.xcarchive -exportOptionsPlist exportOptions.plist -exportPath .
+          # Use Codemagic's built-in tool for automatic signing and building
+          xcode-project build-ipa \
+            --workspace "ios/App/App.xcworkspace" \
+            --scheme "App"
     artifacts:
-      - ios/App/*.ipa
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
