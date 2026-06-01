@@ -88,7 +88,7 @@ workflows:
         script: |
           # Use Codemagic's built-in tool for automatic signing and building
           xcode-project build-ipa \
-            --workspace "ios/App/App.xcworkspace" \
+            --project "ios/App/App.xcodeproj" \
             --scheme "App"
     artifacts:
       - build/ios/ipa/*.ipa
