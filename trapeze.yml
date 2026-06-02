@@ -2,7 +2,7 @@ ios:
   targets:
     App:
       entitlements:
-        - aps-environment: development
+        - aps-environment: production
       buildSettings:
         CODE_SIGN_ENTITLEMENTS: App/App.entitlements
       plist:
