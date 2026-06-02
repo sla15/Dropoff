@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@capacitor-community/safe-area": "^8.0.1",
+    "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor-firebase/messaging": "^8.1.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.1",
@@ -36,6 +37,7 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@capacitor/project": "^2.0.10",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",

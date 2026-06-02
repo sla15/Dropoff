@@ -47,10 +47,8 @@ type DrawerType = 'none' | 'account' | 'history' | 'favorites' | 'support' | 'sa
 const Drawer = ({ title, children, onClose, isClosing, theme, bgCard, maxHeightClass = 'max-h-[92vh]' }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, bgCard: string, maxHeightClass?: string }) => {
     const [dragY, setDragY] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
-    const [isPeeked, setIsPeeked] = useState(false);
     const startY = useRef(0);
     const drawerRef = useRef<HTMLDivElement>(null);
-    const PEEK_Y = 480;
 
     const handleTouchStart = (e: React.TouchEvent) => {
         const scrollContainer = drawerRef.current?.querySelector('.overflow-y-auto');
@@ -63,36 +61,21 @@ const Drawer = ({ title, children, onClose, isClosing, theme, bgCard, maxHeightC
         if (!isDragging) return;
         const currentY = e.touches[0].clientY;
         const delta = currentY - startY.current;
-
-        if (isPeeked) {
-            // If peeked, allow dragging UP
-            if (delta < 0) {
-                setDragY(Math.max(0, PEEK_Y + delta));
-            }
-        } else {
-            // If expanded, allow dragging DOWN
-            if (delta > 0) {
-                setDragY(delta);
-            }
+        // Only allow dragging DOWN (positive delta)
+        if (delta > 0) {
+            setDragY(delta);
         }
     };
 
     const handleTouchEnd = () => {
         setIsDragging(false);
-        if (isPeeked) {
-            if (dragY < PEEK_Y - 100) {
-                setDragY(0);
-                setIsPeeked(false);
-            } else {
-                setDragY(PEEK_Y);
-            }
+        // Swipe down past threshold → fully close the drawer
+        if (dragY > 150) {
+            setDragY(0);
+            onClose();
         } else {
-            if (dragY > 150) {
-                setDragY(PEEK_Y);
-                setIsPeeked(true);
-            } else {
-                setDragY(0);
-            }
+            // Spring back to fully open
+            setDragY(0);
         }
     };
 

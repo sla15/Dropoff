@@ -17,7 +17,7 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
     return (
         <div
             className={`fixed left-0 right-0 z-50 flex justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isNavVisible ? 'nav-visible' : 'nav-hidden'}`}
-            style={{ bottom: `calc(1.5rem + var(--safe-area-inset-bottom, 0px))` }}
+            style={{ bottom: `calc(0.75rem + var(--safe-area-inset-bottom, 0px))` }}
         >
             <div
                 className={`

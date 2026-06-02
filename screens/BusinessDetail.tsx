@@ -5,6 +5,7 @@ import { Theme, Screen, Business, Product, CartItem } from '../types';
 import { triggerHaptic, getInitialAvatar, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { StarRating } from '../components/StarRating';
+import { useIOSSwipeBack } from '../utils/useIOSSwipeBack';
 
 interface Props {
     theme: Theme;
@@ -35,6 +36,8 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     const [userRating, setUserRating] = useState(5);
     const [userComment, setUserComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const { containerStyle, bindGesture } = useIOSSwipeBack(goBack);
 
     // Extract unique categories/tags from all products
     const filters = useMemo(() => {
@@ -156,7 +159,11 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     });
 
     return (
-        <div className={`h-full bg-black ${textMain} animate-slide-in relative overflow-hidden`}>
+        <div 
+            className={`h-full bg-black ${textMain} animate-slide-in relative overflow-hidden`}
+            style={containerStyle}
+            {...bindGesture}
+        >
             {/* Background Image Layer (Parallax Background) */}
             <div className="absolute top-0 left-0 right-0 h-[300px] z-0 pointer-events-none">
                 <img

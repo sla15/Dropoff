@@ -4,6 +4,7 @@ import { Theme, Screen, CartItem, UserData, AppSettings } from '../types';
 import { triggerHaptic, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
+import { useIOSSwipeBack } from '../utils/useIOSSwipeBack';
 
 interface Props {
     theme: Theme;
@@ -34,7 +35,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPicker, setShowPicker] = useState(false);
-    const [hasPickedLocation, setHasPickedLocation] = useState(false); // Must be explicitly confirmed via the picker
+    const [hasPickedLocation, setHasPickedLocation] = useState(false);
     const [deliveryLocation, setDeliveryLocation] = useState<{ address: string; lat: number; lng: number }>({
         address: user.location || 'Banjul, The Gambia',
         lat: user.last_lat || 13.4432,
@@ -42,8 +43,9 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     });
     const [deliveryNote, setDeliveryNote] = useState('');
     const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
-
     const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
+
+    const { containerStyle, bindGesture } = useIOSSwipeBack(goBack);
 
     const uniqueBusinessIds = Array.from(new Set(cart.map(item => item.businessId)));
 
@@ -346,7 +348,11 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     };
 
     return (
-        <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
+        <div
+            className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}
+            style={containerStyle}
+            {...bindGesture}
+        >
             {/* Consistent Header */}
             <div className={`pt-safe px-4 pb-4 flex items-center gap-4 ${bgMain} sticky top-0 z-10 border-b ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'}`}>
                 <button onClick={goBack} className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-gray-800'} transition-colors`}>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { Geolocation } from '@capacitor/geolocation';
@@ -10,6 +10,7 @@ import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 import { logError } from '../utils/logger';
+import { useIOSSwipeBack } from '../utils/useIOSSwipeBack';
 
 interface Props {
    theme: Theme;
@@ -133,16 +134,8 @@ const COUNTRIES = [
 const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { title: string, children: React.ReactNode, onClose: () => void, isClosing: boolean, theme: Theme, forceExpand?: boolean }) => {
    const [dragY, setDragY] = useState(0);
    const [isDragging, setIsDragging] = useState(false);
-   const [isPeeked, setIsPeeked] = useState(false);
    const startY = useRef(0);
    const drawerRef = useRef<HTMLDivElement>(null);
-   const PEEK_Y = 480;
-   useEffect(() => {
-      if (forceExpand) {
-         setDragY(0);
-         setIsPeeked(false);
-      }
-   }, [forceExpand]);
 
    const handleTouchStart = (e: React.TouchEvent) => {
       const scrollContainer = drawerRef.current?.querySelector('.overflow-y-auto');
@@ -155,34 +148,20 @@ const Drawer = ({ title, children, onClose, isClosing, theme, forceExpand }: { t
       if (!isDragging) return;
       const currentY = e.touches[0].clientY;
       const delta = currentY - startY.current;
-
-      if (isPeeked) {
-         if (delta < 0) {
-            setDragY(Math.max(0, PEEK_Y + delta));
-         }
-      } else {
-         if (delta > 0) {
-            setDragY(delta);
-         }
+      // Only allow dragging DOWN
+      if (delta > 0) {
+         setDragY(delta);
       }
    };
 
    const handleTouchEnd = () => {
       setIsDragging(false);
-      if (isPeeked) {
-         if (dragY < PEEK_Y - 100) {
-            setDragY(0);
-            setIsPeeked(false);
-         } else {
-            setDragY(PEEK_Y);
-         }
+      // Swipe down past threshold → fully close
+      if (dragY > 150) {
+         setDragY(0);
+         onClose();
       } else {
-         if (dragY > 150) {
-            setDragY(PEEK_Y);
-            setIsPeeked(true);
-         } else {
-            setDragY(0);
-         }
+         setDragY(0);
       }
    };
 
@@ -235,6 +214,14 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
    const isIOS = Capacitor.getPlatform() === 'ios';
+
+   // iOS swipe-to-go-back: maps each step to its correct back action
+   const stepGoBack = useCallback(() => {
+      if (step === 2) setStep(1);
+      else if (step === 3) setStep(2);
+      else if (step === 4) setStep(3);
+   }, [step]);
+   const { containerStyle: swipeContainerStyle, bindGesture: swipeBindGesture } = useIOSSwipeBack(stepGoBack);
 
    useEffect(() => {
       if (Capacitor.isNativePlatform()) {
@@ -810,7 +797,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return (
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
-            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
+            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-between items-center z-[100]">
@@ -970,7 +958,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return (
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
-            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
+            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
@@ -1046,7 +1035,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       return (
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
-            style={{ paddingBottom: isIOS ? keyboardHeight : 0 }}
+            style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
+            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">

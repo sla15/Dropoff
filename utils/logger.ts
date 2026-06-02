@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient';
 import { Capacitor } from '@capacitor/core';
+import { FirebaseCrashlytics } from '@capacitor-firebase/crashlytics';
 
 export const logError = async (error: Error | string, context?: Record<string, any>) => {
     try {
@@ -13,6 +14,13 @@ export const logError = async (error: Error | string, context?: Record<string, a
         };
 
         const platform = Capacitor.getPlatform(); // 'web', 'ios', or 'android'
+
+        if (platform !== 'web') {
+            FirebaseCrashlytics.recordException({ 
+                message: message, 
+                stacktrace: stack 
+            }).catch(err => console.error("Crashlytics Error:", err));
+        }
 
         // Don't await to avoid blocking the thread during a crash
         supabase.from('app_logs').insert({
@@ -44,4 +52,9 @@ export const setupGlobalErrorHandlers = () => {
         console.error("Global Error:", event.error || event.message);
         logError(event.error || event.message, { type: 'error', filename: event.filename, lineno: event.lineno, colno: event.colno });
     });
+
+    if (Capacitor.isNativePlatform()) {
+        FirebaseCrashlytics.setCrashlyticsCollectionEnabled({ enabled: true })
+            .catch(err => console.error("Crashlytics Init Error:", err));
+    }
 };

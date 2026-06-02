@@ -215,7 +215,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
 
     // Drag Sheet State
-    const PEEK_OFFSET = 320; // Reduced from 460 to ensure visibility
+    const PEEK_OFFSET = 220; // Minimised height: sheet translates down 220px, ~130px stays visible
     const [sheetOffset, setSheetOffset] = useState(0); // Expanded by default
     const [isSheetMinimized, setIsSheetMinimized] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
@@ -476,27 +476,36 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     }, [active]);
 
-    // Re-center Map when screen becomes active
+    // Re-center Map ONCE when the screen first becomes active.
+    // We deliberately do NOT include `indexLocation` in the dep-array so that
+    // subsequent GPS position updates never forcibly re-pan the map while the
+    // user is exploring. The marker is updated separately on every GPS tick.
+    const hasInitialCenteredRef = useRef(false);
     useEffect(() => {
-        if (active && map) {
-            if (indexLocation) {
-                console.log("RideScreen: Using proactive indexLocation:", indexLocation);
-                setUserLocation(indexLocation);
-                setLocationMethod('gps');
-                map.panTo(indexLocation);
-                updateMarker(indexLocation, undefined, map);
-
-                // Force a second update verify to ensure pin is visible
-                setTimeout(() => updateMarker(indexLocation, undefined, map), 500);
-            } else if (!userLocation) {
-                console.log("RideScreen: Screen active, no indexLocation, triggering auto-locate in 60s");
-                const delayTimer = setTimeout(() => {
-                    handleLocateMe(true);
-                }, 60000); // Wait 60 seconds
-                return () => clearTimeout(delayTimer);
-            }
+        if (!active || !map) {
+            // Reset flag whenever screen goes inactive so next activation re-centers
+            if (!active) hasInitialCenteredRef.current = false;
+            return;
         }
-    }, [active, !!map, indexLocation]);
+
+        if (hasInitialCenteredRef.current) return; // already centred this session
+
+        const pos = indexLocation || (userLocation ?? null);
+        if (pos) {
+            console.log("RideScreen: Initial center on activation:", pos);
+            hasInitialCenteredRef.current = true;
+            setUserLocation(pos);
+            setLocationMethod('gps');
+            map.panTo(pos);
+            updateMarker(pos, undefined, map);
+            setTimeout(() => updateMarker(pos, undefined, map), 500);
+        } else if (!userLocation) {
+            // No location yet — try once after a short delay
+            const t = setTimeout(() => handleLocateMe(true), 1000);
+            return () => clearTimeout(t);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active, !!map]);
 
     // Initial Location Capture once Map is ready
     // Removed duplicate useEffect, centering is handled in initMap
@@ -657,18 +666,27 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     }, [prefilledDestination, prefilledTier, map, directionsRenderer]);
 
-    // Re-center Map when screen becomes active — with a 1-minute delay to allow initial orientation
+    // Periodic re-center: pan back to the user's location every 60 seconds of IDLE
+    // (i.e., when the user hasn't dragged the map). Runs only while screen is active.
+    // We use a ref for userLocation inside the timeout to always read the latest value
+    // without restarting the 60-second clock on every GPS update.
+    const userLocationRef = useRef(userLocation);
+    useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+
     useEffect(() => {
-        if (active && map && userLocation && !mapInteractionRef.current) {
-            const delayFocus = setTimeout(() => {
-                if (!mapInteractionRef.current) { // Final check before panning
-                    console.log("Ride screen active, delayed re-centering map (60s timer)...");
-                    map.panTo(userLocation);
-                }
-            }, 60000); // 1 minute wait
-            return () => clearTimeout(delayFocus);
-        }
-    }, [active, map, !!userLocation]);
+        if (!active || !map) return;
+        // Reset interaction flag so the timer can fire next cycle
+        const interval = setInterval(() => {
+            if (!mapInteractionRef.current && userLocationRef.current) {
+                console.log("Ride: 60s idle re-center");
+                map.panTo(userLocationRef.current);
+            }
+            // After each 60s tick, reset the drag flag so the NEXT tick can re-center
+            mapInteractionRef.current = false;
+        }, 60000);
+        return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active, !!map]);
 
     // --- REAL-TIME DRIVER TRACKING ---
     const iconCache = useRef<Map<string, string>>(new Map());

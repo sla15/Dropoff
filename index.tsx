@@ -1220,11 +1220,11 @@ const App = () => {
             {screen && renderScreen()}
           </div>
 
-          {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && screen !== 'business-detail' && (
+          {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && screen !== 'business-detail' && screen !== 'splash' && (
             <BottomNav active={screen} navigate={navigate} theme={theme} isScrolling={isScrolling} isNavVisible={isNavVisible} />
           )}
 
-          {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && (
+          {!isLoading && screen !== 'onboarding' && screen !== 'ride' && screen !== 'checkout' && screen !== 'splash' && (
             <FloatingCartButton cart={cart} theme={theme} onClick={() => navigate('checkout', true)} />
           )}
 
