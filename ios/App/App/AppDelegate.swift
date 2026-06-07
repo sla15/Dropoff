@@ -2,7 +2,6 @@ import UIKit
 import Capacitor
 import FirebaseCore
 import FirebaseMessaging
-import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -12,27 +11,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Configure Firebase
         FirebaseApp.configure()
-
-        // Set Firebase Messaging delegate (to receive FCM token callbacks)
-        Messaging.messaging().delegate = self
-
-        // Set notification center delegate (to control foreground display)
-        UNUserNotificationCenter.current().delegate = self
-
-        // Request push notification permission from the user
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error = error {
-                print("[Push] Permission error: \(error.localizedDescription)")
-            }
-            guard granted else {
-                print("[Push] Permission denied by user")
-                return
-            }
-            DispatchQueue.main.async {
-                application.registerForRemoteNotifications()
-            }
-        }
-
+        // Register for remote notifications (required for iOS push notifications)
+        // On iOS 16+, this is a no-op until the user grants permission,
+        // but it ensures registration for subsequent launches.
+        application.registerForRemoteNotifications()
         return true
     }
 
@@ -52,53 +34,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
-    // Called by iOS when APNs registration succeeds — hand the token to Firebase
+    // Called by iOS when APNs registration succeeds
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                print("Error fetching FCM registration token: \(error)")
+            } else if let token = token {
+                print("FCM registration token: \(token)")
+            }
+        }
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("[Push] APNs registration failed: \(error.localizedDescription)")
         NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
-}
 
-// MARK: - UNUserNotificationCenterDelegate
-extension AppDelegate: UNUserNotificationCenterDelegate {
-
-    /// Show the notification as a banner/sound even when the app is in the FOREGROUND
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .badge, .sound])
-    }
-
-    /// Handle the user tapping on a notification
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        completionHandler()
-    }
-}
-
-// MARK: - MessagingDelegate
-extension AppDelegate: MessagingDelegate {
-
-    /// Called whenever Firebase issues or refreshes the FCM token
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let token = fcmToken else { return }
-        print("[Push] FCM Token: \(token)")
-
-        // Broadcast the token so the Capacitor/JS layer can capture it if needed
-        NotificationCenter.default.post(
-            name: Notification.Name("FCMToken"),
-            object: nil,
-            userInfo: ["token": token]
-        )
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        ApplicationDelegateProxy.shared.application(application, didReceiveRemoteNotification: userInfo, fetchCompletionHandler: completionHandler)
     }
 }

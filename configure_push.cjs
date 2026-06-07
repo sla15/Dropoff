@@ -4,26 +4,30 @@ async function main() {
     try {
         console.log('Loading Capacitor project...');
         const project = new CapacitorProject({
-            ios: { path: 'ios/App' }
+            ios: { path: 'ios' }
         });
         
         await project.load();
 
         console.log('Setting Push Notifications capability...');
         
-        // Ensure App.entitlements is referenced
-        const entitlementsPath = 'App/App.entitlements';
-        await project.ios.setEntitlements('App', entitlementsPath, {
-            'aps-environment': 'development'
+        // Add aps-environment entitlement
+        await project.ios.addEntitlements('App', null, {
+            'aps-environment': 'production'
         });
 
-        // Add System Capabilities to pbxproj directly using the internal pbxproj wrapper
+        // Add System Capabilities to pbxproj
         const pbx = project.ios.getPbxProject();
         
         // This is equivalent to clicking "+ Capability" -> "Push Notifications" in Xcode
-        pbx.addTargetAttribute('SystemCapabilities', {
-            'com.apple.Push': { enabled: 1 }
-        }, 'App');
+        const target = project.ios.getAppTarget();
+        if (target) {
+            pbx.addTargetAttribute('SystemCapabilities', {
+                'com.apple.Push': { enabled: 1 }
+            }, target.id);
+        } else {
+            console.warn('Could not find app target in Xcode project');
+        }
 
         await project.commit();
         console.log('Successfully added Push Notification capabilities to the Xcode project.');
