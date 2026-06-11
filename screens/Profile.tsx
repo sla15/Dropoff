@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserCog, History, Heart, HelpCircle, ChevronRight, LogOut, X, Camera as CameraIcon, Phone, Mail, MessageSquare, Trash2, MapPin, Car, ShoppingBag, Star, Loader2 } from 'lucide-react';
 
 import { Theme, Screen, UserData, Activity, Business, AppSettings, SavedLocation } from '../types';
-import { triggerHaptic, sendPushNotification, compressImage, friendlyError } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage, friendlyError, validateUpload } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
 import { Capacitor } from '@capacitor/core';
@@ -254,6 +254,12 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
             // 1. Upload new photo if selected
             if (photoFile) {
+                const error = validateUpload(photoFile);
+                if (error) {
+                    showAlert("Invalid File", error);
+                    setLoading(false);
+                    return;
+                }
                 console.log("Compressing & Uploading Profile Photo...");
                 const compressedBlob = await compressImage(photoFile, 800, 0.7);
                 const fileName = `${userId}-${Date.now()}.jpg`;
@@ -349,6 +355,11 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                 if (image.webPath) {
                     const response = await fetch(image.webPath);
                     const blob = await response.blob();
+                    const error = validateUpload(blob);
+                    if (error) {
+                        showAlert("Invalid File", error);
+                        return;
+                    }
                     setPhotoFile(blob);
                     setUser({ ...user, photo: image.webPath });
                 }
@@ -358,6 +369,11 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
         } else if (event) {
             const file = event.target.files?.[0];
             if (file) {
+                const error = validateUpload(file);
+                if (error) {
+                    showAlert("Invalid File", error);
+                    return;
+                }
                 setPhotoFile(file);
                 const reader = new FileReader();
                 reader.onloadend = () => {

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, ArrowRight, Camera, Edit2, Phone, MapPin as MapPinFilled, Clock, Truck, Package, Plus, X, ImageIcon, Check, ChevronDown, Store as StoreIcon } from 'lucide-react';
 import { Theme, Screen, Product } from '../types';
-import { triggerHaptic } from '../utils/helpers';
+import { triggerHaptic, validateUpload } from '../utils/helpers';
 import { STORE_CATEGORIES, PRODUCT_CATEGORIES } from '../data';
 import { BottomNav } from '../components/Navigation';
 
@@ -71,6 +71,12 @@ export const StoreScreen = ({ theme, navigate, isScrolling }: Props) => {
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+            const error = validateUpload(file);
+            if (error) {
+                alert(error);
+                event.target.value = '';
+                return;
+            }
             const reader = new FileReader();
             reader.onloadend = () => {
                 setPreviewImage(reader.result as string);

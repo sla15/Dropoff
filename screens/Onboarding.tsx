@@ -5,7 +5,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Browser } from '@capacitor/browser';
 import { ArrowRight, ArrowLeft, Camera, Briefcase, Mail, MapPin, Locate, Loader2, Gift, ChevronDown, X, Search } from 'lucide-react';
 import { Theme, Screen, UserData } from '../types';
-import { triggerHaptic, sendPushNotification, compressImage, friendlyError } from '../utils/helpers';
+import { triggerHaptic, sendPushNotification, compressImage, friendlyError, validateUpload } from '../utils/helpers';
 import { CONFIG } from '../config';
 import { supabase } from '../supabaseClient';
 import { LocationPicker } from '../components/LocationPicker';
@@ -314,17 +314,22 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       );
    };
 
-   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-         setPhotoFile(file);
-         const reader = new FileReader();
-         reader.onloadend = () => {
-            setPhoto(reader.result as string);
-         };
-         reader.readAsDataURL(file);
-      }
-   };
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+       const file = event.target.files?.[0];
+       if (file) {
+          const error = validateUpload(file);
+          if (error) {
+             showAlert("Invalid File", error);
+             return;
+          }
+          setPhotoFile(file);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+             setPhoto(reader.result as string);
+          };
+          reader.readAsDataURL(file);
+       }
+    };
 
    const sendOTP = async () => {
       const sanitizedPhone = phone.trim().replace(/\D/g, '');
@@ -485,6 +490,11 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
             // 3. Upload Photo to Supabase Storage (if exists)
             if (photoFile) {
                try {
+                  const error = validateUpload(photoFile);
+                  if (error) {
+                     showAlert("Invalid File", error);
+                     return;
+                  }
                   console.log("Compressing & Uploading photo to Storage...");
                   const compressedBlob = await compressImage(photoFile, 800, 0.7);
                   const fileName = `${userId}-${Date.now()}.jpg`;

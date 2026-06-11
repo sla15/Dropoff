@@ -118,6 +118,19 @@ export const getInitialAvatar = (name: string, size: number = 40, theme: 'light'
     </svg>`;
 };
 
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+export const validateUpload = (file: File | Blob): string | null => {
+    if (file.size > MAX_UPLOAD_SIZE) {
+        return `File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 5MB.`;
+    }
+    if (file.type && !ALLOWED_TYPES.includes(file.type)) {
+        return `File type "${file.type}" is not supported. Please use JPEG, PNG, or WebP images.`;
+    }
+    return null;
+};
+
 export const compressImage = async (file: File | Blob, maxWidth = 1024, quality = 0.8): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
