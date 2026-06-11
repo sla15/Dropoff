@@ -177,6 +177,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const sessionToken = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
     const driverMarkersRef = useRef<Map<string, any>>(new Map());
+    const markerAnimationsRef = useRef<Map<string, number>>(new Map());
     const lastEtaUpdateRef = useRef<number>(0);
     const [predictions, setPredictions] = useState<any[]>([]);
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
@@ -757,6 +758,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             };
         };
 
+        const animateMarkerTo = (marker: any, endPos: { lat: number, lng: number }, duration = 1000) => {
+            const startPos = { lat: marker.getPosition().lat(), lng: marker.getPosition().lng() };
+            const dist = Math.abs(endPos.lat - startPos.lat) + Math.abs(endPos.lng - startPos.lng);
+            if (dist < 0.0001) { marker.setPosition(endPos); return; }
+            const animId = markerAnimationsRef.current.get(marker.__animId);
+            if (animId) cancelAnimationFrame(animId);
+            const startTime = performance.now();
+            const animate = (currentTime: number) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                marker.setPosition({
+                    lat: startPos.lat + (endPos.lat - startPos.lat) * eased,
+                    lng: startPos.lng + (endPos.lng - startPos.lng) * eased
+                });
+                if (progress < 1) {
+                    markerAnimationsRef.current.set(marker.__animId, requestAnimationFrame(animate));
+                } else {
+                    markerAnimationsRef.current.delete(marker.__animId);
+                }
+            };
+            markerAnimationsRef.current.set(marker.__animId, requestAnimationFrame(animate));
+        };
+
         const refreshMarkers = (drivers: any[]) => {
             const markersMap = driverMarkersRef.current;
             const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
@@ -771,7 +796,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 let marker = markersMap.get(d.id);
 
                 if (marker) {
-                    marker.setPosition(position);
+                    animateMarkerTo(marker, position);
                     marker.setVisible(!isRequestActive || d.id === assignedDriverId);
                     marker.setMap(map);
 
@@ -792,6 +817,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             optimized: false,
                             visible: !isRequestActive || d.id === assignedDriverId
                         });
+                        newMarker.__animId = d.id;
                         markersMap.set(d.id, newMarker);
                     });
                 }
