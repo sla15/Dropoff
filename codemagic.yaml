@@ -94,6 +94,10 @@ workflows:
             echo "Expected symbol 'pendingGetTokenCompletion' not found."
             exit 1
           fi
+      - name: Bump build number
+        script: |
+          cd ios/App
+          xcrun agvtool new-version -all $PROJECT_BUILD_NUMBER
       - name: Build iOS
         script: |
           # Force Codemagic to use the Code Signing Identities you uploaded to the UI
