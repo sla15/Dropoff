@@ -221,7 +221,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       else if (step === 3) setStep(2);
       else if (step === 4) setStep(3);
    }, [step]);
-   const { containerStyle: swipeContainerStyle, bindGesture: swipeBindGesture } = useIOSSwipeBack(stepGoBack);
+   const { containerStyle: swipeContainerStyle } = useIOSSwipeBack(stepGoBack);
 
    useEffect(() => {
       if (Capacitor.isNativePlatform()) {
@@ -808,7 +808,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
-            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-between items-center z-[100]">
@@ -969,7 +968,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
-            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">
@@ -1046,7 +1044,6 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
-            {...swipeBindGesture}
          >
             {/* Header Navigation */}
             <div className="w-full px-6 pt-safe pb-4 flex justify-end items-center z-[100]">

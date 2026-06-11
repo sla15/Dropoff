@@ -22,7 +22,7 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
             <div
                 className={`
           pointer-events-auto
-          ${theme === 'light' ? 'bg-white text-black border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]' : 'bg-[#1C1C1E] text-white border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
+          ${theme === 'light' ? 'bg-white/80 text-black border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]' : 'bg-[#1C1C1E]/80 text-white border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
           backdrop-blur-3xl rounded-[2.5rem] px-5 flex items-center justify-center gap-3 relative
           w-fit mx-auto py-2.5 overflow-visible border-[1px]
         `}

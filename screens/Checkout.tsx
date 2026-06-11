@@ -45,7 +45,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
     const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
 
-    const { containerStyle, bindGesture } = useIOSSwipeBack(goBack);
+    const { containerStyle } = useIOSSwipeBack(goBack);
 
     const uniqueBusinessIds = Array.from(new Set(cart.map(item => item.businessId)));
 
@@ -351,7 +351,6 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
         <div
             className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}
             style={containerStyle}
-            {...bindGesture}
         >
             {/* Consistent Header */}
             <div className={`pt-safe px-4 pb-4 flex items-center gap-4 ${bgMain} sticky top-0 z-10 border-b ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'}`}>

@@ -37,7 +37,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     const [userComment, setUserComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { containerStyle, bindGesture } = useIOSSwipeBack(goBack);
+    const { containerStyle } = useIOSSwipeBack(goBack);
 
     // Extract unique categories/tags from all products
     const filters = useMemo(() => {
@@ -162,7 +162,6 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
         <div 
             className={`h-full bg-black ${textMain} animate-slide-in relative overflow-hidden`}
             style={containerStyle}
-            {...bindGesture}
         >
             {/* Background Image Layer (Parallax Background) */}
             <div className="absolute top-0 left-0 right-0 h-[300px] z-0 pointer-events-none">

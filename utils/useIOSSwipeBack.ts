@@ -1,88 +1,91 @@
-/**
- * useIOSSwipeBack
- *
- * Detects a right-swipe gesture from the left edge of the screen on iOS
- * and calls the provided `goBack` callback — mimicking iOS's native slide-to-go-back.
- *
- * Behaviour:
- *  - Touch must START within EDGE_WIDTH pixels from the left of the screen.
- *  - Horizontal drag must exceed MIN_SWIPE_X and must be more horizontal than vertical.
- *  - A live `containerStyle` (translateX) follows the finger so the screen slides.
- *  - On release: if far enough → calls goBack(); otherwise springs back.
- *
- * Usage (in a .tsx component):
- *   const { containerStyle, bindGesture } = useIOSSwipeBack(goBack);
- *   return <div style={containerStyle} {...bindGesture}>...</div>;
- */
-
-import { useRef, useState, useCallback, CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 
-const EDGE_WIDTH = 28;        // px from left edge where gesture must start
-const MIN_SWIPE_X = 80;       // minimum horizontal px before committing
-const COMMIT_THRESHOLD = 0.4; // fraction of screen width to auto-commit
+const EDGE_WIDTH = 20;
+const MIN_SWIPE_X = 50;
+const COMMIT_THRESHOLD = 0.35;
 
 export function useIOSSwipeBack(goBack: () => void) {
-    const isIOS = Capacitor.getPlatform() === 'ios';
+  const isIOS = Capacitor.getPlatform() === 'ios';
+  const [dragX, setDragX] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const isEdgeSwipe = useRef(false);
+  const dragXRef = useRef(0);
+  const onBackRef = useRef(goBack);
 
-    const startX = useRef(0);
-    const startY = useRef(0);
-    const gestureActive = useRef(false);
-    const [dragX, setDragX] = useState(0);
+  useEffect(() => {
+    onBackRef.current = goBack;
+  }, [goBack]);
 
-    const onTouchStart = useCallback((e: { touches: TouchList }) => {
-        if (!isIOS) return;
-        const t = e.touches[0];
-        if (t.clientX <= EDGE_WIDTH) {
-            startX.current = t.clientX;
-            startY.current = t.clientY;
-            gestureActive.current = true;
-        }
-    }, [isIOS]);
+  useEffect(() => {
+    if (!isIOS) return;
 
-    const onTouchMove = useCallback((e: { touches: TouchList }) => {
-        if (!isIOS || !gestureActive.current) return;
-        const t = e.touches[0];
-        const dx = t.clientX - startX.current;
-        const dy = Math.abs(t.clientY - startY.current);
-
-        // Cancel if gesture becomes more vertical than horizontal
-        if (dy > dx + 10) {
-            gestureActive.current = false;
-            setDragX(0);
-            return;
-        }
-
-        if (dx > 0) {
-            setDragX(dx);
-        }
-    }, [isIOS]);
-
-    const onTouchEnd = useCallback(() => {
-        if (!isIOS || !gestureActive.current) return;
-        gestureActive.current = false;
-
-        const threshold = Math.max(MIN_SWIPE_X, window.innerWidth * COMMIT_THRESHOLD);
-        if (dragX >= threshold) {
-            setDragX(window.innerWidth);
-            setTimeout(() => {
-                setDragX(0);
-                goBack();
-            }, 160);
-        } else {
-            setDragX(0);
-        }
-    }, [isIOS, dragX, goBack]);
-
-    const containerStyle: CSSProperties = isIOS && dragX > 0
-        ? { transform: `translateX(${dragX}px)`, transition: 'none' }
-        : {};
-
-    const bindGesture = {
-        onTouchStart,
-        onTouchMove,
-        onTouchEnd,
+    const handleTouchStart = (e: TouchEvent) => {
+      const x = e.touches[0].clientX;
+      if (x <= EDGE_WIDTH) {
+        startX.current = x;
+        startY.current = e.touches[0].clientY;
+        isEdgeSwipe.current = true;
+        dragXRef.current = 0;
+        setIsAnimating(false);
+        setDragX(0);
+      }
     };
 
-    return { containerStyle, bindGesture };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isEdgeSwipe.current) return;
+      const dx = e.touches[0].clientX - startX.current;
+      const dy = Math.abs(e.touches[0].clientY - startY.current);
+
+      if (dy > dx + 10 && dx < 30) {
+        isEdgeSwipe.current = false;
+        setDragX(0);
+        return;
+      }
+
+      if (dx > 0) {
+        dragXRef.current = dx;
+        setDragX(dx);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!isEdgeSwipe.current) return;
+      isEdgeSwipe.current = false;
+
+      const dx = dragXRef.current;
+      const threshold = Math.max(MIN_SWIPE_X, window.innerWidth * COMMIT_THRESHOLD);
+
+      if (dx >= threshold) {
+        setIsAnimating(true);
+        setDragX(window.innerWidth);
+        setTimeout(() => onBackRef.current(), 180);
+      } else {
+        setIsAnimating(true);
+        setDragX(0);
+        setTimeout(() => setIsAnimating(false), 200);
+      }
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isIOS]);
+
+  const containerStyle: React.CSSProperties = isIOS && dragX > 0
+    ? {
+        transform: `translateX(${dragX}px)`,
+        transition: isAnimating ? 'transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+      }
+    : {};
+
+  return { containerStyle };
 }
