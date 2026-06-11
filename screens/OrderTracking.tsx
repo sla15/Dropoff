@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Package, Truck, Home, Star, Phone, MessageSquare, Loader2, CheckCircle2, X, Plus, RefreshCcw } from 'lucide-react';
 import { Theme, Screen, UserData, Activity } from '../types';
 import { triggerHaptic, sendPushNotification, getInitialAvatar } from '../utils/helpers';
@@ -37,6 +37,9 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
     const [batchOrders, setBatchOrders] = useState<any[]>([]);
     const [driver, setDriver] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const driverRef = useRef(driver);
+    const handleStatusUpdateRef = useRef<((order: any) => void) | null>(null);
+    driverRef.current = driver;
 
     // Review State
     const [showReviewModal, setShowReviewModal] = useState(false);
@@ -66,7 +69,6 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         const channelId = activeBatchId ? `batch-tracking-${activeBatchId}` : `order-tracking-${activeOrderId}`;
         const filterStr = activeBatchId ? `batch_id=eq.${activeBatchId}` : `id=eq.${activeOrderId}`;
 
-        // Subscribe to real-time changes
         const channel = supabase
             .channel(channelId)
             .on(
@@ -77,10 +79,10 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                     if (activeBatchId) {
                         setBatchOrders(prev => prev.map(o => o.id === payload.new.id ? payload.new : o));
                     } else {
-                        handleStatusUpdate(payload.new);
+                        handleStatusUpdateRef.current?.(payload.new);
                     }
 
-                    if (payload.new.driver_id && (!driver || driver.id !== payload.new.driver_id)) {
+                    if (payload.new.driver_id && (!driverRef.current || driverRef.current.id !== payload.new.driver_id)) {
                         fetchDriver(payload.new.driver_id);
                     }
                 }
@@ -241,6 +243,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
         setProgress(newProgress);
         setOrderInfo(order);
     };
+    handleStatusUpdateRef.current = handleStatusUpdate;
 
     const handleCancelOrder = async () => {
         const targetId = activeBatchId || activeOrderId;

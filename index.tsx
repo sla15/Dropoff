@@ -140,6 +140,8 @@ const App = () => {
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [profileDrawerToOpen, setProfileDrawerToOpen] = useState<string>('none');
   const [isRideSearching, setIsRideSearching] = useState(false);
+  const isRideSearchingRef = useRef(false);
+  const handleSetIsRideSearching = (val: boolean) => { isRideSearchingRef.current = val; setIsRideSearching(val); };
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
   const [prefilledTier, setPrefilledTier] = useState<string | null>(null);
@@ -1101,7 +1103,7 @@ const App = () => {
   const navigate = (scr: Screen, addToHistory = false) => {
     // Block navigation if searching for a ride
     // Exception: Allow navigation TO 'ride' or if we are already on the target screen (to avoid alert spam)
-    if (isRideSearching && scr !== 'ride' && scr !== screen) {
+    if (isRideSearchingRef.current && scr !== 'ride' && scr !== screen) {
       showAlert(
         "Request in Progress",
         "Please cancel your search before navigating to another screen.",
@@ -1245,7 +1247,7 @@ const App = () => {
               settings={settings}
               refreshSettings={fetchSettings}
               showAlert={showAlert}
-              onSearchingChange={setIsRideSearching}
+              onSearchingChange={handleSetIsRideSearching}
               indexLocation={userLocation}
             />
           </div>

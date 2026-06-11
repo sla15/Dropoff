@@ -189,6 +189,14 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const notifiedDriversRef = useRef<Set<string>>(new Set());
     const gpsChannelRef = useRef<any>(null);       // Shared broadcast channel ref between effects
     const lastBroadcastRef = useRef<number>(0);    // Timestamp of last GPS broadcast received (suppresses duplicate postgres_changes render)
+    const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const fallbackAppliedRef = useRef(false);
+
+    useEffect(() => {
+        return () => {
+            if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
+        };
+    }, []);
 
     // 🔒 Refs that mirror state — used inside subscription/polling closures to avoid stale reads
     // Declared AFTER all state so there are no forward-reference issues.
@@ -321,18 +329,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         setLocationMethod(null);
         console.log("RideScreen: handleLocateMe triggered", { isInitial, hasMap: !!targetMap });
 
-        let fallbackApplied = false;
-        const fallbackTimeout = setTimeout(() => {
+        if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
+        fallbackTimeoutRef.current = setTimeout(() => {
             if (!userLocation && user.last_lat && user.last_lng) {
                 console.log("RideScreen: GPS slow, applying profile database fallback as interim center...");
                 const pos = { lat: user.last_lat, lng: user.last_lng };
                 setUserLocation(pos);
                 setLocationMethod('profile');
+                fallbackAppliedRef.current = true;
                 if (targetMap) {
                     targetMap.panTo(pos);
                     updateMarker(pos, undefined, targetMap);
                 }
-                fallbackApplied = true;
             }
         }, 4000);
 
@@ -350,7 +358,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 maximumAge: 30000
             });
 
-            clearTimeout(fallbackTimeout);
+            if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
             const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
             console.log("RideScreen: Real GPS success:", pos);
             setUserLocation(pos);
@@ -371,10 +379,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             }
             if (!isInitial) triggerHaptic();
         } catch (err) {
-            clearTimeout(fallbackTimeout);
+            if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
             console.error("RideScreen: Geolocation error:", err);
             setIsLocating(false);
-            if (!isInitial && !fallbackApplied) {
+            if (!isInitial && !fallbackAppliedRef.current) {
                 showAlert("Geolocation Error", "Could not get your current location.", "error");
             }
         }
@@ -1461,6 +1469,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         sessionToken.current = null;
 
+        if (!geocoder) { showAlert("Location Error", "Map service not ready. Please try again.", "error"); return; }
         geocoder.geocode({ placeId: prediction.place_id }, (results: any, status: string) => {
             if (status === 'OK' && results[0] && map) {
                 const loc = results[0].geometry.location;
@@ -2092,10 +2101,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             {/* Actions */}
                             <div className="w-full flex flex-col gap-3 mt-1">
                                 <button
-                                    onClick={() => {
+                                    onClick={async () => {
                                         setDriverCancelledModal(false);
                                         triggerHaptic();
-                                        // Restore the saved trip data and re-search
                                         const saved = cancelledTripRef.current;
                                         if (saved && saved.destinations[0]) {
                                             setDestinations(saved.destinations);
@@ -2105,8 +2113,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                                             setRideType(saved.rideType);
                                             setBookingStep('selecting');
                                             cancelledTripRef.current = null;
-                                            // Kick off a fresh search with restored data
-                                            handleBookRide();
+                                            try { await handleBookRide(); } catch (e) { console.error('Re-book failed:', e); }
                                         } else {
                                             cancelledTripRef.current = null;
                                             setStatus('idle');
