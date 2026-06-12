@@ -358,8 +358,8 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-black tracking-tight truncate max-w-[140px]">{user.name || 'User'}</span>
                 {settings.is_rating_enabled && (
-                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${user.rating >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
-                    user.rating >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
+                  <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg ${user.rating >= 3.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
+                    user.rating >= 2.5 ? 'bg-orange-500/10 text-orange-500' :
                       'bg-red-500/10 text-red-500'
                     }`}>
                     <span className="text-[10px] font-black">{(user.rating || 5.0).toFixed(1)}</span>
@@ -626,7 +626,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                     )}
 
                     <div className="absolute top-3 right-3 bg-white/90 dark:bg-black/80 backdrop-blur-md px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm">
-                      <Star size={12} fill="currentColor" className={b.rating >= 4.5 ? 'text-[#00D68F]' : 'text-orange-400'} />
+                      <Star size={12} fill="currentColor" className={b.rating >= 4.0 ? 'text-[#00D68F]' : 'text-[#00D68F]/60'} />
                       <span className="text-xs font-bold text-black dark:text-white">{b.rating.toFixed(1)}</span>
                     </div>
                   </div>
@@ -698,7 +698,6 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                           setPrefilledDestination(activity.title);
                           const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
                           setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
-                          setPrefilledDistance(activity.distance_km || null);
                           navigate('ride');
                         } else {
                           navigate('marketplace');

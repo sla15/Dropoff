@@ -20,12 +20,10 @@ export const StarRating: React.FC<StarRatingProps> = ({
     const getStarColor = (starIndex: number) => {
         if (starIndex > rating) return 'text-gray-300 dark:text-gray-700';
 
-        // Colors from Red (1) to Green (5)
-        if (rating <= 1) return 'text-red-500';
-        if (rating <= 2) return 'text-orange-500';
-        if (rating <= 3) return 'text-yellow-500';
-        if (rating <= 4) return 'text-lime-500';
-        return 'text-[#00D68F]'; // Brand Green for 5
+        // Light green for all filled stars
+        if (rating <= 2) return 'text-red-400';
+        if (rating <= 3) return 'text-orange-400';
+        return 'text-[#00D68F]';
     };
 
     const handleStarClick = (s: number) => {

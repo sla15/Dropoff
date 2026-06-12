@@ -34,6 +34,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Loader2, WifiOff, RefreshCcw, AlertTriangle } from 'lucide-react';
 import { logError, setupGlobalErrorHandlers } from './utils/logger';
 // --- END API INITIALIZATION ---
@@ -89,12 +90,8 @@ const App = () => {
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = async (e: MediaQueryListEvent) => {
-      const { value: saved } = await Preferences.get({ key: 'app_theme' });
-      // If no manual preference is saved, follow system changes
-      if (!saved) {
-        setThemeState(e.matches ? 'dark' : 'light');
-      }
+    const handleChange = (e: MediaQueryListEvent) => {
+      setThemeState(e.matches ? 'dark' : 'light');
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -1011,6 +1008,7 @@ const App = () => {
     // 3. App State Change Listener (Resume/Background)
     CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
+        FirebaseMessaging.removeAllDeliveredNotifications().catch(() => {});
         console.log("📱 App Resumed: verifying and refreshing session...");
         
         // Explicitly force a session refresh. This prevents the auto-refresh lock 

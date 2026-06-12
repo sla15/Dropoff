@@ -45,7 +45,7 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
     const [isCalculatingDistance, setIsCalculatingDistance] = useState(true);
 
-    const { containerStyle } = useIOSSwipeBack(goBack);
+    const { containerStyle, scrimStyle } = useIOSSwipeBack(goBack);
 
     const uniqueBusinessIds = Array.from(new Set(cart.map(item => item.businessId)));
 
@@ -348,6 +348,8 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
     };
 
     return (
+        <>
+        <div style={scrimStyle} />
         <div
             className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}
             style={containerStyle}
@@ -532,5 +534,6 @@ export const CheckoutScreen = ({ theme, navigate, goBack, cart, setCart, user, s
                 />
             )}
         </div>
+        </>
     );
 };

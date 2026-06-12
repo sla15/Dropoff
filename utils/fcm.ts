@@ -98,6 +98,7 @@ const initNativePush = async (userId?: string) => {
         // When user taps on a notification
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Notification tapped:', event.notification?.title);
+            FirebaseMessaging.removeAllDeliveredNotifications().catch(() => {});
             if (event.notification?.data) {
                 window.dispatchEvent(new CustomEvent('notification_tapped', { detail: event.notification.data }));
             }

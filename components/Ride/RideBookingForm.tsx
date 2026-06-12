@@ -146,7 +146,7 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                         {isCalculating ? (
                             <>
                                 <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                                Calculating...
+                                <span className="animate-pulse">Calculating...</span>
                             </>
                         ) : 'Next'}
                     </button>
@@ -190,14 +190,13 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                         </div>
                         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 px-1 snap-x">
                             {isCalculating ? (
-                                // Show 3 Skeleton Cards
                                 [1, 2, 3].map(i => (
-                                    <div key={i} className="min-w-[200px] h-[160px] p-5 rounded-3xl bg-gray-100 dark:bg-gray-800 flex flex-col gap-3">
-                                        <Skeleton className="w-12 h-4 mb-2" />
-                                        <Skeleton className="w-24 h-6" />
-                                        <Skeleton className="w-16 h-4" />
+                                    <div key={i} className="min-w-[200px] h-[160px] p-5 rounded-3xl bg-gray-100 dark:bg-gray-800 flex flex-col gap-3 animate-pulse" style={{ animationDelay: `${i * 80}ms` }}>
+                                        <div className="w-12 h-3 rounded-full bg-gray-300 dark:bg-gray-700" />
+                                        <div className="w-24 h-6 rounded-lg bg-gray-300 dark:bg-gray-700" />
+                                        <div className="w-16 h-3 rounded-full bg-gray-300 dark:bg-gray-700" />
                                         <div className="mt-auto">
-                                            <Skeleton className="w-20 h-8" />
+                                            <div className="w-20 h-7 rounded-lg bg-gray-300 dark:bg-gray-700" />
                                         </div>
                                     </div>
                                 ))

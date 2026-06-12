@@ -37,7 +37,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     const [userComment, setUserComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { containerStyle } = useIOSSwipeBack(goBack);
+    const { containerStyle, scrimStyle } = useIOSSwipeBack(goBack);
 
     // Extract unique categories/tags from all products
     const filters = useMemo(() => {
@@ -159,6 +159,8 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
     });
 
     return (
+        <>
+        <div style={scrimStyle} />
         <div 
             className={`h-full bg-black ${textMain} animate-slide-in relative overflow-hidden`}
             style={containerStyle}
@@ -200,7 +202,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                             </div>
                             <div className="flex items-center gap-2 text-sm font-medium">
                                 <div className="flex items-center gap-1">
-                                    <Star size={14} fill="currentColor" className={selectedBusiness.rating >= 4.5 ? 'text-orange-400' : 'text-gray-400'} />
+                                    <Star size={14} fill="currentColor" className={selectedBusiness.rating >= 4.5 ? 'text-[#00D68F]' : 'text-[#00D68F]/70'} />
                                     <span className={`font-bold ${theme === 'light' ? 'text-black' : 'text-white'}`}>{selectedBusiness.rating}</span>
                                 </div>
                                 <span className={textSec}>({realReviews.length} reviews)</span>
@@ -377,6 +379,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 </div>
             )}
         </div>
+        </>
     );
 };
 

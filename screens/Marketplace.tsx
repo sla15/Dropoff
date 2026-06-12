@@ -49,41 +49,56 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user, onRefresh, isRefreshing }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
 
-   // Pull-to-refresh state
-   const [pullY, setPullY] = useState(0);
-   const [isPulling, setIsPulling] = useState(false);
-   const touchStartY = useRef(0);
-   const scrollContainerRef = useRef<HTMLDivElement>(null);
-   const PULL_THRESHOLD = 72; // px needed to trigger refresh
+    // Pull-to-refresh state
+    const [pullY, setPullY] = useState(0);
+    const [isPulling, setIsPulling] = useState(false);
+    const touchStartY = useRef(0);
+    const touchStartX = useRef(0);
+    const isHorizontalScroll = useRef(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const PULL_THRESHOLD = 72; // px needed to trigger refresh
 
-   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
       // Only activate pull-to-refresh when scrolled to top
       if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
          touchStartY.current = e.touches[0].clientY;
+         touchStartX.current = e.touches[0].clientX;
+         isHorizontalScroll.current = false;
          setIsPulling(true);
       }
-   }, []);
+    }, []);
 
-   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
       if (!isPulling) return;
-      const delta = e.touches[0].clientY - touchStartY.current;
-      if (delta > 0 && scrollContainerRef.current?.scrollTop === 0) {
-         // Dampen the pull (rubber-band feel)
-         setPullY(Math.min(delta * 0.45, PULL_THRESHOLD + 20));
-      }
-   }, [isPulling]);
+      const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+      const dy = e.touches[0].clientY - touchStartY.current;
 
-   const handleTouchEnd = useCallback(async () => {
+      // Bail if horizontal scroll detected (e.g. category carousel)
+      if (dy < 10 && dx > 15) {
+         isHorizontalScroll.current = true;
+         setIsPulling(false);
+         setPullY(0);
+         return;
+      }
+      if (isHorizontalScroll.current) return;
+
+      if (dy > 0 && scrollContainerRef.current?.scrollTop === 0) {
+         // Quadratic dampening for iOS-like rubber-band feel
+         const damped = Math.sqrt(dy * 6) * 4;
+         setPullY(Math.min(damped, PULL_THRESHOLD + 30));
+      }
+    }, [isPulling]);
+
+    const handleTouchEnd = useCallback(async () => {
       if (!isPulling) return;
       setIsPulling(false);
       if (pullY >= PULL_THRESHOLD) {
          triggerHaptic();
-         setPullY(0);
+         setPullY(PULL_THRESHOLD); // Hold briefly at threshold
          await onRefresh();
-      } else {
-         setPullY(0);
       }
-   }, [isPulling, pullY, onRefresh]);
+      setPullY(0);
+    }, [isPulling, pullY, onRefresh]);
 
    const bgMain = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]';
    const bgCard = theme === 'light' ? 'bg-[#FFFFFF]' : 'bg-[#1C1C1E]';
@@ -128,7 +143,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                   <button
                      key={c}
                      onClick={() => setSelectedCategory(c)}
-                     className={`px-4 py-2 rounded-full font-black text-sm whitespace-nowrap transition-all shadow-sm ${selectedCategory === c ? 'bg-[#00D68F] text-black border border-[#00D68F]' : `bg-white dark:bg-[#1C1C1E] border ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'} ${textSec}`}`}
+                      className={`px-4 py-2 rounded-full font-black text-sm whitespace-nowrap transition-all shadow-sm ${selectedCategory === c ? 'bg-[#00D68F] text-black border border-[#00D68F]' : `${theme === 'light' ? 'bg-gray-100 border-gray-300/50 text-gray-600' : 'bg-[#1C1C1E] border-gray-800 text-[#98989D]'} border`}`}
                   >
                      {c}
                   </button>
@@ -146,15 +161,19 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
          >
             {/* Pull-to-refresh indicator */}
             <div
-               className="flex items-center justify-center overflow-hidden transition-all duration-300"
-               style={{ height: isRefreshing ? 48 : pullY > 0 ? pullY : 0, opacity: isRefreshing || pullY > 0 ? 1 : 0 }}
+               className="flex items-center justify-center overflow-hidden"
+               style={{
+                  height: isRefreshing ? 48 : pullY > 0 ? pullY : 0,
+                  opacity: isRefreshing || pullY > 0 ? 1 : 0,
+                  transition: isPulling ? 'none' : 'height 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease',
+               }}
             >
                <div className={`flex items-center gap-2 text-[#00D68F] text-xs font-black ${isRefreshing ? 'opacity-100' : pullY >= PULL_THRESHOLD ? 'opacity-100' : 'opacity-60'
                   }`}>
                   <RefreshCw
                      size={16}
                      className={isRefreshing ? 'animate-spin' : ''}
-                     style={!isRefreshing ? { transform: `rotate(${(pullY / PULL_THRESHOLD) * 180}deg)` } : {}}
+                     style={!isRefreshing ? { transform: `rotate(${(pullY / PULL_THRESHOLD) * 180}deg) scale(${Math.min(1, pullY / PULL_THRESHOLD)})` } : {}}
                   />
                   <span>{isRefreshing ? 'Refreshing...' : pullY >= PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
                </div>

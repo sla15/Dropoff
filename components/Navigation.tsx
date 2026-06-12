@@ -22,9 +22,9 @@ export const BottomNav = ({ active, navigate, theme, isScrolling, isNavVisible =
             <div
                 className={`
           pointer-events-auto
-          ${theme === 'light' ? 'bg-white/80 text-black border-white/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)]' : 'bg-[#1C1C1E]/80 text-white border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
+          ${theme === 'light' ? 'bg-white/95 text-black border-[#00D68F]/30 shadow-[0_8px_32px_rgba(0,0,0,0.12)] shadow-[#00D68F]/10' : 'bg-[#1C1C1E]/95 text-white border-[#00D68F]/30 shadow-[0_8px_32px_rgba(0,0,0,0.4)]'}
           backdrop-blur-3xl rounded-[2.5rem] px-5 flex items-center justify-center gap-3 relative
-          w-fit mx-auto py-2.5 overflow-visible border-[1px]
+          w-fit mx-auto py-2.5 overflow-visible border
         `}
             >
                 {/* Liquid Top Highlighter */}
@@ -88,7 +88,7 @@ const NavItem = ({ active, onClick, icon: Icon, label, theme, isHome }: { active
                     w-12 h-12 rounded-[18px] active:scale-90
                     ${active
                         ? 'text-[#00D68F] -translate-y-0.5'
-                        : `${theme === 'light' ? 'text-black/30' : 'text-white/30'} hover:text-current`
+                        : `${theme === 'light' ? 'text-gray-500' : 'text-white/50'} hover:text-current`
                     }
                 `}
             >

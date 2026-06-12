@@ -221,7 +221,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
       else if (step === 3) setStep(2);
       else if (step === 4) setStep(3);
    }, [step]);
-   const { containerStyle: swipeContainerStyle } = useIOSSwipeBack(stepGoBack);
+   const { containerStyle: swipeContainerStyle, scrimStyle } = useIOSSwipeBack(stepGoBack);
 
    useEffect(() => {
       if (Capacitor.isNativePlatform()) {
@@ -805,6 +805,8 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
 
    if (step === 2) {
       return (
+         <React.Fragment>
+         <div style={scrimStyle} />
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
@@ -960,13 +962,16 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </Drawer>
             )}
          </div>
+         </React.Fragment>
       );
    }
 
    if (step === 3) {
       return (
-         <div 
-            className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
+          <>
+          <div style={scrimStyle} />
+          <div
+             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
          >
             {/* Header Navigation */}
@@ -1036,11 +1041,14 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
          </div>
+         </>
       );
    }
 
    if (step === 4) {
       return (
+         <>
+         <div style={scrimStyle} />
          <div 
             className={`h-full w-full flex flex-col ${bgMain} ${textMain} animate-slide-in overflow-hidden transition-all duration-300`}
             style={{ paddingBottom: isIOS ? keyboardHeight : 0, ...swipeContainerStyle }}
@@ -1159,6 +1167,7 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                </div>
             </div>
          </div>
+         </>
       );
    }
 

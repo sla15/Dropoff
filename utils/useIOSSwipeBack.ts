@@ -84,8 +84,29 @@ export function useIOSSwipeBack(goBack: () => void) {
     ? {
         transform: `translateX(${dragX}px)`,
         transition: isAnimating ? 'transform 0.2s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
+        boxShadow: dragX > 0 ? '-3px 0 12px rgba(0,0,0,0.25)' : 'none',
+        position: 'relative',
+        zIndex: 2,
       }
     : {};
 
-  return { containerStyle };
+  const scrimOpacity = isIOS && dragX > 0
+    ? Math.min(dragX / window.innerWidth * 0.5, 0.45)
+    : 0;
+
+  const scrimStyle: React.CSSProperties = isIOS
+    ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: `rgba(0,0,0,${scrimOpacity})`,
+        pointerEvents: 'none',
+        zIndex: 1,
+        transition: isAnimating ? 'opacity 0.2s ease' : 'none',
+      }
+    : {};
+
+  return { containerStyle, scrimStyle };
 }

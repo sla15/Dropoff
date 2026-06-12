@@ -840,7 +840,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
                                     <div className="flex-1 py-1 min-w-0">
                                         <h4 className="font-bold truncate">{b.name}</h4>
                                         <p className={`text-xs ${textSec} truncate`}>{b.category} • {b.distance}</p>
-                                        <div className="flex items-center gap-1 mt-1 text-xs font-bold text-orange-500">
+                                        <div className="flex items-center gap-1 mt-1 text-xs font-bold text-[#00D68F]">
                                             <Star size={10} fill="currentColor" /> {b.rating}
                                         </div>
                                     </div>
@@ -898,7 +898,7 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
 
                     </div>
                     <div className={`mt-8 text-center text-xs ${textSec}`}>
-                        <p>Version 1.11.0-beta4 (Build 232)</p>
+                        <p>Version 1.11.0-beta5 (Build 235)</p>
                         <p className="text-[10px] opacity-20">© 2026 DROPOFF</p>
                     </div>
                 </Drawer>
