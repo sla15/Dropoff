@@ -14,6 +14,7 @@ import { RideStatusPanel } from '../components/Ride/RideStatusPanel';
 import { RideCancellationSummary } from '../components/Ride/RideCancellationSummary';
 import { RidePaymentSummary } from '../components/Ride/RidePaymentSummary';
 import { LocationSearchOverlay } from '../components/Ride/LocationSearchOverlay';
+import { RideIssueDrawer } from '../components/Ride/RideIssueDrawer';
 import { RequestErrorModal } from '../components/RequestErrorModal';
 import { LocationPermissionGate } from '../components/LocationPermissionGate';
 interface Props {
@@ -83,6 +84,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [showPaymentSummary, setShowPaymentSummary] = useState(false);
     const [showCancellationSummary, setShowCancellationSummary] = useState(false);
     const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+    const [searchOverlayFocus, setSearchOverlayFocus] = useState<'pickup' | 'destination'>('destination');
+    const [showIssueDrawer, setShowIssueDrawer] = useState(false);
+    const [lastRideIdForIssues, setLastRideIdForIssues] = useState<string | null>(null);
     const [isMinimalRating, setIsMinimalRating] = useState(false);
     const [isCalculating, setIsCalculating] = useState(false);
     const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
@@ -91,6 +95,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [locationMethod, setLocationMethod] = useState<'gps' | 'profile' | null>(null);
     const [currentRideId, setCurrentRideId] = useState<string | null>(null);
     const [isPriceErrorModalOpen, setIsPriceErrorModalOpen] = useState(false);
+    // Custom pickup location (null = use GPS)
+    const [pickupLocation, setPickupLocation] = useState<string>('Current Location');
+    const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
 
     // --- CHECK LOCATION PERMISSION on mount and whenever screen becomes active ---
     const checkLocationPermission = async () => {
@@ -650,7 +657,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     if (prefilledDistance) {
                         const directionsService = new (window as any).google.maps.DirectionsService();
                         directionsService.route({
-                            origin: userLocation || { lat: 13.4432, lng: -16.5916 },
+                            origin: pickupCoords || userLocation || { lat: 13.4432, lng: -16.5916 },
                             destination: loc,
                             travelMode: (window as any).google.maps.TravelMode.DRIVING
                         }, (result: any, routeStatus: string) => {
@@ -971,16 +978,17 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         console.log("Requesting Accurate Distance for:", validDestinations);
 
         // --- DISTANCE CACHING (7 DAYS) ---
-        const startAddr = userLocation || { lat: 13.4432, lng: -16.5916 };
+        const startAddr = pickupCoords || userLocation || { lat: 13.4432, lng: -16.5916 };
         const endAddr = validDestinations[validDestinations.length - 1];
 
         try {
             // 1. Check if we have coordinates for the final destination
             const finalCoord = destinationCoords[validDestinations.length - 1];
-            if (finalCoord && userLocation) {
+            const effectiveOrigin = pickupCoords || userLocation;
+            if (finalCoord && effectiveOrigin) {
                 const roundedOrigin = {
-                    lat: parseFloat(userLocation.lat.toFixed(4)),
-                    lng: parseFloat(userLocation.lng.toFixed(4))
+                    lat: parseFloat(effectiveOrigin.lat.toFixed(4)),
+                    lng: parseFloat(effectiveOrigin.lng.toFixed(4))
                 };
                 const roundedDest = {
                     lat: parseFloat(finalCoord.lat.toFixed(4)),
@@ -1012,7 +1020,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             const defaultCenter = { lat: user.last_lat || 13.4432, lng: user.last_lng || -16.5916 };
             const request: any = {
-                origin: userLocation || defaultCenter,
+                origin: pickupCoords || userLocation || defaultCenter,
                 destination: validDestinations[validDestinations.length - 1],
                 waypoints: validDestinations.length > 1
                     ? validDestinations.slice(0, -1).map(d => ({ location: d, stopover: true }))
@@ -1339,7 +1347,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
                     const categoryMap: Record<string, string> = { 'eco': 'economic', 'prem': 'premium', 'moto': 'scooter' };
                     const { data: nearbyDrivers } = await supabase.rpc('get_nearby_drivers', {
-                        user_lat: userLocation.lat, user_lng: userLocation.lng, radius_km: currentSearchRadius,
+                        user_lat: ride.pickup_lat || userLocation.lat,
+                        user_lng: ride.pickup_lng || userLocation.lng,
+                        radius_km: currentSearchRadius,
                         required_category: rideTypeRef.current === 'delivery' ? 'any' : (categoryMap[selectedTierRef.current] || 'economic')
                     });
 
@@ -1459,6 +1469,15 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     };
 
+    const handlePickupSelected = (address: string, coords: { lat: number; lng: number }) => {
+        setPickupLocation(address);
+        setPickupCoords(coords);
+        if (map) {
+            map.panTo(coords);
+            updateMarker(coords, undefined, map);
+        }
+    };
+
     const selectPrediction = (prediction: any) => {
         if (activeInputIndex === null) return;
 
@@ -1544,8 +1563,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 'moto': 'scooter'
             };
 
-            const pickup_lat = userLocation?.lat || user.last_lat;
-            const pickup_lng = userLocation?.lng || user.last_lng;
+            const pickup_lat = pickupCoords?.lat ?? userLocation?.lat ?? user.last_lat;
+            const pickup_lng = pickupCoords?.lng ?? userLocation?.lng ?? user.last_lng;
+            const pickup_address_label = pickupLocation || 'Current Location';
 
             if (!pickup_lat || !pickup_lng) {
                 showAlert("Location Missing", "We couldn't determine your pickup location. Please wait a moment or try again.", "error");
@@ -1567,7 +1587,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             const { data, error: insertError } = await supabase.from('rides').insert({
                 customer_id: session.user.id,
-                pickup_address: 'Current Location',
+                pickup_address: pickup_address_label,
                 pickup_lat,
                 pickup_lng,
                 dropoff_address: destinations[destinations.length - 1],
@@ -1692,6 +1712,11 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     const handleCancelRide = async () => {
         const wasActive = status === 'searching' || status === 'accepted' || status === 'arrived' || status === 'in-progress';
+        const isActiveBooking = wasActive && status !== 'searching'; // driver was already assigned
+        
+        if (currentRideId) {
+            setLastRideIdForIssues(currentRideId);
+        }
 
         if (status === 'searching') {
             // Explicitly notify parent to unlock navigation immediately
@@ -1731,18 +1756,26 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         setAssignedDriver(null);
         setRealDistanceKm(0);
         setEtaSeconds(300);
+        // Reset custom pickup back to GPS default
+        setPickupLocation('Current Location');
+        setPickupCoords(null);
 
         // 4. Conditional UI transition
-        if (wasActive && status !== 'searching') {
-            // Only show summary if it was an actual booking (accepted/etc)
-            // If it was just 'searching', just go back to idle
+        if (isActiveBooking) {
+            // Driver was assigned — show issue drawer first, then cancellation summary
             setStatus('cancelled');
-            setShowCancellationSummary(true);
             setIsMinimalRating(true);
+            setShowIssueDrawer(true);
         } else {
             setStatus('idle');
             navigate('dashboard');
         }
+    };
+
+    // Called when user taps Done in the RideIssueDrawer
+    const handleIssueDrawerClose = () => {
+        setShowIssueDrawer(false);
+        setShowCancellationSummary(true);
     };
 
     const completeTrip = () => {
@@ -1940,6 +1973,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     setBookingStep={setBookingStep}
                     handleLocateMe={handleLocateMe}
                     onSelectPrediction={selectPrediction}
+                    pickupLocation={pickupLocation}
+                    onPickupSelected={handlePickupSelected}
+                    initialFocus={searchOverlayFocus}
                 />
             )}
 
@@ -1962,7 +1998,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             {/* Bottom Card / Draggable Sheet */}
             <div
-                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white' : 'bg-[#1C1C1E]'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] min-h-[350px] transition-transform duration-300 ease-out`}
+                className={`absolute bottom-0 left-0 right-0 z-20 ${theme === 'light' ? 'bg-white/90' : 'bg-[#1C1C1E]/90'} backdrop-blur-3xl rounded-t-[2.5rem] shadow-[0_-10px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[88vh] min-h-[350px] transition-transform duration-300 ease-out`}
                 style={{
                     transform: sheetTransform,
                     transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)'
@@ -2012,11 +2048,19 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                             user={user}
                             settings={settings}
                             showAlert={showAlert}
-                            setShowSearchOverlay={setShowSearchOverlay}
+                            setShowSearchOverlay={(show) => {
+                                if (show) setSearchOverlayFocus('destination');
+                                setShowSearchOverlay(show);
+                            }}
                             distanceKm={realDistanceKm}
                             expandSheet={() => {
                                 setIsSheetMinimized(false);
                                 setSheetOffset(0);
+                            }}
+                            pickupLocation={pickupLocation}
+                            onChangePickup={() => {
+                                setSearchOverlayFocus('pickup');
+                                setShowSearchOverlay(true);
                             }}
                         />
                     )}
@@ -2039,6 +2083,16 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     )}
                 </div>
             </div>
+
+
+
+            {/* Issue Drawer — appears after customer cancels an active ride */}
+            <RideIssueDrawer
+                isOpen={showIssueDrawer}
+                onClose={handleIssueDrawerClose}
+                rideId={lastRideIdForIssues}
+                customerId={user.id}
+            />
 
             {showCancellationSummary && (
                 <RideCancellationSummary

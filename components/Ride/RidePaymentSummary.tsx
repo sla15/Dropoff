@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Check } from 'lucide-react';
 import { StarRating } from '../StarRating';
 import { UserData } from '../../types';
+import { RideIssueDrawer } from './RideIssueDrawer';
 
 interface RidePaymentSummaryProps {
     assignedDriver: any;
@@ -49,6 +50,7 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
     textSec,
     user
 }) => {
+    const [isIssueDrawerOpen, setIsIssueDrawerOpen] = useState(false);
     const priceInfo = calculatePrice(tiers.find(t => t.id === selectedTier)?.mult || 1);
     const charsLeft = 1000 - reviewComment.length;
 
@@ -115,14 +117,26 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
                     </button>
 
                     <button
+                        onClick={() => setIsIssueDrawerOpen(true)}
+                        className={`w-full py-2 rounded-2xl font-bold text-sm ${textSec} active:scale-95 transition-all text-center underline decoration-dashed underline-offset-4`}
+                    >
+                        Problem with the Ride?
+                    </button>
+
+                    <button
                         onClick={onReviewSkip}
                         disabled={loading}
-                        className={`w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-widest ${textSec} active:scale-95 transition-all text-center`}
+                        className={`w-full py-3 rounded-2xl font-bold text-xs uppercase tracking-widest ${textSec} active:scale-95 transition-all text-center opacity-70`}
                     >
                         Skip for Now
                     </button>
                 </div>
             </div>
+            
+            <RideIssueDrawer 
+                isOpen={isIssueDrawerOpen} 
+                onClose={() => setIsIssueDrawerOpen(false)} 
+            />
         </div>
     );
 };

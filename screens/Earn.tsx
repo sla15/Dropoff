@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Gift, Copy, Share2, Award, Sparkles, Users, ChevronRight } from 'lucide-react';
 import { Theme, Screen, Reward, AppSettings } from '../types';
 import { triggerHaptic } from '../utils/helpers';
@@ -41,6 +40,14 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
     const [referralBalance, setReferralBalance] = useState(0);
     const [activeRewards, setActiveRewards] = useState<Reward[]>([]);
     const [loading, setLoading] = useState(true);
+    const [headerHeight, setHeaderHeight] = useState(115);
+    const headerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (headerRef.current) {
+            setHeaderHeight(headerRef.current.offsetHeight);
+        }
+    }, []);
 
     const isDark = theme === 'dark';
     const bgMain = isDark ? 'bg-[#000000]' : 'bg-[#F2F2F7]';
@@ -139,14 +146,14 @@ export const EarnScreen = ({ theme, navigate, isScrolling, isNavVisible, handleS
     };
 
     return (
-        <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
+        <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
             {/* Header */}
-            <div className="pt-safe px-6 pb-4">
+            <div ref={headerRef} className={`absolute top-0 left-0 right-0 z-20 pt-safe px-6 pb-4 ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]'} border-b ${theme === 'light' ? 'border-gray-200/50' : 'border-white/5'} transition-all`}>
                 <h1 className="text-3xl font-black tracking-tight">Gifts &amp; Earn</h1>
                 <p className={`text-sm mt-1 font-medium ${textSec}`}>Share your code. Earn every time.</p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-32" onScroll={handleScroll}>
+            <div className="flex-1 overflow-y-auto px-6 pb-32" style={{ paddingTop: headerHeight }} onScroll={handleScroll}>
 
                 {/* ── Hero Invite Card (Apple-style tilt + premium shadow) ── */}
                 <div

@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Search, Star, Heart, RefreshCw } from 'lucide-react';
 import { Theme, Screen, Business, Category, UserData } from '../types';
 import { triggerHaptic, getInitialAvatar } from '../utils/helpers';
@@ -48,6 +48,14 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 
 export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user, onRefresh, isRefreshing }: Props) => {
    const [selectedCategory, setSelectedCategory] = useState('All');
+   const [headerHeight, setHeaderHeight] = useState(195);
+   const headerRef = useRef<HTMLDivElement>(null);
+
+   useEffect(() => {
+      if (headerRef.current) {
+         setHeaderHeight(headerRef.current.offsetHeight);
+      }
+   }, [searchQuery, selectedCategory]);
 
     // Pull-to-refresh state
     const [pullY, setPullY] = useState(0);
@@ -125,10 +133,10 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
    });
 
    return (
-      <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in`}>
-         <div className={`pt-safe px-6 pb-4 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-md z-10 sticky top-0 border-b ${theme === 'light' ? 'border-gray-200' : 'border-gray-800'}`}>
+      <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
+         <div ref={headerRef} className={`pt-safe px-6 pb-4 ${theme === 'light' ? 'bg-white' : 'bg-[#000000]'} z-20 absolute top-0 left-0 right-0 border-b ${theme === 'light' ? 'border-gray-200/50' : 'border-white/5'} transition-all`}>
             <h1 className="text-3xl font-black tracking-tight mb-4">Marketplace</h1>
-            <div className={`flex items-center gap-3 p-3 rounded-[22px] h-14 ${theme === 'light' ? 'bg-white border-none shadow-[0_12px_40px_rgba(0,0,0,0.06)] focus-within:shadow-[0_12px_40px_rgba(0,214,143,0.15)] focus-within:ring-2 focus-within:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/60 border border-white/5 shadow-lg focus-within:ring-2 focus-within:ring-[#00D68F]/30'} backdrop-blur-xl transition-all`}>
+            <div className={`flex items-center gap-3 p-3 rounded-[22px] h-14 ${theme === 'light' ? 'bg-white border-none shadow-[0_12px_40px_rgba(0,0,0,0.06)] focus-within:shadow-[0_12px_40px_rgba(0,214,143,0.15)] focus-within:ring-2 focus-within:ring-[#00D68F]/20' : 'bg-[#1C1C1E]/60 border border-white/5 shadow-lg focus-within:ring-2 focus-within:ring-[#00D68F]/30'} transition-all`}>
                <Search size={20} className={`${textSec} ml-2`} />
                <input
                   placeholder="Search for food, shops..."
@@ -153,7 +161,8 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
 
          <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto min-h-0 px-6 pt-4 pb-32 space-y-8"
+            className="flex-1 overflow-y-auto min-h-0 px-6 pb-32 space-y-8"
+            style={{ paddingTop: headerHeight + 16 }}
             onScroll={handleScroll}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}

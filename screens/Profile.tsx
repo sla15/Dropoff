@@ -130,6 +130,14 @@ const safeFormatPhone = (phoneStr: string) => {
 export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recentActivities, setRecentActivities, favorites, businesses, isScrolling, isNavVisible, setIsNavVisible, handleScroll, settings, showAlert, initialDrawer, clearInitialDrawer, handleLogout }: Props) => {
     const [activeDrawer, setActiveDrawer] = useState<DrawerType>('none');
     const [isClosing, setIsClosing] = useState(false);
+    const [headerHeight, setHeaderHeight] = useState(80);
+    const headerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (headerRef.current) {
+            setHeaderHeight(headerRef.current.offsetHeight);
+        }
+    }, []);
 
     useEffect(() => {
         if (initialDrawer && initialDrawer !== 'none') {
@@ -388,12 +396,11 @@ export const ProfileScreen = ({ theme, navigate, setScreen, user, setUser, recen
     return (
         <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
             {/* Fixed Header */}
-            {/* Fixed Header */}
-            <div className={`pt-safe px-6 pb-2 flex-shrink-0 ${bgMain}`} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <div ref={headerRef} className={`absolute top-0 left-0 right-0 z-20 pt-safe px-6 pb-3 ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-[#000000]'} border-b ${theme === 'light' ? 'border-gray-200/50' : 'border-white/5'} transition-all`}>
                 <h1 className="text-3xl font-black tracking-tight">Profile</h1>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar" onScroll={handleScroll}>
+            <div className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar" style={{ paddingTop: headerHeight }} onScroll={handleScroll}>
                 {/* --- HERO SECTION --- */}
                 <div className="flex flex-col items-center justify-center mb-8 mt-4 relative">
                     {/* Ambient Glow */}

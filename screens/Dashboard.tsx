@@ -77,6 +77,14 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const searchTimeout = useRef<any>(null);
   const sessionToken = useRef<any>(null);
+  const [headerHeight, setHeaderHeight] = useState(180);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (headerRef.current) {
+      setHeaderHeight(headerRef.current.offsetHeight);
+    }
+  }, [searchQuery, predictions.length, user.referralBalance, searchMode]);
 
   const EMOJIS = ['🏠', '💼', '🏋️', '🏫', '🌳', '🛍️', '🍽️', '🎾'];
   const LABELS = ['Home', 'Work', 'Gym', 'School', 'Park', 'Mall', 'Restaurant', 'Club'];
@@ -338,7 +346,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
 
   return (
     <div className={`h-full flex flex-col ${bgMain} ${textMain} relative overflow-hidden`}>
-      <div className={`pt-safe px-6 pb-6 z-10 flex flex-col gap-6 ${theme === 'light' ? 'bg-white' : 'bg-black'} backdrop-blur-sm transition-all`}>
+      <div ref={headerRef} className={`absolute top-0 left-0 right-0 z-20 flex flex-col gap-6 ${theme === 'light' ? 'bg-white' : 'bg-[#000000]'} border-b ${theme === 'light' ? 'border-gray-200/50' : 'border-white/5'} pt-safe px-6 pb-6 transition-all`}>
         <div className="flex justify-between items-center mt-2">
           <div id="walkthrough-profile" className="flex items-center gap-3">
             <div className="relative">
@@ -455,7 +463,7 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
         )}
       </div>
 
-      <div className="flex-1 px-5 pt-4 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" onScroll={handleScroll}>
+      <div className="flex-1 px-5 flex flex-col gap-8 overflow-y-auto min-h-0 pb-40" style={{ paddingTop: headerHeight + 16 }} onScroll={handleScroll}>
         {/* ── Hero Cards: side-by-side on wide, swipeable carousel on narrow ── */}
         <div className="w-full relative">
           {/* Wide layout (≥ 480px) */}
@@ -463,23 +471,25 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
             {/* Ride Card */}
             <div id="walkthrough-ride-card" onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.3)] dark:shadow-[0_30px_50px_-20px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
               <div className="absolute inset-0 bg-[#00D68F]/20 blur-3xl rounded-[32px] opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none"></div>
-              <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
+              <img src="/assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
                 <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.5)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
                 <h2 className="text-2xl font-black text-white tracking-tighter">Ride & Delivery</h2>
-                <p className="text-[10px] uppercase font-bold text-white/80 tracking-[0.15em] flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+                <p className="text-xs text-white/90 font-bold mt-1 max-w-[200px] leading-tight ml-auto">Get a ride or send packages instantly</p>
+                <p className="text-[10px] uppercase font-black text-[#00D68F] tracking-[0.15em] flex items-center justify-end gap-1 mt-2"><MapPin size={10} /> {user.location || 'Locating...'}</p>
               </div>
             </div>
             {/* Marketplace Card */}
             <div id="walkthrough-marketplace-card" onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.3)] dark:shadow-[0_30px_50px_-20px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
               <div className="absolute inset-0 bg-[#FF9500]/20 blur-3xl rounded-[32px] opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none"></div>
-              <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
+              <img src="/assets/market_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
                 <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.5)] transition-transform group-hover:scale-110"><ShoppingBag size={20} /></div></div>
                 <h2 className="text-2xl font-black text-white tracking-tighter">Market</h2>
-                <p className="text-[10px] uppercase font-bold text-white/80 tracking-[0.15em]">Premium Shops</p>
+                <p className="text-xs text-white/90 font-bold mt-1 max-w-[200px] leading-tight ml-auto">Shop from your favorite local stores</p>
+                <p className="text-[10px] uppercase font-black text-[#FF9500] tracking-[0.15em] mt-2">Premium Shops</p>
               </div>
             </div>
           </div>
@@ -501,12 +511,13 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 onClick={() => navigate('ride')}
                 className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}
               >
-                <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=800&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
+                <img src="/assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-6 right-6 text-right z-10">
                   <div className="flex justify-end mb-3"><div className="w-12 h-12 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_20px_rgba(0,214,143,0.4)]"><Car size={24} /></div></div>
                   <h2 className="text-3xl font-black text-white tracking-tighter mb-0.5">Ride & Delivery</h2>
-                  <p className="text-[10px] uppercase font-bold text-white/80 tracking-[0.15em] flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
+                  <p className="text-xs text-white/90 font-bold mb-1.5 max-w-[220px] leading-tight ml-auto">Get a ride or send packages instantly</p>
+                  <p className="text-[10px] uppercase font-black text-[#00D68F] tracking-[0.15em] flex items-center justify-end gap-1"><MapPin size={10} /> {user.location || 'Locating...'}</p>
                 </div>
               </div>
               {/* Marketplace Card */}
@@ -514,12 +525,13 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                 onClick={() => navigate('marketplace')}
                 className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}
               >
-                <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=80" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
+                <img src="/assets/market_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-6 right-6 text-right z-10">
                   <div className="flex justify-end mb-3"><div className="w-12 h-12 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_20px_rgba(255,149,0,0.4)]"><ShoppingBag size={24} /></div></div>
                   <h2 className="text-3xl font-black text-white tracking-tighter mb-0.5">Market</h2>
-                  <p className="text-[10px] uppercase font-bold text-white/80 tracking-[0.15em]">Premium Shops</p>
+                  <p className="text-xs text-white/90 font-bold mb-1.5 max-w-[220px] leading-tight ml-auto">Shop from your favorite local stores</p>
+                  <p className="text-[10px] uppercase font-black text-[#FF9500] tracking-[0.15em]">Premium Shops</p>
                 </div>
               </div>
             </div>

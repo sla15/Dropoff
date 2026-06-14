@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Locate, MapPin as MapPinFilled, Plus, Trash, X, Info, Car, Bike, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Locate, MapPin as MapPinFilled, Plus, Trash, X, Info, Car, Bike, Search, Pencil } from 'lucide-react';
 import { Theme, UserData, AppSettings } from '../../types';
 import { Skeleton } from '../Skeleton';
 
@@ -38,6 +38,9 @@ interface RideBookingFormProps {
     expandSheet?: () => void;
     setShowSearchOverlay: (show: boolean) => void;
     distanceKm?: number;
+    // Pickup location
+    pickupLocation?: string;
+    onChangePickup?: () => void;
 }
 
 export const RideBookingForm: React.FC<RideBookingFormProps> = ({
@@ -74,7 +77,9 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
     showAlert,
     expandSheet,
     setShowSearchOverlay,
-    distanceKm = 0
+    distanceKm = 0,
+    pickupLocation = 'Current Location',
+    onChangePickup
 }) => {
     const minFare = rideType === 'delivery' ? settings.min_delivery_fee : settings.min_ride_price;
 
@@ -101,14 +106,24 @@ export const RideBookingForm: React.FC<RideBookingFormProps> = ({
                     </div>
 
                     <div className="space-y-4">
-                        <div className="relative flex items-center gap-3">
+                        {/* Pickup Row — tappable to choose custom pickup */}
+                        <button
+                            onClick={() => { triggerHaptic(); onChangePickup?.(); }}
+                            className={`relative w-full flex items-center gap-3 text-left active:scale-[0.98] transition-all`}
+                        >
                             <div className="w-10 h-10 rounded-full bg-[#00D68F]/10 flex items-center justify-center flex-shrink-0">
                                 <Locate size={18} className="text-[#00D68F]" />
                             </div>
-                            <div className={`flex-1 p-3.5 rounded-xl ${inputBg} font-medium text-sm ${textSec} flex items-center justify-between`}>
-                                <span>Current Location</span>
+                            <div className={`flex-1 p-3.5 rounded-xl ${inputBg} font-medium text-sm flex items-center justify-between gap-2`}>
+                                <span className={`truncate ${pickupLocation === 'Current Location' ? textSec : (theme === 'light' ? 'text-black' : 'text-white')}`}>
+                                    {pickupLocation}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <Pencil size={12} className="text-[#00D68F] opacity-70" />
+                                    <span className="text-[10px] font-bold text-[#00D68F] uppercase tracking-wide">Change</span>
+                                </div>
                             </div>
-                        </div>
+                        </button>
 
                         {/* Summarized View for Overlay Trigger */}
                         <div

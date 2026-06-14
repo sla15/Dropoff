@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Star, Bike, Car } from 'lucide-react';
 import { UserData, RideStatus } from '../../types';
+import { SlideButton } from './SlideButton';
 
 interface RideStatusPanelProps {
     status: RideStatus;
@@ -94,6 +95,19 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Cancel Slide Button — shown once a driver is assigned (accepted/arrived/in-progress) */}
+            {(status === 'accepted' || status === 'arrived' || status === 'in-progress') && (
+                <div className="mt-4 px-2 animate-scale-in">
+                    <SlideButton
+                        label={rideType === 'delivery' ? 'Slide to Cancel Delivery' : 'Slide to Cancel Ride'}
+                        description="Slide fully to cancel"
+                        onSlideComplete={handleCancelRide}
+                        activeColor="#EF4444"
+                        baseColor="bg-red-50 dark:bg-red-900/10"
+                    />
                 </div>
             )}
 

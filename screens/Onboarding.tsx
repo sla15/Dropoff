@@ -1163,6 +1163,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
                            />
                         </div>
                      </div>
+
+                     {/* Dynamic spacer to allow scrolling above soft keyboard */}
+                     <div style={{ height: keyboardHeight > 0 ? keyboardHeight : 0, transition: 'height 0.3s ease' }} />
                   </div>
                </div>
             </div>
