@@ -23,6 +23,8 @@ interface Props {
     goBack: () => void;
     setRecentActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
     user: UserData;
+    prefilledPickup?: string | null;
+    prefilledPickupCoords?: { lat: number; lng: number } | null;
     prefilledDestination?: string | null;
     prefilledTier?: string | null;
     prefilledDistance?: number | null;
@@ -45,7 +47,7 @@ interface Props {
     indexLocation?: { lat: number, lng: number } | null;
 }
 
-export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation }: Props) => {
+export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledPickup, prefilledPickupCoords, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
     const [driverCancelledModal, setDriverCancelledModal] = useState(false);
     const [driverCancelledName, setDriverCancelledName] = useState('');
@@ -96,8 +98,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [currentRideId, setCurrentRideId] = useState<string | null>(null);
     const [isPriceErrorModalOpen, setIsPriceErrorModalOpen] = useState(false);
     // Custom pickup location (null = use GPS)
-    const [pickupLocation, setPickupLocation] = useState<string>('Current Location');
-    const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+    const [pickupLocation, setPickupLocation] = useState<string>(prefilledPickup || 'Current Location');
+    const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(prefilledPickupCoords || null);
 
     // --- CHECK LOCATION PERMISSION on mount and whenever screen becomes active ---
     const checkLocationPermission = async () => {
@@ -190,6 +192,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [activeInputIndex, setActiveInputIndex] = useState<number | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [destinationCoords, setDestinationCoords] = useState<({ lat: number, lng: number } | null)[]>([]);
+    const [savedLocations, setSavedLocations] = useState<any[]>([]);
     const [realDistanceKm, setRealDistanceKm] = useState<number>(prefilledDistance || 0);
     const [searchRadius, setSearchRadius] = useState(5);
     const searchIntervalRef = useRef<any>(null);
@@ -204,6 +207,36 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
         };
     }, []);
+
+    useEffect(() => {
+        const fetchSavedLocations = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+                const { data, error } = await supabase
+                    .from('user_saved_locations')
+                    .select('*')
+                    .eq('user_id', session.user.id);
+                if (error) throw error;
+                if (data) {
+                    setSavedLocations(data);
+                }
+            } catch (err) {
+                console.error("Ride Screen: Error fetching saved locations:", err);
+            }
+        };
+        fetchSavedLocations();
+    }, [user.id]);
+
+    const handleSelectSavedLocation = (address: string, coords: { lat: number; lng: number }) => {
+        updateDestination(0, address);
+        const newCoords = [...destinationCoords];
+        newCoords[0] = coords;
+        setDestinationCoords(newCoords);
+        if (map) {
+            map.panTo(coords);
+        }
+    };
 
     // 🔒 Refs that mirror state — used inside subscription/polling closures to avoid stale reads
     // Declared AFTER all state so there are no forward-reference issues.
@@ -839,7 +872,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
                 // ETA Logic for assigned driver - Throttled to 30s to save cost
                 if (d.id === assignedDriverId && userLocation) {
-                    setAssignedDriver(d);
+                    // MERGE position-only fields into the existing assignedDriver object.
+                    // This preserves phone, name, and other profile data fetched on 'accepted',
+                    // which live in 'profiles' and are NOT present in the raw 'drivers' row.
+                    setAssignedDriver((prev: any) => prev
+                        ? { ...prev, current_lat: d.current_lat, current_lng: d.current_lng, heading: d.heading }
+                        : d
+                    );
                     const now = Date.now();
                     if (now - lastEtaUpdateRef.current > 30000) {
                         lastEtaUpdateRef.current = now;
@@ -2062,6 +2101,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                                 setSearchOverlayFocus('pickup');
                                 setShowSearchOverlay(true);
                             }}
+                            savedLocations={savedLocations}
+                            onSelectSavedLocation={handleSelectSavedLocation}
                         />
                     )}
 
@@ -2092,6 +2133,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 onClose={handleIssueDrawerClose}
                 rideId={lastRideIdForIssues}
                 customerId={user.id}
+                driverId={assignedDriverId}
             />
 
             {showCancellationSummary && (

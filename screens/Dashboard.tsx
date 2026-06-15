@@ -27,6 +27,8 @@ interface Props {
   setPrefilledDestination: (dest: string | null) => void;
   setPrefilledTier: (tier: string | null) => void;
   setPrefilledDistance: (dist: number | null) => void;
+  setPrefilledPickup: (pickup: string | null) => void;
+  setPrefilledPickupCoords: (coords: { lat: number; lng: number } | null) => void;
   setMarketSearchQuery: (q: string) => void;
   settings: AppSettings;
   showAlert: (
@@ -50,7 +52,7 @@ interface Props {
 
 
 
-export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen, isActivitiesLoading, isFavoritesLoading, locationPromptDone }: Props) => {
+export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setPrefilledPickup, setPrefilledPickupCoords, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen, isActivitiesLoading, isFavoritesLoading, locationPromptDone }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -693,6 +695,11 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                         </button>
                       </div>
                     </div>
+                    {activity.pickup_address && (
+                      <p className={`text-[11px] ${textSec} font-medium mt-0.5 truncate`}>
+                        <span className="text-[#00D68F] font-bold">Pick up:</span> {activity.pickup_address}
+                      </p>
+                    )}
                     <p className={`text-[11px] ${textSec} tracking-wide font-medium mt-0.5 truncate`}>{activity.subtitle} • {activity.date}</p>
                   </div>
                 </div>
@@ -710,6 +717,15 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                           setPrefilledDestination(activity.title);
                           const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
                           setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
+                          if (activity.distance_km !== undefined) {
+                            setPrefilledDistance(activity.distance_km);
+                          }
+                          if (activity.pickup_address) {
+                            setPrefilledPickup(activity.pickup_address);
+                          }
+                          if (activity.pickup_lat !== undefined && activity.pickup_lng !== undefined) {
+                            setPrefilledPickupCoords({ lat: activity.pickup_lat, lng: activity.pickup_lng });
+                          }
                           navigate('ride');
                         } else {
                           navigate('marketplace');

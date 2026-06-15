@@ -118,6 +118,8 @@ export interface AppSettings {
   price_per_km: number;
   price_per_stop: number;
   waiting_fee_per_min: number;
+  penalty_rating_threshold: number;
+  penalty_commission_percentage: number;
   min_app_version?: string;
   latest_app_version?: string;
   update_url_android?: string;

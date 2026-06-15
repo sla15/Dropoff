@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Star, Bike, Car } from 'lucide-react';
+import { User, Star, Bike, Car, Phone, MessageSquare } from 'lucide-react';
 import { UserData, RideStatus } from '../../types';
 import { SlideButton } from './SlideButton';
 
@@ -94,6 +94,59 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Driver Contact Buttons */}
+                        {assignedDriver && (
+                            <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/10">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Phone size={13} className="text-[#00D68F]" />
+                                        <span className={`text-sm font-bold tracking-tight`}>
+                                            {assignedDriver.phone || 'No number on file'}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {assignedDriver.phone ? (
+                                            <>
+                                                <a
+                                                    href={`tel:${assignedDriver.phone}`}
+                                                    id="driver-call-btn"
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00D68F] text-black font-bold text-xs active:scale-95 transition-transform shadow-sm shadow-[#00D68F]/30"
+                                                >
+                                                    <Phone size={13} />
+                                                    Call
+                                                </a>
+                                                <a
+                                                    href={`sms:${assignedDriver.phone}?body=Hi, I'm your passenger. I'm waiting for you!`}
+                                                    id="driver-sms-btn"
+                                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs active:scale-95 transition-transform shadow-sm ${theme === 'light' ? 'bg-[#E5E5EA] text-[#000]' : 'bg-[#3A3A3C] text-white'}`}
+                                                >
+                                                    <MessageSquare size={13} />
+                                                    Text
+                                                </a>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span
+                                                    id="driver-call-btn"
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-300/50 dark:bg-gray-700/50 text-gray-400 font-bold text-xs cursor-not-allowed"
+                                                >
+                                                    <Phone size={13} />
+                                                    Call
+                                                </span>
+                                                <span
+                                                    id="driver-sms-btn"
+                                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-300/50 dark:bg-gray-700/50 text-gray-400 font-bold text-xs cursor-not-allowed"
+                                                >
+                                                    <MessageSquare size={13} />
+                                                    Text
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

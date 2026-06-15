@@ -1,60 +1,84 @@
 -- 1. Fix user_activities table
 ALTER TABLE public.user_activities ADD COLUMN IF NOT EXISTS reference_id UUID;
 
--- 2. Update log_user_activity to store reference_id
+-- 2. Update log_user_activity to store reference_id and pickup details
 CREATE OR REPLACE FUNCTION public.log_user_activity()
 RETURNS trigger AS $$
+DECLARE
+  v_user_id uuid;
+  v_type text;
+  v_title text;
+  v_subtitle text;
+  v_price numeric;
+  v_status text;
+  v_ref_id uuid;
+  v_distance numeric;
+  v_pickup_address text;
+  v_pickup_lat numeric;
+  v_pickup_lng numeric;
+  v_dropoff_lat numeric;
+  v_dropoff_lng numeric;
+  v_requested_vehicle_type text;
 BEGIN
-    IF (TG_TABLE_NAME = 'rides') THEN
-        IF (NEW.status = 'completed') THEN
-            INSERT INTO public.user_activities (user_id, price, status, type, title, subtitle, reference_id)
-            VALUES (
-                NEW.customer_id, 
-                NEW.price, 
-                'completed', 
-                'ride', 
-                NEW.dropoff_address, 
-                COALESCE(NEW.requested_vehicle_type::text, 'Economic'),
-                NEW.id
-            );
-        ELSIF (NEW.status = 'cancelled') THEN
-             INSERT INTO public.user_activities (user_id, price, status, type, title, subtitle, reference_id)
-            VALUES (
-                NEW.customer_id, 
-                0, 
-                'cancelled', 
-                'ride', 
-                NEW.dropoff_address, 
-                COALESCE(NEW.requested_vehicle_type::text, 'Economic'),
-                NEW.id
-            );
-        END IF;
-    ELSIF (TG_TABLE_NAME = 'orders') THEN
-        IF (NEW.status = 'completed') THEN
-            INSERT INTO public.user_activities (user_id, price, status, type, title, subtitle, reference_id)
-            VALUES (
-                NEW.customer_id, 
-                NEW.total_amount, 
-                'completed', 
-                'order', 
-                'Marketplace Order', 
-                'ID: ' || substring(NEW.id::text from 1 for 8),
-                NEW.id
-            );
-        ELSIF (NEW.status = 'cancelled') THEN
-            INSERT INTO public.user_activities (user_id, price, status, type, title, subtitle, reference_id)
-            VALUES (
-                NEW.customer_id, 
-                0, 
-                'cancelled', 
-                'order', 
-                'Marketplace Order', 
-                'ID: ' || substring(NEW.id::text from 1 for 8),
-                NEW.id
-            );
-        END IF;
+  v_ref_id := NEW.id;
+  v_status := LOWER(NEW.status::text);
+  
+  IF TG_TABLE_NAME = 'rides' THEN
+    v_user_id := NEW.customer_id;
+    v_price := NEW.price;
+    v_distance := NEW.distance_km;
+    v_pickup_address := NEW.pickup_address;
+    v_pickup_lat := NEW.pickup_lat;
+    v_pickup_lng := NEW.pickup_lng;
+    v_dropoff_lat := NEW.dropoff_lat;
+    v_dropoff_lng := NEW.dropoff_lng;
+    v_requested_vehicle_type := NEW.requested_vehicle_type::text;
+    
+    IF NEW.ride_type = 'delivery' THEN
+      v_type := 'delivery';
+    ELSE
+      v_type := 'ride';
     END IF;
-    RETURN NEW;
+
+    v_type := v_type || '_' || v_status;
+    
+    v_title := COALESCE(NEW.dropoff_address, 'Ride to Unknown');
+    v_subtitle := INITCAP(v_status) || ' • ' || TO_CHAR(NEW.created_at, 'DD Mon, HH24:MI');
+    
+  ELSIF TG_TABLE_NAME = 'orders' THEN
+    v_user_id := NEW.customer_id;
+    v_price := NEW.total_amount;
+    v_type := 'order_' || v_status;
+    v_title := 'Order from ' || COALESCE((SELECT name FROM businesses WHERE id = NEW.business_id), 'Market');
+    v_subtitle := INITCAP(v_status) || ' • ' || TO_CHAR(NEW.created_at, 'DD Mon, HH24:MI');
+  END IF;
+
+  IF v_status IN ('completed', 'cancelled') THEN
+    INSERT INTO public.user_activities (
+      user_id, type, title, subtitle, price, status, reference_id, distance_km,
+      pickup_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, requested_vehicle_type
+    ) VALUES (
+      v_user_id, v_type, COALESCE(v_title, 'Activity'), COALESCE(v_subtitle, 'Updated'), 
+      COALESCE(v_price, 0), v_status, v_ref_id, v_distance,
+      v_pickup_address, v_pickup_lat, v_pickup_lng, v_dropoff_lat, v_dropoff_lng, v_requested_vehicle_type
+    )
+    ON CONFLICT (reference_id) DO UPDATE SET
+      type = EXCLUDED.type,
+      title = EXCLUDED.title,
+      subtitle = EXCLUDED.subtitle,
+      price = EXCLUDED.price,
+      status = EXCLUDED.status,
+      distance_km = EXCLUDED.distance_km,
+      pickup_address = EXCLUDED.pickup_address,
+      pickup_lat = EXCLUDED.pickup_lat,
+      pickup_lng = EXCLUDED.pickup_lng,
+      dropoff_lat = EXCLUDED.dropoff_lat,
+      dropoff_lng = EXCLUDED.dropoff_lng,
+      requested_vehicle_type = EXCLUDED.requested_vehicle_type,
+      created_at = NOW();
+  END IF;
+
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 

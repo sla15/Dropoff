@@ -7,9 +7,10 @@ interface RideIssueDrawerProps {
     onClose: () => void;
     rideId?: string | null;
     customerId?: string | null;
+    driverId?: string | null;
 }
 
-export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClose, rideId, customerId }) => {
+export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClose, rideId, customerId, driverId }) => {
     const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -27,6 +28,7 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
     const categories = [
         {
             title: "My initiative",
+            isDriverAction: false,
             items: [
                 { id: "found_another_ride", label: "Found another ride", emoji: "🚗" },
                 { id: "plans_changed", label: "Plans changed", emoji: "🗓️" },
@@ -35,6 +37,7 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
         },
         {
             title: "Driver's actions",
+            isDriverAction: true,
             items: [
                 { id: "asked_to_cancel", label: "Asked to cancel", emoji: "🚫" },
                 { id: "rude_behavior", label: "Rude behavior", emoji: "🤬" },
@@ -52,6 +55,7 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
         },
         {
             title: "Service issues",
+            isDriverAction: false,
             items: [
                 { id: "drivers_rating", label: "Driver's rating", emoji: "⭐️" },
                 { id: "ride_price", label: "Ride price", emoji: "💵" },
@@ -75,8 +79,28 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
                 if (error) {
                     console.error("Error saving cancellation reasons:", error);
                 }
+
+                const driverActionCategory = categories.find(c => c.title === "Driver's actions");
+                const hasDriverIssue = selectedIssues.some(issueId => 
+                    driverActionCategory?.items.some(item => item.id === issueId)
+                );
+
+                if (hasDriverIssue && driverId) {
+                    const { data: driver } = await supabase
+                        .from('drivers')
+                        .select('average_rating')
+                        .eq('id', driverId)
+                        .single();
+
+                    if (driver) {
+                        await supabase
+                            .from('drivers')
+                            .update({ average_rating: Math.max(0, driver.average_rating - 0.5) })
+                            .eq('id', driverId);
+                    }
+                }
             } catch (err) {
-                console.error("Failed to save cancellation reasons:", err);
+                console.error("Failed to process cancellation:", err);
             } finally {
                 setIsSaving(false);
             }
@@ -108,9 +132,16 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
                 <div className="flex-1 overflow-y-auto px-6 pt-4 pb-28 hide-scrollbar">
                     {categories.map((category, idx) => (
                         <div key={idx} className="mb-6">
-                            <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">
-                                {category.title}
-                            </h3>
+                            <div className="flex items-center gap-2 mb-3">
+                                <h3 className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                    {category.title}
+                                </h3>
+                                {category.isDriverAction && (
+                                    <span className="text-[10px] font-black bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                        ⚠️ Affects Rating
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {category.items.map(item => {
                                     const isSelected = selectedIssues.includes(item.id);
@@ -120,7 +151,9 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
                                             onClick={() => toggleIssue(item.id)}
                                             className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 active:scale-95
                                                 ${isSelected 
-                                                    ? 'bg-[#00D68F] text-black shadow-md scale-[1.02] border border-transparent' 
+                                                    ? category.isDriverAction
+                                                        ? 'bg-red-500 text-white shadow-md shadow-red-500/30 scale-[1.02] border border-transparent'
+                                                        : 'bg-[#00D68F] text-black shadow-md scale-[1.02] border border-transparent'
                                                     : 'bg-black/5 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/50 dark:border-gray-800/50 hover:bg-black/10 dark:hover:bg-white/10'
                                                 }`}
                                         >

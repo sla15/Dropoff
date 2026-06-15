@@ -35,6 +35,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
+import { Badge } from '@capawesome/capacitor-badge';
 import { Loader2, WifiOff, RefreshCcw, AlertTriangle } from 'lucide-react';
 import { logError, setupGlobalErrorHandlers } from './utils/logger';
 // --- END API INITIALIZATION ---
@@ -143,6 +144,8 @@ const App = () => {
   const [prefilledDestination, setPrefilledDestination] = useState<string | null>(null);
   const [prefilledTier, setPrefilledTier] = useState<string | null>(null);
   const [prefilledDistance, setPrefilledDistance] = useState<number | null>(null);
+  const [prefilledPickup, setPrefilledPickup] = useState<string | null>(null);
+  const [prefilledPickupCoords, setPrefilledPickupCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [marketSearchQuery, setMarketSearchQuery] = useState('');
 
   const [modalConfig, setModalConfig] = useState<{
@@ -327,7 +330,9 @@ const App = () => {
     multiplier_economy: 1.0,
     multiplier_premium: 1.5,
     price_per_km: 40,
-    waiting_fee_per_min: 0.5
+    waiting_fee_per_min: 0.5,
+    penalty_rating_threshold: 4.0,
+    penalty_commission_percentage: 20.0
   });
 
   const [businesses, setBusinesses] = useState<Business[]>(INITIAL_BUSINESSES);
@@ -650,8 +655,9 @@ const App = () => {
         'pending_gift_card'
       ];
       keysToClear.forEach(key => localStorage.removeItem(key));
-      // Clear cached profile from Preferences
+      // Clear cached profile and favorites from Preferences
       Preferences.remove({ key: 'cached_user_profile' }).catch(() => {});
+      Preferences.remove({ key: 'cached_favorites' }).catch(() => {});
       
       // 4. Reset Navigation
       setScreen('onboarding');
@@ -669,7 +675,12 @@ const App = () => {
     setIsFavoritesLoading(true);
     try {
       const { data, error } = await supabase.from('user_favorite_businesses').select('business_id').eq('user_id', userId);
-      if (data && !error) setFavorites(data.map(f => f.business_id));
+      if (data && !error) {
+        const ids = data.map(f => f.business_id);
+        setFavorites(ids);
+        // 💾 Persist to device storage so favorites load instantly next time
+        Preferences.set({ key: 'cached_favorites', value: JSON.stringify(ids) }).catch(() => {});
+      }
     } catch (err) { console.error(err); }
     finally { setIsFavoritesLoading(false); }
   };
@@ -694,7 +705,14 @@ const App = () => {
           date: new Date(a.created_at).toLocaleDateString(),
           created_at: a.created_at,
           status: a.status as 'completed' | 'cancelled',
-          reference_id: a.reference_id
+          reference_id: a.reference_id,
+          distance_km: a.distance_km ? Number(a.distance_km) : undefined,
+          pickup_address: a.pickup_address,
+          pickup_lat: a.pickup_lat ? Number(a.pickup_lat) : undefined,
+          pickup_lng: a.pickup_lng ? Number(a.pickup_lng) : undefined,
+          dropoff_lat: a.dropoff_lat ? Number(a.dropoff_lat) : undefined,
+          dropoff_lng: a.dropoff_lng ? Number(a.dropoff_lng) : undefined,
+          requested_vehicle_type: a.requested_vehicle_type
         }));
 
         setRecentActivities(formattedActivities);
@@ -868,8 +886,8 @@ const App = () => {
         try {
           console.log("🚀 Init: Start...");
 
-          // 0. Immediately load cached profile from Preferences
-          // This guarantees the user's name/photo are visible even before any network call.
+          // 0. Immediately load cached profile & favorites from Preferences
+          // This guarantees the user's name/photo/favorites are visible even before any network call.
           try {
             const { value: cachedProfile } = await Preferences.get({ key: 'cached_user_profile' });
             if (cachedProfile) {
@@ -881,6 +899,20 @@ const App = () => {
             }
           } catch (e) {
             console.warn("🚀 Init: Failed to restore cached profile:", e);
+          }
+
+          // 💾 Restore cached favorites instantly (before any network call)
+          try {
+            const { value: cachedFavs } = await Preferences.get({ key: 'cached_favorites' });
+            if (cachedFavs) {
+              const parsed = JSON.parse(cachedFavs);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log("🚀 Init: Restoring", parsed.length, "cached favorites");
+                setFavorites(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("🚀 Init: Failed to restore cached favorites:", e);
           }
 
           // 1. Critical Session Check - FIRST priority
@@ -1009,6 +1041,7 @@ const App = () => {
     CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive) {
         FirebaseMessaging.removeAllDeliveredNotifications().catch(() => {});
+        Badge.clear().catch(() => {});
         console.log("📱 App Resumed: verifying and refreshing session...");
         
         // Explicitly force a session refresh. This prevents the auto-refresh lock 
@@ -1159,11 +1192,21 @@ const App = () => {
 
     if (favorites.includes(bizId)) {
       const { error } = await supabase.from('user_favorite_businesses').delete().eq('user_id', session.user.id).eq('business_id', bizId);
-      if (!error) setFavorites(prev => prev.filter(f => f !== bizId));
+      if (!error) {
+        const updated = favorites.filter(f => f !== bizId);
+        setFavorites(updated);
+        // 💾 Keep device cache in sync
+        Preferences.set({ key: 'cached_favorites', value: JSON.stringify(updated) }).catch(() => {});
+      }
     } else {
       if (favorites.length >= 6) { alert("Limit reached!"); return; }
       const { error } = await supabase.from('user_favorite_businesses').insert({ user_id: session.user.id, business_id: bizId });
-      if (!error) setFavorites(prev => [...prev, bizId]);
+      if (!error) {
+        const updated = [...favorites, bizId];
+        setFavorites(updated);
+        // 💾 Keep device cache in sync
+        Preferences.set({ key: 'cached_favorites', value: JSON.stringify(updated) }).catch(() => {});
+      }
     }
   };
   const renderScreen = () => {
@@ -1189,8 +1232,9 @@ const App = () => {
         setPrefilledDestination={setPrefilledDestination}
         setPrefilledTier={setPrefilledTier}
         setPrefilledDistance={setPrefilledDistance}
+        setPrefilledPickup={setPrefilledPickup}
+        setPrefilledPickupCoords={setPrefilledPickupCoords}
         setMarketSearchQuery={setMarketSearchQuery}
-
         settings={settings}
         showAlert={showAlert}
         activeOrderId={activeOrderId}
@@ -1236,10 +1280,18 @@ const App = () => {
               goBack={goBack}
               setRecentActivities={setRecentActivities}
               user={user}
+              prefilledPickup={prefilledPickup}
+              prefilledPickupCoords={prefilledPickupCoords}
               prefilledDestination={prefilledDestination}
               prefilledTier={prefilledTier}
               prefilledDistance={prefilledDistance}
-              clearPrefilled={() => { setPrefilledDestination(null); setPrefilledTier(null); setPrefilledDistance(null); }}
+              clearPrefilled={() => { 
+                setPrefilledDestination(null); 
+                setPrefilledTier(null); 
+                setPrefilledDistance(null); 
+                setPrefilledPickup(null); 
+                setPrefilledPickupCoords(null); 
+              }}
               active={screen === 'ride'}
               handleScroll={handleScroll}
               settings={settings}

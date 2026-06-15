@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
+import { Badge } from '@capawesome/capacitor-badge';
 import { supabase } from "../supabaseClient";
 import { CONFIG as APP_CONFIG } from "../config";
 
@@ -99,6 +100,7 @@ const initNativePush = async (userId?: string) => {
         FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
             console.log('🔔 FCM: Notification tapped:', event.notification?.title);
             FirebaseMessaging.removeAllDeliveredNotifications().catch(() => {});
+            Badge.clear().catch(() => {});
             if (event.notification?.data) {
                 window.dispatchEvent(new CustomEvent('notification_tapped', { detail: event.notification.data }));
             }
