@@ -86,16 +86,16 @@ export const RideIssueDrawer: React.FC<RideIssueDrawerProps> = ({ isOpen, onClos
                 );
 
                 if (hasDriverIssue && driverId) {
-                    const { data: driver } = await supabase
-                        .from('drivers')
+                    const { data: driverProfile } = await supabase
+                        .from('profiles')
                         .select('average_rating')
                         .eq('id', driverId)
                         .single();
 
-                    if (driver) {
+                    if (driverProfile) {
                         await supabase
-                            .from('drivers')
-                            .update({ average_rating: Math.max(0, driver.average_rating - 0.5) })
+                            .from('profiles')
+                            .update({ average_rating: Math.max(0, Number(driverProfile.average_rating || 5.0) - 0.5) })
                             .eq('id', driverId);
                     }
                 }

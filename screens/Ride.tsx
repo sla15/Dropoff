@@ -47,6 +47,17 @@ interface Props {
     indexLocation?: { lat: number, lng: number } | null;
 }
 
+const calculateProximity = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
 export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledPickup, prefilledPickupCoords, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
     const [driverCancelledModal, setDriverCancelledModal] = useState(false);
@@ -77,6 +88,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [ridePayMethod, setRidePayMethod] = useState<'cash' | 'wave'>('wave');
     const [etaSeconds, setEtaSeconds] = useState(300);
     const [rating, setRating] = useState(5);
+    const [acTurnedOn, setAcTurnedOn] = useState<boolean | null>(null);
     const [reviewComment, setReviewComment] = useState('');
     const [bookingStep, setBookingStep] = useState<'planning' | 'selecting'>('planning');
     const mapPinsRef = useRef<{ x: number, y: number, label?: string }[]>([]);
@@ -100,6 +112,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     // Custom pickup location (null = use GPS)
     const [pickupLocation, setPickupLocation] = useState<string>(prefilledPickup || 'Current Location');
     const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(prefilledPickupCoords || null);
+    const [onlineDrivers, setOnlineDrivers] = useState<any[]>([]);
 
     // --- CHECK LOCATION PERMISSION on mount and whenever screen becomes active ---
     const checkLocationPermission = async () => {
@@ -165,12 +178,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     }, [active]);
 
-    // Tiers Definition
-    const tiers = [
-        { id: 'eco', label: 'Economy', mult: Number(settings.multiplier_economy) || 1, time: '3 min', icon: Car, img: '/assets/white_yaris_side.png', desc: '4 seats' },
-        { id: 'prem', label: 'AC', mult: Number(settings.multiplier_premium) || 1.8, time: '5 min', icon: Car, img: '/assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
-        { id: 'moto', label: 'Bike', mult: Number(settings.multiplier_scooter) || 0.6, time: '2 min', icon: Bike, img: '/assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
-    ];
+
 
     // Animation States
     const [driverPos, setDriverPos] = useState({ x: 80, y: 10 });
@@ -201,6 +209,37 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const lastBroadcastRef = useRef<number>(0);    // Timestamp of last GPS broadcast received (suppresses duplicate postgres_changes render)
     const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const fallbackAppliedRef = useRef(false);
+
+    // Nearby Drivers Counting Logic
+    const getNearbyCount = (category: string) => {
+        const center = pickupCoords || userLocation;
+        if (!center) return 0;
+        const radius = settings.driver_search_radius_km || 15;
+        return onlineDrivers.filter(d => {
+            const cat = d.vehicle_category || 'economic';
+            const matchesCategory = (category === 'eco' && cat === 'economic') ||
+                                    (category === 'prem' && cat === 'premium') ||
+                                    (category === 'moto' && cat === 'scooter');
+            if (!matchesCategory) return false;
+            if (typeof d.current_lat !== 'number' || typeof d.current_lng !== 'number') return false;
+            const dist = calculateProximity(center.lat, center.lng, d.current_lat, d.current_lng);
+            return dist <= radius;
+        }).length;
+    };
+
+    const getNearbyDriversText = (category: string) => {
+        const count = getNearbyCount(category);
+        if (count === 0) return 'No drivers nearby';
+        if (count === 1) return '1 driver nearby';
+        return `${count} drivers nearby`;
+    };
+
+    // Tiers Definition
+    const tiers = [
+        { id: 'eco', label: 'Economy', mult: Number(settings.multiplier_economy) || 1, time: getNearbyDriversText('eco'), icon: Car, img: '/assets/white_yaris_side.png', desc: '4 seats' },
+        { id: 'prem', label: 'AC', mult: Number(settings.multiplier_premium) || 1.8, time: getNearbyDriversText('prem'), icon: Car, img: '/assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
+        { id: 'moto', label: 'Bike', mult: Number(settings.multiplier_scooter) || 0.6, time: getNearbyDriversText('moto'), icon: Bike, img: '/assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
+    ];
 
     useEffect(() => {
         return () => {
@@ -916,7 +955,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             } else {
                 // Regular free-roam viewing
                 const { data } = await supabase.from('drivers').select('*').eq('is_online', true);
-                if (data) refreshMarkers(data);
+                if (data) {
+                    setOnlineDrivers(data);
+                    refreshMarkers(data);
+                }
             }
         };
 
@@ -963,6 +1005,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 if (!isRequestActive || payload.id === assignedDriverId) {
                     lastBroadcastRef.current = Date.now(); // Mark so postgres_changes skips its fetch
                     refreshMarkers([payload]);
+                    if (!isRequestActive) {
+                        setOnlineDrivers(prev => {
+                            const index = prev.findIndex(d => d.id === payload.id);
+                            if (index >= 0) {
+                                const next = [...prev];
+                                next[index] = { ...next[index], ...payload };
+                                return next;
+                            } else {
+                                return [...prev, payload];
+                            }
+                        });
+                    }
                 }
             })
             .subscribe();
@@ -977,16 +1031,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         };
     }, [map, status, assignedDriverId]);
 
-    const calculateProximity = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        const R = 6371; // km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    };
+
 
     const sendPush = (title: string, message: string) => {
         sendPushNotification(title, message);
@@ -1847,6 +1892,25 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
             if (reviewError) throw reviewError;
 
+            // Apply AC Penalty deduction if applicable (deduct 0.5 from driver's average rating in profiles)
+            if (selectedTier === 'prem' && acTurnedOn === false && assignedDriverId) {
+                const { data: driverProfile } = await supabase
+                    .from('profiles')
+                    .select('average_rating')
+                    .eq('id', assignedDriverId)
+                    .single();
+
+                if (driverProfile) {
+                    const currentRating = Number(driverProfile.average_rating) || 5.0;
+                    const newRating = Math.max(0, currentRating - 0.5);
+
+                    await supabase
+                        .from('profiles')
+                        .update({ average_rating: newRating })
+                        .eq('id', assignedDriverId);
+                }
+            }
+
             // 3. Deduct Referral Balance if used
             if (amountUsed > 0) {
                 await supabase.rpc('deduct_referral_balance', {
@@ -1892,6 +1956,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     const finalizeTripCleanup = () => {
         setRating(5);
+        setAcTurnedOn(null);
         setCurrentRideId(null);
         setStatus('idle');
         setAssignedDriverId(null);
@@ -2253,6 +2318,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     assignedDriver={assignedDriver}
                     rating={rating}
                     setRating={setRating}
+                    acTurnedOn={acTurnedOn}
+                    setAcTurnedOn={setAcTurnedOn}
                     reviewComment={reviewComment}
                     setReviewComment={setReviewComment}
                     calculatePrice={calculatePrice}

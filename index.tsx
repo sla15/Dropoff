@@ -116,8 +116,21 @@ const App = () => {
   }, [theme, isNative]);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSplashActive, setIsSplashActive] = useState(true);
+  const [isSplashExiting, setIsSplashExiting] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const isOfflineRef = useRef(false); // Mirror for closures
+
+  // Synchronized X/Twitter splash exit timer
+  useEffect(() => {
+    if (!isLoading) {
+      setIsSplashExiting(true);
+      const timer = setTimeout(() => {
+        setIsSplashActive(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
   const [screen, setScreenState] = useState<Screen>('splash');
   const screenRef = useRef<Screen>('splash');
   const setScreen = (scr: Screen | ((prev: Screen) => Screen)) => {
@@ -1212,7 +1225,7 @@ const App = () => {
   const renderScreen = () => {
     switch (screen || 'splash') {
 
-      case 'splash': return <SplashScreen theme={theme} />;
+      case 'splash': return <SplashScreen theme={theme} isExiting={isSplashExiting} />;
       case 'onboarding': return <OnboardingScreen theme={theme} navigate={navigate} setUser={setUser} showAlert={showAlert} />;
       case 'dashboard': return <DashboardScreen
         user={user}
@@ -1250,15 +1263,15 @@ const App = () => {
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
       case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} handleLogout={handleLogout} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
-      default: return <SplashScreen theme={theme} />;
+      default: return <SplashScreen theme={theme} isExiting={isSplashExiting} />;
     }
 
   };
 
   return (
     <div className={`flex h-[100dvh] w-full ${theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-black'} transition-colors overflow-hidden`}>
-      {isLoading && <SplashScreen theme={theme} />}
-      <div className={`flex-1 relative flex justify-center bg-gray-100 dark:bg-black/50 overflow-hidden ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
+      {isSplashActive && <SplashScreen theme={theme} isExiting={isSplashExiting} />}
+      <div className={`flex-1 relative flex justify-center bg-gray-100 dark:bg-black/50 overflow-hidden ${isLoading ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'} transition-all duration-[800ms] cubic-bezier(0.25, 1, 0.5, 1)`}>
         <div className={`w-full h-full ${theme === 'light' ? 'bg-white/95' : 'bg-black/95'} relative overflow-hidden`}>
           <div key={screen} className="h-full w-full animate-scale-in">
             {screen && renderScreen()}

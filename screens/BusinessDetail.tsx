@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2, Phone } from 'lucide-react';
 import { Theme, Screen, Business, Product, CartItem } from '../types';
 import { triggerHaptic, getInitialAvatar, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
@@ -209,6 +209,20 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                                 <span className="opacity-30 mx-1">•</span>
                                 <span className={`uppercase tracking-widest text-[10px] font-black ${theme === 'light' ? 'text-[#00D68F]' : 'text-[#00D68F]'}`}>{selectedBusiness.category}</span>
                             </div>
+                            {selectedBusiness.phone && (
+                                <a
+                                    href={`tel:${selectedBusiness.phone}`}
+                                    onClick={(e) => { e.stopPropagation(); triggerHaptic(); }}
+                                    className={`inline-flex items-center gap-2 mt-1 px-3 py-1.5 rounded-full text-xs font-black transition-all active:scale-95 ${
+                                        theme === 'light'
+                                            ? 'bg-[#00D68F]/10 text-[#00D68F] border border-[#00D68F]/20 hover:bg-[#00D68F]/20'
+                                            : 'bg-[#00D68F]/10 text-[#00D68F] border border-[#00D68F]/20 hover:bg-[#00D68F]/20'
+                                    }`}
+                                >
+                                    <Phone size={11} strokeWidth={2.5} />
+                                    <span>{selectedBusiness.phone}</span>
+                                </a>
+                            )}
                         </div>
                     </div>
 

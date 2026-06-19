@@ -8,6 +8,8 @@ interface RidePaymentSummaryProps {
     assignedDriver: any;
     rating: number;
     setRating: (rating: number) => void;
+    acTurnedOn: boolean | null;
+    setAcTurnedOn: (val: boolean | null) => void;
     reviewComment: string;
     setReviewComment: (c: string) => void;
     calculatePrice: (multiplier: number) => { originalPrice: number; finalPrice: number; amountUsed: number };
@@ -36,6 +38,8 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
     assignedDriver,
     rating,
     setRating,
+    acTurnedOn,
+    setAcTurnedOn,
     reviewComment,
     setReviewComment,
     calculatePrice,
@@ -77,6 +81,41 @@ export const RidePaymentSummary: React.FC<RidePaymentSummaryProps> = ({
                 <div className="flex justify-center mb-5">
                     <StarRating rating={rating} setRating={setRating} size={36} />
                 </div>
+
+                {selectedTier === 'prem' && (
+                    <div className="mb-5 flex flex-col items-center">
+                        <p className={`text-sm ${textSec} font-bold mb-3`}>Did the driver turn on the AC?</p>
+                        <div className="flex gap-4 w-full px-4">
+                            <button
+                                type="button"
+                                onClick={() => setAcTurnedOn(true)}
+                                className={`flex-1 py-3 rounded-2xl font-bold text-sm transition-all duration-200 active:scale-95 border ${
+                                    acTurnedOn === true
+                                        ? 'bg-[#00D68F]/20 border-[#00D68F] text-[#00D68F]'
+                                        : 'bg-transparent border-gray-200 dark:border-gray-800 text-gray-500'
+                                }`}
+                            >
+                                Yes 👍
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAcTurnedOn(false)}
+                                className={`flex-1 py-3 rounded-2xl font-bold text-sm transition-all duration-200 active:scale-95 border ${
+                                    acTurnedOn === false
+                                        ? 'bg-red-500/20 border-red-500 text-red-500'
+                                        : 'bg-transparent border-gray-200 dark:border-gray-800 text-gray-500'
+                                }`}
+                            >
+                                No 👎
+                            </button>
+                        </div>
+                        {acTurnedOn === false && (
+                            <p className="text-xs text-red-500 font-semibold mt-2 text-center px-4">
+                                ⚠️ A 0.5 rating deduction will be applied to the driver.
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 {/* Optional comment — sanitized, not required */}
                 <div className="mb-5 relative">
