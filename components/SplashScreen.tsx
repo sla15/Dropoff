@@ -19,7 +19,7 @@ export const SplashScreen = ({ theme, isExiting = false }: SplashScreenProps) =>
             <img
               src="assets/Code_Generated_Image.png"
               alt="Logo"
-              className="w-[50vw] h-[50vw] max-w-[320px] max-h-[320px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)]"
+              className="w-[65vw] max-w-[340px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)]"
             />
           </div>
 

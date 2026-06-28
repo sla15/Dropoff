@@ -814,6 +814,10 @@ const App = () => {
           }
           return true;
         } else {
+          if (isOfflineRef.current) {
+            console.warn("👤 Profile fetch failed or returned empty while offline — ignoring onboarding redirect.");
+            return false;
+          }
           console.warn("👤 No profile found for authenticated user");
           setScreen('onboarding');
           return false;
@@ -854,15 +858,27 @@ const App = () => {
                .then(({ data: profile, error }) => {
                  if (error) {
                     console.error("Error fetching profile during auth change:", error);
-                    setScreen('onboarding');
+                    if (isOfflineRef.current) {
+                       setScreen('dashboard');
+                    } else {
+                       setScreen('onboarding');
+                    }
                  } else if (profile && profile.full_name && profile.phone) {
+                    setScreen('dashboard');
+                 } else {
+                    if (isOfflineRef.current) {
+                       setScreen('dashboard');
+                    } else {
+                       setScreen('onboarding');
+                    }
+                 }
+               }, (err: any) => {
+                 console.error("Exception fetching profile during auth change:", err);
+                 if (isOfflineRef.current) {
                     setScreen('dashboard');
                  } else {
                     setScreen('onboarding');
                  }
-               }, (err: any) => {
-                 console.error("Exception fetching profile during auth change:", err);
-                 setScreen('onboarding');
                });
           }
           handleUserAuthenticated(session).catch(err => console.error("Background sync error:", err)); // Sync in background
@@ -994,10 +1010,18 @@ const App = () => {
                console.error("🚀 Init: Background sync failed:", err);
             });
           } else {
-            console.log("🚀 Init: No session recovered, heading to onboarding");
-            if (!hasDeterminedDestRef.current) {
-              setScreen('onboarding');
+            // Check if offline and we have a cached profile (previously logged in)
+            const { value: hasLoggedIn } = await Preferences.get({ key: 'has_ever_logged_in' });
+            if (isOfflineRef.current && hasLoggedIn === 'true') {
+              console.log("🚀 Init: Offline but previously logged in. Bypassing onboarding, heading to dashboard.");
+              setScreen('dashboard');
               markDestDetermined();
+            } else {
+              console.log("🚀 Init: No session recovered, heading to onboarding");
+              if (!hasDeterminedDestRef.current) {
+                setScreen('onboarding');
+                markDestDetermined();
+              }
             }
           }
 
@@ -1060,12 +1084,22 @@ const App = () => {
           // Refresh the JWT first (it may have expired while offline)
           await supabase.auth.refreshSession().catch(() => {});
           const { data: { session } } = await supabase.auth.getSession();
+
+          // Re-fetch general configurations & business listings
+          fetchSettings();
+          fetchBusinesses();
+          fetchCategories();
+
           if (session) {
             console.log("🌐 Network restore: session valid, reloading profile...");
             // Await the sync to ensure profile is loaded before moving on
             await handleUserAuthenticated(session).catch(err =>
               console.warn("🌐 Network restore profile sync failed:", err)
             );
+            // Re-fetch user activities and favorites
+            fetchFavorites(session.user.id);
+            fetchActivities(session.user.id);
+
             // Reconnect Realtime channels that may have dropped
             try {
               supabase.realtime.disconnect();
@@ -1305,7 +1339,7 @@ const App = () => {
       />;
       case 'marketplace': return <MarketplaceScreen theme={theme} navigate={navigate} businesses={businesses} categories={categories} setSelectedBusiness={setSelectedBusiness} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} toggleFavorite={toggleFavorite} favorites={favorites} searchQuery={marketSearchQuery} setSearchQuery={setMarketSearchQuery} showAlert={showAlert} user={user} onRefresh={async () => { setIsRefreshingMarket(true); try { await fetchBusinesses(); } finally { setIsRefreshingMarket(false); } }} isRefreshing={isRefreshingMarket} />;
       case 'earn': return <EarnScreen theme={theme} navigate={navigate} isScrolling={isScrolling} isNavVisible={isNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} />;
-      case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} />;
+      case 'business-detail': return <BusinessDetailScreen theme={theme} navigate={navigate} goBack={goBack} selectedBusiness={selectedBusiness} cart={cart} setCart={setCart} showAlert={showAlert} isOffline={isOffline} />;
       case 'checkout': return <CheckoutScreen theme={theme} navigate={navigate} goBack={goBack} cart={cart} setCart={setCart} user={user} settings={settings} showAlert={showAlert} setActiveOrderId={setActiveOrderId} setActiveBatchId={setActiveBatchId} activeOrderId={activeOrderId} activeBatchId={activeBatchId} />;
       case 'profile': return <ProfileScreen theme={theme} navigate={navigate} setScreen={setScreen} user={user} setUser={setUser} recentActivities={recentActivities} setRecentActivities={setRecentActivities} favorites={favorites} businesses={businesses} isScrolling={isScrolling} isNavVisible={isNavVisible} setIsNavVisible={setIsNavVisible} handleScroll={handleScroll} settings={settings} showAlert={showAlert} initialDrawer={profileDrawerToOpen} clearInitialDrawer={() => setProfileDrawerToOpen('none')} handleLogout={handleLogout} />;
       case 'order-tracking': return <OrderTrackingScreen theme={theme} navigate={navigate} user={user} setRecentActivities={setRecentActivities} showAlert={showAlert} activeOrderId={activeOrderId} setActiveOrderId={setActiveOrderId} activeBatchId={activeBatchId} setActiveBatchId={setActiveBatchId} />;
@@ -1358,6 +1392,7 @@ const App = () => {
               showAlert={showAlert}
               onSearchingChange={handleSetIsRideSearching}
               indexLocation={userLocation}
+              isOffline={isOffline}
             />
           </div>
         </div>
@@ -1369,7 +1404,7 @@ const App = () => {
         <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1C1C1E] border-b border-white/10 animate-slide-down">
           <WifiOff size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-xs font-semibold text-white/80 tracking-wide">
-            You're not online — no activities can be done.
+            You are currently offline, please connect to the internet.
           </p>
         </div>
       )}

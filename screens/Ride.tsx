@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2, WifiOff } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
 import { triggerHaptic, sendPushNotification, friendlyError } from '../utils/helpers';
 
@@ -46,6 +46,7 @@ interface Props {
     ) => void;
     onSearchingChange?: (searching: boolean) => void;
     indexLocation?: { lat: number, lng: number } | null;
+    isOffline?: boolean;
 }
 
 const calculateProximity = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -59,7 +60,7 @@ const calculateProximity = (lat1: number, lon1: number, lat2: number, lon2: numb
     return R * c;
 };
 
-export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledPickup, prefilledPickupCoords, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation }: Props) => {
+export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user, prefilledPickup, prefilledPickupCoords, prefilledDestination, prefilledTier, prefilledDistance, clearPrefilled, active, handleScroll, settings, refreshSettings, showAlert, onSearchingChange, indexLocation, isOffline }: Props) => {
     const [status, setStatus] = useState<RideStatus>('idle');
     const [driverCancelledModal, setDriverCancelledModal] = useState(false);
     const [driverCancelledName, setDriverCancelledName] = useState('');
@@ -1114,7 +1115,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             supabase.removeChannel(broadcastChannel);
             gpsChannelRef.current = null;
         };
-    }, [map, status, assignedDriverId]);
+    }, [map, status, assignedDriverId, isOffline]);
 
 
 
@@ -1150,6 +1151,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     //   2. postgres_changes on 'drivers' table   — fallback for DB-only updates
 
     const calculateRouteAndPrice = async (): Promise<boolean> => {
+        if (isOffline) {
+            showAlert("Offline Mode", "You are currently offline, please connect to the internet.", "error");
+            return false;
+        }
         if (!map || directionsRenderer === null || destinations.every(d => !d)) return false;
 
         if (prefilledDistance) {
@@ -1521,6 +1526,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         // 2. The Heartbeat Pulse (Authoritative polling + Search logic)
         const heartbeat = setInterval(async () => {
+            if (isOffline) return;
             try {
                 const { data: ride } = await supabase.from('rides').select('*').eq('id', currentRideId).single();
                 if (!ride) {
@@ -1600,7 +1606,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             supabase.removeChannel(channel);
             clearInterval(heartbeat);
         };
-    }, [currentRideId, status]);
+    }, [currentRideId, status, isOffline]);
 
 
 
@@ -1893,6 +1899,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
         if (user.location && destinations[destinations.length - 1].toLowerCase().trim() === user.location.toLowerCase().trim()) {
             showAlert("Invalid Location", "Destination cannot be your current location!", "error");
+            return;
+        }
+        if (isOffline) {
+            showAlert("Offline Mode", "You are currently offline, please connect to the internet.", "error");
             return;
         }
         handleBookRide();
@@ -2227,6 +2237,16 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 </div>
 
                 <div className="flex-1 overflow-y-auto min-h-0 p-6 pt-2 pb-safe" onScroll={handleScroll}>
+                    {isOffline && (
+                        <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500">
+                            <WifiOff size={20} className="flex-shrink-0 animate-pulse" />
+                            <div className="flex-1">
+                                <p className="text-sm font-bold leading-snug">You are currently offline</p>
+                                <p className="text-xs font-semibold opacity-80 leading-normal">Please connect to the internet.</p>
+                            </div>
+                        </div>
+                    )}
+
                     {status === 'idle' && (
                         <RideBookingForm
                             theme={theme}

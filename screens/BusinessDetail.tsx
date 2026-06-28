@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2, Phone } from 'lucide-react';
+import { ArrowLeft, Star, Plus, ThumbsUp, MessageCircle, Loader2, Phone, WifiOff } from 'lucide-react';
 import { Theme, Screen, Business, Product, CartItem } from '../types';
 import { triggerHaptic, getInitialAvatar, friendlyError } from '../utils/helpers';
 import { supabase } from '../supabaseClient';
 import { StarRating } from '../components/StarRating';
 import { useIOSSwipeBack } from '../utils/useIOSSwipeBack';
+import { Preferences } from '@capacitor/preferences';
 
 interface Props {
     theme: Theme;
@@ -24,9 +25,10 @@ interface Props {
         cancelText?: string,
         onCancel?: () => void
     ) => void;
+    isOffline?: boolean;
 }
 
-export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness, cart, setCart, showAlert }: Props) => {
+export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness, cart, setCart, showAlert, isOffline }: Props) => {
     const [selectedFilter, setSelectedFilter] = useState('All');
     const [realReviews, setRealReviews] = useState<any[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
@@ -71,6 +73,34 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
         }
     }, [selectedBusiness]);
 
+    // 💾 Load cached products on mount (allows instant offline loading if previously visited)
+    React.useEffect(() => {
+        if (selectedBusiness) {
+            Preferences.get({ key: `cached_products_${selectedBusiness.id}` }).then(({ value }) => {
+                if (value) {
+                    try {
+                        const parsed = JSON.parse(value);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            console.log(`🚀 Loaded ${parsed.length} cached products for business ${selectedBusiness.id}`);
+                            setProducts(parsed);
+                        }
+                    } catch (e) {
+                        console.warn("Error parsing cached products", e);
+                    }
+                }
+            }).catch(() => {});
+        }
+    }, [selectedBusiness]);
+
+    // 🌐 Re-fetch products/reviews when coming back online
+    React.useEffect(() => {
+        if (!isOffline && selectedBusiness) {
+            console.log("🌐 BusinessDetailScreen: connection back, refreshing items...");
+            fetchProducts();
+            fetchReviews();
+        }
+    }, [isOffline, selectedBusiness]);
+
     const fetchProducts = async () => {
         if (!selectedBusiness) return;
         setLoadingProducts(true);
@@ -83,7 +113,7 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                 .order('name', { ascending: true });
 
             if (data && !error) {
-                setProducts(data.map((p: any) => ({
+                const mappedProducts = data.map((p: any) => ({
                     id: p.id,
                     name: p.name,
                     price: p.price,
@@ -92,7 +122,13 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                     stock: p.stock,
                     mainCategory: p.category,
                     categories: [p.category]
-                })));
+                }));
+                setProducts(mappedProducts);
+                // Save to local device cache
+                Preferences.set({
+                    key: `cached_products_${selectedBusiness.id}`,
+                    value: JSON.stringify(mappedProducts)
+                }).catch(() => {});
             }
         } catch (err) {
             console.error("Fetch Products Error:", err);
@@ -191,6 +227,16 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
 
                 <div className={`min-h-[calc(100vh-100px)] ${bgMain} rounded-t-[40px] shadow-[0_-12px_40px_rgba(0,0,0,0.5)] flex flex-col pb-32 relative pointer-events-auto`}>
 
+                    {isOffline && (
+                        <div className="mx-6 mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500">
+                            <WifiOff size={20} className="flex-shrink-0 animate-pulse" />
+                            <div className="flex-1">
+                                <p className="text-sm font-bold leading-snug">You are currently offline</p>
+                                <p className="text-xs font-semibold opacity-80 leading-normal">Please connect to the internet.</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Business Info Section - Now inside the scroll flow! */}
                     <div className="px-8 pt-8 pb-4">
                         <div className="flex flex-col gap-2">
@@ -269,7 +315,14 @@ export const BusinessDetailScreen = ({ theme, navigate, goBack, selectedBusiness
                             <div className="flex items-center justify-between mb-6 px-2">
                                 <h2 className="font-bold text-xl">Reviews <span className={`text-sm ${textSec} font-normal`}>({realReviews.length})</span></h2>
                                 <button
-                                    onClick={() => { triggerHaptic(); setShowReviewModal(true); }}
+                                    onClick={() => {
+                                        triggerHaptic();
+                                        if (isOffline) {
+                                            showAlert("Offline Mode", "You are currently offline, please connect to the internet.", "error");
+                                            return;
+                                        }
+                                        setShowReviewModal(true);
+                                    }}
                                     className="text-[#00D68F] font-bold text-sm bg-[#00D68F]/10 px-4 py-2 rounded-full active:scale-95 transition-transform"
                                 >
                                     Write a Review
