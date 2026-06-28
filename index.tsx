@@ -67,6 +67,12 @@ const App = () => {
     }
   }, []);
 
+  // 🚀 Hide native splash screen on mount to transition directly into the React animated splash screen
+  useEffect(() => {
+    if (isNative) {
+      NativeSplashScreen.hide().catch(() => {});
+    }
+  }, [isNative]);
 
   // 🌓 Theme Management (Apple-style)
   const [theme, setThemeState] = useState<Theme>('dark');
@@ -833,7 +839,7 @@ const App = () => {
 
     const initializeApp = async () => {
       setIsLoading(true);
-      const minTime = new Promise(resolve => setTimeout(resolve, 2000)); 
+      const minTime = new Promise(resolve => setTimeout(resolve, 2800)); 
       const safetyTimeout = new Promise(resolve => setTimeout(resolve, 15000));
 
       const hasDeterminedDestRef = { current: false }; // Use local ref-like object for boot closure
@@ -1401,7 +1407,10 @@ const App = () => {
 
       {/* Connectivity Banner (Offline) — slim top bar, non-blocking like Uber */}
       {isOffline && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1C1C1E] border-b border-white/10 animate-slide-down">
+        <div 
+          className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 px-4 pb-2.5 bg-[#1C1C1E] border-b border-white/10 animate-slide-down"
+          style={{ paddingTop: 'calc(var(--safe-area-inset-top, 0px) + 0.6rem)' }}
+        >
           <WifiOff size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-xs font-semibold text-white/80 tracking-wide">
             You are currently offline, please connect to the internet.
