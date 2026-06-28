@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck, Phone } from 'lucide-react';
+import { Sun, Moon, Search, Car, MapPin, ShoppingBag, Star, Trash, Trash2, X, Plus, ArrowRight, Loader2, Map as MapIcon, Gift, Truck, Phone, Package, User, Check, AlertCircle } from 'lucide-react';
 import { Theme, Screen, UserData, Activity, Business, SavedLocation, AppSettings } from '../types';
 import { triggerHaptic, friendlyError } from '../utils/helpers';
 
@@ -54,6 +54,11 @@ interface Props {
 
 export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAssistant, favorites, businesses, recentActivities, setRecentActivities, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, setPrefilledDestination, setPrefilledTier, setPrefilledDistance, setPrefilledPickup, setPrefilledPickupCoords, setMarketSearchQuery, settings, showAlert, activeOrderId, activeBatchId, setIsNavVisible, setProfileDrawerToOpen, isActivitiesLoading, isFavoritesLoading, locationPromptDone }: Props) => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+  const [forgotRide, setForgotRide] = useState<any>(null);
+  const [forgotDriver, setForgotDriver] = useState<any>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotReporting, setForgotReporting] = useState(false);
+  const [forgotDone, setForgotDone] = useState(false);
   const [placeholderText, setPlaceholderText] = useState("Where to?");
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -87,6 +92,15 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
       setHeaderHeight(headerRef.current.offsetHeight);
     }
   }, [searchQuery, predictions.length, user.referralBalance, searchMode]);
+
+  // Hide Bottom Navigation menu when Forgot Something modal is open
+  useEffect(() => {
+    if (forgotRide) {
+      setIsNavVisible(false);
+    } else {
+      setIsNavVisible(true);
+    }
+  }, [forgotRide, setIsNavVisible]);
 
   const EMOJIS = ['🏠', '💼', '🏋️', '🏫', '🌳', '🛍️', '🍽️', '🎾'];
   const LABELS = ['Home', 'Work', 'Gym', 'School', 'Park', 'Mall', 'Restaurant', 'Club'];
@@ -163,6 +177,34 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
     }
   };
 
+
+  const handleForgotCall = async () => {
+    if (!forgotRide || !forgotDriver) return;
+    setForgotReporting(true);
+    try {
+      // 1. Log report to Supabase
+      await supabase.from('lost_item_reports').insert({
+        customer_id: user.id,
+        customer_name: user.name || 'Unknown',
+        driver_id: forgotDriver.id,
+        driver_name: forgotDriver.name,
+        driver_phone: forgotDriver.phone,
+        ride_id: forgotRide.reference_id,
+        status: 'pending',
+        reported_at: new Date().toISOString(),
+      });
+
+      // 2. Dial the driver's phone number
+      window.location.href = `tel:${forgotDriver.phone}`;
+      setForgotDone(true);
+    } catch (err) {
+      console.error('Error logging report:', err);
+      window.location.href = `tel:${forgotDriver.phone}`;
+      setForgotDone(true);
+    } finally {
+      setForgotReporting(false);
+    }
+  };
 
   const handleDeleteActivity = async (activity: Activity, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -471,9 +513,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           {/* Wide layout (≥ 480px) */}
           <div className="hidden min-[480px]:grid grid-cols-2 gap-6 relative">
             {/* Ride Card */}
-            <div id="walkthrough-ride-card" onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(0,214,143,0.3)] dark:shadow-[0_30px_50px_-20px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <div id="walkthrough-ride-card" onClick={() => navigate('ride')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-none cursor-pointer border border-black/5 dark:border-white/10`}>
               <div className="absolute inset-0 bg-[#00D68F]/20 blur-3xl rounded-[32px] opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none"></div>
-              <img src="/assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
+              <img src="assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Car" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
                 <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(0,214,143,0.5)] transition-transform group-hover:scale-110"><Car size={20} /></div></div>
@@ -483,9 +525,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               </div>
             </div>
             {/* Marketplace Card */}
-            <div id="walkthrough-marketplace-card" onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] hover:shadow-[0_30px_50px_-15px_rgba(255,149,0,0.3)] dark:shadow-[0_30px_50px_-20px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}>
+            <div id="walkthrough-marketplace-card" onClick={() => navigate('marketplace')} className={`col-span-1 h-56 ${bgCard} rounded-[32px] relative overflow-hidden group active:scale-[0.96] hover:-translate-y-1 transition-all duration-400 shadow-none cursor-pointer border border-black/5 dark:border-white/10`}>
               <div className="absolute inset-0 bg-[#FF9500]/20 blur-3xl rounded-[32px] opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none"></div>
-              <img src="/assets/market_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
+              <img src="assets/market_card.png" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Market" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
               <div className="absolute bottom-5 right-5 text-right z-10 filter drop-shadow-md">
                 <div className="flex justify-end mb-2"><div className="w-10 h-10 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_16px_rgba(255,149,0,0.5)] transition-transform group-hover:scale-110"><ShoppingBag size={20} /></div></div>
@@ -511,9 +553,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               {/* Ride Card */}
               <div
                 onClick={() => navigate('ride')}
-                className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}
+                className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-none cursor-pointer border border-black/5 dark:border-white/10`}
               >
-                <img src="/assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
+                <img src="assets/ride_delivery_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Car" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-6 right-6 text-right z-10">
                   <div className="flex justify-end mb-3"><div className="w-12 h-12 rounded-full bg-[#00D68F] flex items-center justify-center text-black shadow-[0_8px_20px_rgba(0,214,143,0.4)]"><Car size={24} /></div></div>
@@ -525,9 +567,9 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
               {/* Marketplace Card */}
               <div
                 onClick={() => navigate('marketplace')}
-                className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-[0_16px_30px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-15px_rgba(0,0,0,1)] cursor-pointer border border-black/5 dark:border-white/10`}
+                className={`snap-center flex-shrink-0 w-[88vw] h-[220px] ${bgCard} rounded-[32px] relative overflow-hidden active:scale-[0.97] transition-all duration-300 shadow-none cursor-pointer border border-black/5 dark:border-white/10`}
               >
-                <img src="/assets/market_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
+                <img src="assets/market_card.png" className="absolute inset-0 w-full h-full object-cover" alt="Market" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"></div>
                 <div className="absolute bottom-6 right-6 text-right z-10">
                   <div className="flex justify-end mb-3"><div className="w-12 h-12 rounded-full bg-[#FF9500] flex items-center justify-center text-black shadow-[0_8px_20px_rgba(255,149,0,0.4)]"><ShoppingBag size={24} /></div></div>
@@ -709,33 +751,105 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
                   className={`grid transition-all duration-300 ease-in-out ${expandedActivity === activity.id ? 'grid-rows-[1fr] opacity-100 mt-3' : 'grid-rows-[0fr] opacity-0 mt-0'}`}
                 >
                   <div className="overflow-hidden">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        triggerHaptic();
-                        if (activity.type.startsWith('ride') || activity.type.startsWith('delivery')) {
-                          setPrefilledDestination(activity.title);
-                          const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
-                          setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
-                          if (activity.distance_km !== undefined) {
-                            setPrefilledDistance(activity.distance_km);
+                    <div className="flex gap-2">
+                      {/* Re-order button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerHaptic();
+                          if (activity.type.startsWith('ride') || activity.type.startsWith('delivery')) {
+                            setPrefilledDestination(activity.title);
+                            const tierMap: Record<string, string> = { 'premium': 'prem', 'scooter': 'moto', 'economic': 'eco' };
+                            setPrefilledTier(tierMap[activity.requested_vehicle_type || 'economic'] || 'eco');
+                            if (activity.distance_km !== undefined) {
+                              setPrefilledDistance(activity.distance_km);
+                            }
+                            if (activity.pickup_address) {
+                              setPrefilledPickup(activity.pickup_address);
+                            }
+                            if (activity.pickup_lat !== undefined && activity.pickup_lng !== undefined) {
+                              setPrefilledPickupCoords({ lat: activity.pickup_lat, lng: activity.pickup_lng });
+                            }
+                            navigate('ride');
+                          } else {
+                            navigate('marketplace');
                           }
-                          if (activity.pickup_address) {
-                            setPrefilledPickup(activity.pickup_address);
-                          }
-                          if (activity.pickup_lat !== undefined && activity.pickup_lng !== undefined) {
-                            setPrefilledPickupCoords({ lat: activity.pickup_lat, lng: activity.pickup_lng });
-                          }
-                          navigate('ride');
-                        } else {
-                          navigate('marketplace');
-                        }
-                      }}
-                      className="w-full bg-[#00D68F] text-black font-bold py-3.5 rounded-[16px] flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                    >
-                      <span>Reorder</span>
-                      <ArrowRight size={16} />
-                    </button>
+                        }}
+                        className="flex-1 bg-[#00D68F] text-black font-bold py-3.5 rounded-[16px] flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                      >
+                        <span>Reorder</span>
+                        <ArrowRight size={16} />
+                      </button>
+
+                      {/* Forgot Something — only for ride/delivery */}
+                      {(activity.type.startsWith('ride') || activity.type.startsWith('delivery')) && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            triggerHaptic();
+
+                            if (!activity.reference_id) {
+                              showAlert('Missing ID', 'Could not locate ride reference ID.', 'error');
+                              return;
+                            }
+
+                            setForgotRide(activity);
+                            setForgotDone(false);
+                            setForgotDriver(null);
+                            setForgotLoading(true);
+
+                            try {
+                              const { data: ride, error: rideError } = await supabase
+                                .from('rides')
+                                .select('driver_id')
+                                .eq('id', activity.reference_id)
+                                .single();
+
+                              if (rideError || !ride || !ride.driver_id) {
+                                setForgotLoading(false);
+                                showAlert('No Driver Found', 'We could not find an assigned driver for this ride.', 'error');
+                                setForgotRide(null);
+                                return;
+                              }
+
+                              const { data: driverData, error: driverError } = await supabase
+                                .from('drivers')
+                                .select('*, profile:profiles(full_name, phone, avatar_url)')
+                                .eq('id', ride.driver_id)
+                                .single();
+
+                              if (driverError || !driverData || !(driverData.profile as any)?.phone) {
+                                setForgotLoading(false);
+                                showAlert('Contact Info Missing', 'We could not find the driver\'s phone number.', 'error');
+                                setForgotRide(null);
+                                return;
+                              }
+
+                              const driverPhone = (driverData.profile as any).phone;
+                              const driverName = (driverData.profile as any).full_name || 'Driver';
+                              const driverPhoto = (driverData.profile as any).avatar_url || null;
+
+                              setForgotDriver({
+                                id: ride.driver_id,
+                                name: driverName,
+                                phone: driverPhone,
+                                photo: driverPhoto
+                              });
+                            } catch (err) {
+                              console.error('Error fetching driver details:', err);
+                              showAlert('Error', 'Could not retrieve driver contact details.', 'error');
+                              setForgotRide(null);
+                            } finally {
+                              setForgotLoading(false);
+                            }
+                          }}
+                          className="flex-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 font-bold py-3.5 rounded-[16px] flex items-center justify-center gap-1.5 active:scale-95 transition-transform text-sm"
+                        >
+                          <Package size={14} />
+                          <span>Forgot?</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -868,6 +982,97 @@ export const DashboardScreen = ({ user, theme, navigate, toggleTheme, setShowAss
           }}
           onComplete={completeWalkthrough} 
         />
+      )}
+
+      {/* ── Forgot Something Modal (Dashboard History) ── */}
+      {forgotRide && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm animate-scale-in">
+          <div className="bg-[#1C1C1E] dark:bg-[#1C1C1E] w-full max-w-md rounded-[32px] p-6 flex flex-col gap-4 shadow-2xl border border-white/5 animate-slide-in-up">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 flex items-center justify-center">
+                  <Package size={20} className="text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-base">Forgot Something?</h3>
+                  <p className="text-[#98989D] text-xs font-medium">We'll connect you and notify admin</p>
+                </div>
+              </div>
+              <button onClick={() => setForgotRide(null)} className="w-8 h-8 rounded-full bg-[#2C2C2E] flex items-center justify-center active:scale-90 transition-transform">
+                <X size={16} className="text-[#98989D]" />
+              </button>
+            </div>
+
+            {forgotLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Loader2 className="animate-spin text-amber-500" size={32} />
+                <p className="text-white/70 text-sm font-bold animate-pulse">Retrieving driver details...</p>
+              </div>
+            ) : forgotDone ? (
+              <div className="flex flex-col items-center gap-3 py-3">
+                <div className="w-14 h-14 rounded-full bg-[#00D68F]/15 flex items-center justify-center">
+                  <Check size={28} className="text-[#00D68F]" strokeWidth={3} />
+                </div>
+                <p className="text-white font-bold text-center">Report Sent to Admin</p>
+                <p className="text-[#98989D] text-xs text-center">Your driver's number has been dialled. Admin has been notified and will follow up if needed.</p>
+                <button onClick={() => setForgotRide(null)} className="w-full py-3 rounded-2xl bg-[#00D68F] text-black font-black text-sm active:scale-95 transition-all mt-1">
+                  Close
+                </button>
+              </div>
+            ) : forgotDriver ? (
+              <>
+                {/* Driver Info card */}
+                <div className="flex items-center gap-3 bg-[#2C2C2E] rounded-2xl p-4">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700 flex-shrink-0">
+                    {forgotDriver.photo ? (
+                      <img src={forgotDriver.photo} className="w-full h-full object-cover" alt="Driver" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><User size={20} className="text-gray-400" /></div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-sm truncate">{forgotDriver.name}</p>
+                    <p className="text-[#98989D] text-xs font-medium">{forgotDriver.phone}</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-[#00D68F]/15 flex items-center justify-center flex-shrink-0">
+                    <Phone size={16} className="text-[#00D68F]" />
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 bg-amber-500/10 rounded-2xl p-3">
+                  <AlertCircle size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-amber-300 text-xs font-medium leading-relaxed">
+                    Tapping call will dial the driver and log a lost item case to the administrator for support.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleForgotCall}
+                  disabled={forgotReporting}
+                  className="w-full py-4 rounded-2xl bg-amber-500 text-black font-black text-base flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-amber-500/25"
+                >
+                  {forgotReporting ? (
+                    <Loader2 className="animate-spin text-black" size={20} />
+                  ) : (
+                    <><Phone size={18} /> Call the Driver</>
+                  )}
+                </button>
+
+                <button onClick={() => setForgotRide(null)} className="w-full py-3 rounded-2xl font-bold text-sm text-[#98989D] active:scale-95 transition-all text-center">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <AlertCircle className="text-red-500" size={32} />
+                <p className="text-white text-sm font-bold">Could not load driver info</p>
+                <button onClick={() => setForgotRide(null)} className="mt-2 px-6 py-2 rounded-xl bg-[#2C2C2E] text-white text-xs font-bold">Close</button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

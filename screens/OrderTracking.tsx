@@ -192,7 +192,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                 newStatus = 'pending'; 
                 newProgress = 35; 
                 if (orderInfo?.status !== 'accepted') {
-                    sendPushNotification("DROPOFF: Order Accepted", "The merchant has accepted your order!");
+                    // sendPushNotification("DROPOFF: Order Accepted", "The merchant has accepted your order!");
                     triggerHaptic();
                 }
                 break;
@@ -200,7 +200,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                 newStatus = 'preparing'; 
                 newProgress = 50; 
                 if (orderInfo?.status !== 'preparing') {
-                    sendPushNotification("DROPOFF: Preparing Order", "The merchant is now preparing your items.");
+                    // sendPushNotification("DROPOFF: Preparing Order", "The merchant is now preparing your items.");
                     triggerHaptic();
                 }
                 break;
@@ -208,7 +208,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                 newStatus = 'preparing'; 
                 newProgress = 65; 
                 if (orderInfo?.status !== 'ready') {
-                    sendPushNotification("DROPOFF: Ready for Pickup", "Your order is ready and waiting for the driver!");
+                    // sendPushNotification("DROPOFF: Ready for Pickup", "Your order is ready and waiting for the driver!");
                     triggerHaptic();
                 }
                 break;
@@ -216,7 +216,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                 newStatus = 'picked-up'; 
                 newProgress = 85; 
                 if (orderInfo?.status !== 'delivering') {
-                    sendPushNotification("DROPOFF: Out for Delivery", "Your driver has picked up your order and is on the way!");
+                    // sendPushNotification("DROPOFF: Out for Delivery", "Your driver has picked up your order and is on the way!");
                     triggerHaptic();
                 }
                 break;
@@ -225,7 +225,7 @@ export const OrderTrackingScreen = ({ theme, navigate, user, setRecentActivities
                 newProgress = 100;
                 // If it's the first time reaching completed, notify user
                 if (status !== 'delivered') {
-                    sendPushNotification("DROPOFF: Order Delivered", "Your order has been delivered successfully!");
+                    // sendPushNotification("DROPOFF: Order Delivered", "Your order has been delivered successfully!");
                     triggerHaptic();
                 }
                 break;

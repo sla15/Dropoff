@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { ArrowLeft, MapPin as MapPinFilled, Plus, X, Car, Bike, Star, Phone, MessageSquare, Navigation, Info, Locate, User, Trash, Loader2 } from 'lucide-react';
 import { Theme, Screen, RideStatus, Activity, UserData, AppSettings } from '../types';
 import { triggerHaptic, sendPushNotification, friendlyError } from '../utils/helpers';
@@ -114,6 +115,8 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(prefilledPickupCoords || null);
     const [onlineDrivers, setOnlineDrivers] = useState<any[]>([]);
 
+    // NOTE: pickup coords auto-update effect is placed AFTER userLocation is declared below (line ~215+)
+
     // --- CHECK LOCATION PERMISSION on mount and whenever screen becomes active ---
     const checkLocationPermission = async () => {
         setLocationPermissionState('checking');
@@ -209,6 +212,20 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const lastBroadcastRef = useRef<number>(0);    // Timestamp of last GPS broadcast received (suppresses duplicate postgres_changes render)
     const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const fallbackAppliedRef = useRef(false);
+    const mapReadyRef = useRef(false); // true once WebGL/Vector map 'idle' fires and GPU context is ready
+
+    // Auto-update pickup coords if pickupLocation is 'Current Location' and user location becomes available.
+    // Only fires when pickupCoords is null — never overwrites a custom pickup that was explicitly set.
+    // Placed here so all referenced state (userLocation, pickupCoords, indexLocation) are already declared.
+    useEffect(() => {
+        if (active && pickupLocation === 'Current Location' && !pickupCoords) {
+            const activeCoords = indexLocation || userLocation || (user.last_lat && user.last_lng ? { lat: user.last_lat, lng: user.last_lng } : null);
+            if (activeCoords) {
+                console.log("RideScreen: Seeding 'Current Location' pickup coordinates (first time):", activeCoords);
+                setPickupCoords(activeCoords);
+            }
+        }
+    }, [active, pickupLocation, pickupCoords, indexLocation, userLocation, user.last_lat, user.last_lng]);
 
     // Nearby Drivers Counting Logic
     const getNearbyCount = (category: string) => {
@@ -236,9 +253,9 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
     // Tiers Definition
     const tiers = [
-        { id: 'eco', label: 'Economy', mult: Number(settings.multiplier_economy) || 1, time: getNearbyDriversText('eco'), icon: Car, img: '/assets/white_yaris_side.png', desc: '4 seats' },
-        { id: 'prem', label: 'AC', mult: Number(settings.multiplier_premium) || 1.8, time: getNearbyDriversText('prem'), icon: Car, img: '/assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
-        { id: 'moto', label: 'Bike', mult: Number(settings.multiplier_scooter) || 0.6, time: getNearbyDriversText('moto'), icon: Bike, img: '/assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
+        { id: 'eco', label: 'Economy', mult: Number(settings.multiplier_economy) || 1, time: getNearbyDriversText('eco'), icon: Car, img: 'assets/white_yaris_side.png', desc: '4 seats' },
+        { id: 'prem', label: 'AC', mult: Number(settings.multiplier_premium) || 1.8, time: getNearbyDriversText('prem'), icon: Car, img: 'assets/black_luxury_side.png', desc: 'Premium • 4 seats' },
+        { id: 'moto', label: 'Bike', mult: Number(settings.multiplier_scooter) || 0.6, time: getNearbyDriversText('moto'), icon: Bike, img: 'assets/scooter_side_view.png', desc: 'Fast • 1 seat' }
     ];
 
     useEffect(() => {
@@ -504,7 +521,10 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     disableDefaultUI: true,
                     clickableIcons: false,
                     gestureHandling: 'greedy',
-                    styles: [] // Standard Light Theme
+                    renderingType: 'VECTOR', // Enable WebGL Vector Map for tilt & rotate gestures
+                    rotateControl: true,
+                    tiltControl: true,
+                    styles: [] // Theme applied dynamically in RideMap.tsx
                 };
 
                 // On low-end devices, disable Google Maps' internal animations
@@ -529,7 +549,20 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
                 setMap(newMap);
                 initialCenterDoneRef.current = true;
-                updateMarker(targetCenter, user.name || 'You', newMap);
+
+                // Wait for the map's first 'idle' event before touching markers.
+                // With VECTOR/WebGL maps the GPU context initializes asynchronously,
+                // so any marker.setPosition() call before 'idle' throws "Not initialized".
+                const idleListener = newMap.addListener('idle', () => {
+                    mapReadyRef.current = true;
+                    google.maps.event.removeListener(idleListener);
+                    const latestCenter = userMarkerRef.current
+                        ? null // already placed — don't double-place
+                        : targetCenter;
+                    if (latestCenter) {
+                        updateMarker(latestCenter, user.name || 'You', newMap);
+                    }
+                });
 
                 const directionsRenderer = new google.maps.DirectionsRenderer({
                     map: newMap,
@@ -571,25 +604,35 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
     const hasInitialCenteredRef = useRef(false);
     useEffect(() => {
         if (!active || !map) {
-            // Reset flag whenever screen goes inactive so next activation re-centers
-            if (!active) hasInitialCenteredRef.current = false;
+            // Reset both flags whenever screen goes inactive so next activation re-centers
+            if (!active) {
+                hasInitialCenteredRef.current = false;
+                mapReadyRef.current = false;
+            }
             return;
         }
 
         if (hasInitialCenteredRef.current) return; // already centred this session
 
-        const pos = indexLocation || (userLocation ?? null);
+        // If WebGL map isn't ready yet, the idle listener in initMap() will handle marker placement.
+        // Only proceed with pan (not marker) here so there's no race condition.
+        const pos = indexLocation || userLocation || (user.last_lat && user.last_lng ? { lat: user.last_lat, lng: user.last_lng } : null);
         if (pos) {
             console.log("RideScreen: Initial center on activation:", pos);
             hasInitialCenteredRef.current = true;
             setUserLocation(pos);
-            setLocationMethod('gps');
+            setLocationMethod(indexLocation || userLocation ? 'gps' : 'profile');
             map.panTo(pos);
-            updateMarker(pos, undefined, map);
-            setTimeout(() => updateMarker(pos, undefined, map), 500);
-        } else if (!userLocation) {
-            // No location yet — try once after a short delay
-            const t = setTimeout(() => handleLocateMe(true), 1000);
+            // Only update marker when WebGL is confirmed ready
+            if (mapReadyRef.current) {
+                updateMarker(pos, undefined, map);
+                setTimeout(() => updateMarker(pos, undefined, map), 500);
+            }
+        }
+
+        // If GPS is not ready yet, trigger handleLocateMe(true) in the background to capture high accuracy coords
+        if (!indexLocation && !userLocation) {
+            const t = setTimeout(() => handleLocateMe(true), 500);
             return () => clearTimeout(t);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -754,6 +797,30 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         }
     }, [prefilledDestination, prefilledTier, map, directionsRenderer]);
 
+    // Handle Prefilled Pickup from Recent Activities re-order.
+    // RideScreen is persistently mounted (never unmounts when navigating away), so
+    // useState initial values don't re-run when props change. We watch the prop
+    // explicitly and push the value into state whenever it arrives.
+    useEffect(() => {
+        if (prefilledPickup) {
+            console.log("RideScreen: Applying prefilled pickup:", prefilledPickup);
+            setPickupLocation(prefilledPickup);
+            if (prefilledPickupCoords) {
+                setPickupCoords(prefilledPickupCoords);
+                if (map) {
+                    map.panTo(prefilledPickupCoords);
+                    updateMarker(prefilledPickupCoords, undefined, map);
+                }
+            }
+            // Clear the prefill prop so it doesn't re-fire after the ride ends
+            // and the pickup is reset to 'Current Location'. If prefilledDestination
+            // is also set, its effect will call clearPrefilled() too — that is fine.
+            if (clearPrefilled && !prefilledDestination) {
+                clearPrefilled();
+            }
+        }
+    }, [prefilledPickup, prefilledPickupCoords]);
+
     // Periodic re-center: pan back to the user's location every 60 seconds of IDLE
     // (i.e., when the user hasn't dragged the map). Runs only while screen is active.
     // We use a ref for userLocation inside the timeout to always read the latest value
@@ -775,6 +842,24 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
         return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [active, !!map]);
+
+    // Listen to real-time location changes from parent and update marker/pan map locally
+    useEffect(() => {
+        if (!active || !map || !indexLocation) return;
+        // Guard: WebGL map may not be fully initialized yet — wait for mapReadyRef
+        if (!mapReadyRef.current) return;
+        
+        console.log("RideScreen: indexLocation updated:", indexLocation);
+        setUserLocation(indexLocation);
+        setLocationMethod('gps');
+        updateMarker(indexLocation, undefined, map);
+        
+        // If the user is on an active ride OR they haven't manually panned the map, follow them!
+        const isActiveRide = status === 'accepted' || status === 'arrived' || status === 'in-progress';
+        if (isActiveRide || !mapInteractionRef.current) {
+            map.panTo(indexLocation);
+        }
+    }, [active, map, indexLocation, status]);
 
     // --- REAL-TIME DRIVER TRACKING ---
     const iconCache = useRef<Map<string, string>>(new Map());
@@ -1034,7 +1119,29 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
 
 
     const sendPush = (title: string, message: string) => {
-        sendPushNotification(title, message);
+        // sendPushNotification(title, message);
+    };
+
+    // Re-request push notification permission when a driver accepts — the user just
+    // had a positive outcome and is far more likely to allow it this time.
+    // This is a one-shot native dialog; if they already granted/denied it, it's a no-op.
+    const requestPushPermissionIfNeeded = async () => {
+        try {
+            if (Capacitor.isNativePlatform()) {
+                const status = await FirebaseMessaging.checkPermissions();
+                if (status.receive === 'prompt') {
+                    console.log('🔔 RideScreen: Requesting push permission (driver accepted trigger)');
+                    await FirebaseMessaging.requestPermissions();
+                }
+            } else {
+                // Web fallback
+                if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+                    await Notification.requestPermission();
+                }
+            }
+        } catch (err) {
+            console.warn('RideScreen: Push permission request failed silently:', err);
+        }
     };
 
     // Driver location is managed entirely by the partner app.
@@ -1336,23 +1443,24 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                         setAssignedDriverId(ride.driver_id);
                         setAssignedDriver(formattedDriver);
                         setStatus('accepted');
-                        sendPushNotification("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`);
+                        // sendPushNotification("DROPOFF: Ride Accepted", `Your ride with ${formattedDriver.name} has been accepted!`); // re-enable when FCM is production-ready
                         triggerHaptic();
+                        // Re-request push notification permission if not yet granted
+                        requestPushPermissionIfNeeded();
                     }
                 } else if (ride.status === 'arrived') {
                     setStatus('arrived');
-                    sendPushNotification("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!");
+                    // sendPushNotification("DROPOFF: Driver Arrived", "Your driver has arrived at the pickup location!"); // re-enable when FCM is production-ready
                     triggerHaptic();
                 } else if (ride.status === 'in-progress') {
                     setStatus('in-progress');
                     triggerHaptic();
                 } else if (ride.status === 'completed') {
-
-                    sendPushNotification("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!");
+                    // sendPushNotification("DROPOFF: Destination Reached", "You have arrived at your destination. Thank you for riding with us!"); // re-enable when FCM is production-ready
                     completeTrip();
                 } else if (ride.status === 'searching') {
                     if (lastKnownDbStatus !== 'idle' && lastKnownDbStatus !== 'searching') {
-                        sendPushNotification("DROPOFF: Driver Update", "Your driver had to unassign. We are finding you a new driver right now!");
+                        // sendPushNotification("DROPOFF: Driver Update", "Your driver had to unassign. We are finding you a new driver right now!"); // re-enable when FCM is production-ready
                         triggerHaptic();
                     }
                     setAssignedDriverId(null);
@@ -1361,7 +1469,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     notifiedDriversRef.current.clear();
                 } else if (ride.status === 'cancelled' || ride.status === 'cancelled_by_driver') {
                     if (ride.status === 'cancelled_by_driver' || (ride.status === 'cancelled' && ride.driver_id)) {
-                        sendPushNotification("DROPOFF: Ride Cancelled", "Your driver has cancelled the trip.");
+                        // sendPushNotification("DROPOFF: Ride Cancelled", "Your driver has cancelled the trip."); // re-enable when FCM is production-ready
                         triggerHaptic();
                     }
                     handleCancellation(ride);
@@ -2333,6 +2441,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     inputBg={inputBg}
                     textSec={textSec}
                     user={user}
+                    currentRideId={currentRideId}
                 />
             )}
 

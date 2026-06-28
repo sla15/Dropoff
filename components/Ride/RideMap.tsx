@@ -22,9 +22,9 @@ export const RideMap: React.FC<RideMapProps> = ({
     // Theme-aware Map Styles
     useEffect(() => {
         if (map) {
-            console.log("RideMap: Map instance received and active");
+            console.log("RideMap: Map instance received and active, theme is:", theme);
             map.setOptions({
-                styles: [] // Standard Light Theme
+                styles: theme === 'dark' ? darkMapStyle : []
             });
         } else {
             console.log("RideMap: Map instance is currently null");

@@ -47,9 +47,16 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 };
 
 export const MarketplaceScreen = ({ theme, navigate, businesses, categories, setSelectedBusiness, isScrolling, isNavVisible, handleScroll, toggleFavorite, favorites, searchQuery, setSearchQuery, showAlert, user, onRefresh, isRefreshing }: Props) => {
-   const [selectedCategory, setSelectedCategory] = useState('All');
-   const [headerHeight, setHeaderHeight] = useState(195);
-   const headerRef = useRef<HTMLDivElement>(null);
+    const [selectedCategory, setSelectedCategory] = useState('All');
+    const [headerHeight, setHeaderHeight] = useState(195);
+    const headerRef = useRef<HTMLDivElement>(null);
+
+    // Client-side Lazy Loading / Infinite Scroll
+    const [visibleCount, setVisibleCount] = useState(10);
+
+    useEffect(() => {
+       setVisibleCount(10);
+    }, [selectedCategory, searchQuery, businesses]);
 
    useEffect(() => {
       if (headerRef.current) {
@@ -122,15 +129,25 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
       return matchesCategory && matchesSearch;
    });
 
-   const filteredProducts = businesses.flatMap(b =>
-      (b.products || []).map(p => ({ ...p, business: b }))
-   ).filter(p => {
-      if (!searchQuery) return false; // Only show products if searching
-      const q = searchQuery.toLowerCase();
-      return p.name.toLowerCase().includes(q) ||
-         (p.mainCategory || '').toLowerCase().includes(q) ||
-         (p.description || '').toLowerCase().includes(q);
-   });
+    const filteredProducts = businesses.flatMap(b =>
+       (b.products || []).map(p => ({ ...p, business: b }))
+    ).filter(p => {
+       if (!searchQuery) return false; // Only show products if searching
+       const q = searchQuery.toLowerCase();
+       return p.name.toLowerCase().includes(q) ||
+          (p.mainCategory || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q);
+    });
+
+    const handleScrollInternal = (e: React.UIEvent<HTMLDivElement>) => {
+       if (handleScroll) handleScroll(e);
+
+       const target = e.currentTarget;
+       // Trigger loading 10 more when within 120px of the bottom
+       if (target.scrollHeight - target.scrollTop <= target.clientHeight + 120) {
+          setVisibleCount(prev => Math.min(prev + 10, filteredBusinesses.length));
+       }
+    };
 
    return (
       <div className={`h-full flex flex-col ${bgMain} ${textMain} animate-slide-in relative`}>
@@ -163,7 +180,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto min-h-0 px-6 pb-32 space-y-8"
             style={{ paddingTop: headerHeight + 16 }}
-            onScroll={handleScroll}
+            onScroll={handleScrollInternal}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -195,7 +212,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                   </h2>
 
                   <div className="space-y-4">
-                     {filteredBusinesses.map(b => (
+                      {filteredBusinesses.slice(0, visibleCount).map(b => (
                         <div
                            key={b.id}
                            onClick={() => {
@@ -242,7 +259,7 @@ export const MarketplaceScreen = ({ theme, navigate, businesses, categories, set
                <div className="space-y-4 animate-scale-in">
                   <h2 className="font-black text-xl tracking-tight">Matching Products</h2>
                   <div className="grid grid-cols-2 gap-4">
-                     {filteredProducts.map(p => (
+                      {filteredProducts.slice(0, visibleCount).map(p => (
                         <div
                            key={`${p.business.id}-${p.id}`}
                            onClick={() => { setSelectedBusiness(p.business); navigate('business-detail', true); }}

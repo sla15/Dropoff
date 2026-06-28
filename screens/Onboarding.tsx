@@ -278,9 +278,9 @@ export const OnboardingScreen = ({ theme, navigate, setUser, showAlert }: Props)
    const [vehicleIndex, setVehicleIndex] = useState(0);
 
    const vehicles = [
-      { src: "/assets/black_luxury_side.png", alt: "Premium Car" },
-      { src: "/assets/white_yaris_side.png", alt: "Economic Car" },
-      { src: "/assets/scooter_side_view.png", alt: "Scooter" }
+      { src: "assets/black_luxury_side.png", alt: "Premium Car" },
+      { src: "assets/white_yaris_side.png", alt: "Economic Car" },
+      { src: "assets/scooter_side_view.png", alt: "Scooter" }
    ];
 
    useEffect(() => {

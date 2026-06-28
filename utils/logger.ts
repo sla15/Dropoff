@@ -18,7 +18,7 @@ export const logError = async (error: Error | string, context?: Record<string, a
         if (platform !== 'web') {
             FirebaseCrashlytics.recordException({ 
                 message: message, 
-                stacktrace: stack 
+                stacktrace: (stack as any)
             }).catch(err => console.error("Crashlytics Error:", err));
         }
 
@@ -54,7 +54,7 @@ export const setupGlobalErrorHandlers = () => {
     });
 
     if (Capacitor.isNativePlatform()) {
-        FirebaseCrashlytics.setCrashlyticsCollectionEnabled({ enabled: true })
-            .catch(err => console.error("Crashlytics Init Error:", err));
+        (FirebaseCrashlytics as any).setCrashlyticsCollectionEnabled?.({ enabled: true })
+            .catch((err: any) => console.error("Crashlytics Init Error:", err));
     }
 };

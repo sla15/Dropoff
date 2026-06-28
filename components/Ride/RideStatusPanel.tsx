@@ -43,44 +43,78 @@ export const RideStatusPanel: React.FC<RideStatusPanelProps> = ({
             {(status === 'accepted' || status === 'arrived' || status === 'in-progress') && (
                 <div className="animate-scale-in px-2">
                     <div className={`p-5 rounded-[24px] ${inputBg} shadow-sm mb-6`}>
-                        <div className="flex justify-between items-start mb-5">
-                            <div className="text-left">
-                                <div className="text-[#00D68F] font-bold text-3xl mb-1 tabular-nums">
-                                    {status === 'in-progress' ? 'On Trip' : (status === 'arrived' ? 'Arrived' : formatTime(etaSeconds))}
-                                </div>
-                                <div className={`${textSec} text-sm font-medium`}>
-                                    {status === 'in-progress' ? `Heading to ${destinations[0]}` : (status === 'arrived' ? 'Driver is waiting' : 'Estimated arrival')}
-                                </div>
-                            </div>
-                            <div className="relative">
-                                <div className="w-16 h-16 rounded-full bg-[#00D68F]/10 flex items-center justify-center border-4 border-white dark:border-[#1C1C1E] shadow-md overflow-hidden">
-                                    {assignedDriver?.profile_picture ? (
-                                        <img src={assignedDriver.profile_picture} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <User size={32} className="text-[#00D68F] opacity-50" />
-                                    )}
-                                </div>
-                                <div className={`absolute -bottom-2 right-1 px-1.5 py-0.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm flex items-center gap-1 ${(assignedDriver?.rating || 5.0) >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' :
-                                    (assignedDriver?.rating || 5.0) >= 3.0 ? 'bg-orange-500/10 text-orange-500' :
-                                        'bg-red-500/10 text-red-500'
-                                    }`}>
-                                    <Star size={10} fill="currentColor" />
-                                    <span className="text-[10px] font-black">{Number(assignedDriver?.rating || 5.0).toFixed(1)}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="h-px w-full bg-black/5 dark:bg-white/10 my-4"></div>
 
-                        {/* Driver Info */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl bg-[#00D68F]/10 flex items-center justify-center text-[#00D68F] overflow-hidden">
+                        {/* ── Uber/Yango-style Journey Bar ─────────────────── */}
+                        <div className="flex items-center gap-3 mb-5">
+
+                            {/* Driver Vehicle Icon */}
+                            <div className="flex flex-col items-center gap-1.5 shrink-0">
+                                <div className="w-14 h-14 rounded-2xl bg-[#00D68F]/10 border-2 border-[#00D68F]/30 flex items-center justify-center text-[#00D68F] overflow-hidden shadow-sm">
                                     {assignedDriver?.vehicle_img ? (
                                         <img src={assignedDriver.vehicle_img} className="w-full h-full object-cover" />
                                     ) : (
-                                        selectedTier === 'moto' ? <Bike size={24} /> : <Car size={24} />
+                                        selectedTier === 'moto' ? <Bike size={26} /> : <Car size={26} />
                                     )}
                                 </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${textSec}`}>Driver</span>
+                            </div>
+
+                            {/* Animated Progress Line */}
+                            <div className="flex-1 flex flex-col items-center gap-1.5">
+                                {/* Status badge */}
+                                <div className={`px-3 py-1 rounded-full text-xs font-black tracking-tight ${
+                                    status === 'in-progress'
+                                        ? 'bg-[#00D68F] text-black'
+                                        : status === 'arrived'
+                                            ? 'bg-orange-500/15 text-orange-500 border border-orange-500/30'
+                                            : 'bg-[#00D68F]/10 text-[#00D68F] border border-[#00D68F]/30'
+                                }`}>
+                                    {status === 'in-progress' ? '🚗  On Trip' : status === 'arrived' ? '📍  Arrived' : `⏱  ${formatTime(etaSeconds)}`}
+                                </div>
+                                {/* Dashed animated track */}
+                                <div className="relative w-full h-[3px] rounded-full overflow-hidden bg-black/10 dark:bg-white/10">
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-[#00D68F] rounded-full"
+                                        style={{
+                                            width: status === 'in-progress' ? '100%' : status === 'arrived' ? '80%' : '40%',
+                                            transition: 'width 1s ease-in-out'
+                                        }}
+                                    />
+                                </div>
+                                <span className={`text-[10px] font-medium ${textSec}`}>
+                                    {status === 'in-progress'
+                                        ? `To ${destinations[0]?.split(',')[0] || 'destination'}`
+                                        : status === 'arrived'
+                                            ? 'Driver is waiting'
+                                            : 'Driver en route'}
+                                </span>
+                            </div>
+
+                            {/* User Avatar */}
+                            <div className="flex flex-col items-center gap-1.5 shrink-0">
+                                <div className="relative">
+                                    <div className="w-14 h-14 rounded-full border-2 border-[#00D68F]/40 overflow-hidden shadow-sm bg-[#00D68F]/10 flex items-center justify-center">
+                                        {user.photo ? (
+                                            <img src={user.photo} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span className="text-xl font-black text-[#00D68F]">{user.name?.charAt(0)}</span>
+                                        )}
+                                    </div>
+                                    {/* Driver rating badge */}
+                                    <div className={`absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm flex items-center gap-0.5 ${(assignedDriver?.rating || 5.0) >= 4.5 ? 'bg-[#00D68F]/10 text-[#00D68F]' : (assignedDriver?.rating || 5.0) >= 3.0 ? 'bg-orange-500/10 text-orange-500' : 'bg-red-500/10 text-red-500'}`}>
+                                        <Star size={9} fill="currentColor" />
+                                        <span className="text-[9px] font-black">{Number(assignedDriver?.rating || 5.0).toFixed(1)}</span>
+                                    </div>
+                                </div>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider ${textSec}`}>You</span>
+                            </div>
+                        </div>
+
+                        <div className="h-px w-full bg-black/5 dark:bg-white/10 my-1"></div>
+
+                        {/* Driver Info */}
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="flex items-center gap-3">
                                 <div className="text-left">
                                     <div className="font-bold text-base truncate max-w-[150px]">{assignedDriver?.name || 'Your Driver'}</div>
                                     <div className="font-bold text-sm tracking-tight">{assignedDriver?.vehicle_model || 'Toyota Prius'}</div>

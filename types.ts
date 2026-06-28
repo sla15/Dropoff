@@ -64,6 +64,9 @@ export interface Activity {
   requested_vehicle_type?: string;
   distance_km?: number;
   reference_id?: string;
+  pickup_address?: string;
+  pickup_lat?: number;
+  pickup_lng?: number;
 }
 
 export interface SavedLocation {

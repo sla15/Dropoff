@@ -31,8 +31,8 @@ import { triggerHaptic, sendPushNotification } from './utils/helpers';
 import { initFCM } from './utils/fcm';
 import { UpdatePopup } from './components/UpdatePopup';
 import { App as CapacitorApp } from '@capacitor/app';
-
 import { Network } from '@capacitor/network';
+import { SplashScreen as NativeSplashScreen } from '@capacitor/splash-screen';
 import { Preferences } from '@capacitor/preferences';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Badge } from '@capawesome/capacitor-badge';
@@ -124,6 +124,7 @@ const App = () => {
   // Synchronized X/Twitter splash exit timer
   useEffect(() => {
     if (!isLoading) {
+      NativeSplashScreen.hide().catch(() => {});
       setIsSplashExiting(true);
       const timer = setTimeout(() => {
         setIsSplashActive(false);
@@ -351,16 +352,7 @@ const App = () => {
   const [businesses, setBusinesses] = useState<Business[]>(INITIAL_BUSINESSES);
   const [categories, setCategories] = useState<Category[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [recentActivities, setRecentActivities] = useState<Activity[]>(() => {
-    try {
-      const saved = localStorage.getItem('app_recent_activities');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to parse activities from localStorage", e);
-      localStorage.removeItem('app_recent_activities');
-      return [];
-    }
-  });
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
 
   const scrollTimeout = useRef<any>(null);
   const lastScrollY = useRef(0);
@@ -591,9 +583,11 @@ const App = () => {
 
   const fetchBusinesses = async () => {
     try {
-      const { data, error } = await supabase.from('businesses').select(`*, products(*)`);
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id, name, category, description, rating, image_url, payment_phone, location_address, working_hours, is_open');
       if (data && !error) {
-        setBusinesses(data.map((b: any) => ({
+        const formatted = data.map((b: any) => ({
           id: b.id,
           name: b.name,
           category: b.category,
@@ -607,17 +601,11 @@ const App = () => {
           location: b.location_address || '',
           isOpen: isBusinessOpen(b.working_hours, b.is_open),
           working_hours: b.working_hours,
-          products: (b.products || []).map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.image_url || '',
-            description: p.description || '',
-            stock: p.stock || 0,
-            mainCategory: p.category || '',
-            categories: []
-          }))
-        })));
+          products: [] // products are fetched on-demand in BusinessDetail.tsx
+        }));
+        setBusinesses(formatted);
+        // 💾 Persist to Preferences cache
+        Preferences.set({ key: 'cached_businesses', value: JSON.stringify(formatted) }).catch(() => {});
       }
     } catch (err) { console.error(err); }
   };
@@ -625,7 +613,11 @@ const App = () => {
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase.from('business_categories').select('*').eq('is_active', true).order('display_order', { ascending: true });
-      if (data && !error) setCategories(data);
+      if (data && !error) {
+        setCategories(data);
+        // 💾 Persist to Preferences cache
+        Preferences.set({ key: 'cached_categories', value: JSON.stringify(data) }).catch(() => {});
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -671,6 +663,9 @@ const App = () => {
       // Clear cached profile and favorites from Preferences
       Preferences.remove({ key: 'cached_user_profile' }).catch(() => {});
       Preferences.remove({ key: 'cached_favorites' }).catch(() => {});
+      Preferences.remove({ key: 'cached_businesses' }).catch(() => {});
+      Preferences.remove({ key: 'cached_categories' }).catch(() => {});
+      Preferences.remove({ key: 'cached_recent_activities' }).catch(() => {});
       
       // 4. Reset Navigation
       setScreen('onboarding');
@@ -729,7 +724,7 @@ const App = () => {
         }));
 
         setRecentActivities(formattedActivities);
-        localStorage.setItem('app_recent_activities', JSON.stringify(formattedActivities));
+        Preferences.set({ key: 'cached_recent_activities', value: JSON.stringify(formattedActivities) }).catch(() => {});
       }
     } catch (err) { console.error("Activities Fetch Error:", err); }
     finally { setIsActivitiesLoading(false); }
@@ -745,15 +740,10 @@ const App = () => {
       if (realtimeChannel) supabase.removeChannel(realtimeChannel);
       
       const channel = supabase.channel('app-changes');
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' }, () => fetchSettings());
-      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'business_categories' }, () => fetchCategories());
-      // 🟢 Scalability: Removed global 'businesses' and 'products' subscriptions.
-      // Previously these triggered fetchBusinesses() for ALL connected users whenever ANY merchant
-      // updated a product — a thundering herd DDoS against our own DB at scale.
-      // Businesses are fetched once on startup and on-demand via pull-to-refresh in Marketplace.
+      // 🟢 Scalability: Removed global settings, categories, businesses, products, and activity subscriptions.
+      // These are loaded on boot/navigation, preventing thundering herd scenarios and database read spikes.
 
       if (userId) {
-        channel.on('postgres_changes', { event: '*', schema: 'public', table: 'user_activities', filter: `user_id=eq.${userId}` }, () => fetchActivities(userId));
         channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` }, (payload) => {
           const p = payload.new as any;
           setUser(prev => ({
@@ -926,6 +916,48 @@ const App = () => {
             }
           } catch (e) {
             console.warn("🚀 Init: Failed to restore cached favorites:", e);
+          }
+
+          // 💾 Restore cached businesses instantly (before any network call)
+          try {
+            const { value: cachedBiz } = await Preferences.get({ key: 'cached_businesses' });
+            if (cachedBiz) {
+              const parsed = JSON.parse(cachedBiz);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log("🚀 Init: Restoring", parsed.length, "cached businesses");
+                setBusinesses(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("🚀 Init: Failed to restore cached businesses:", e);
+          }
+
+          // 💾 Restore cached categories instantly (before any network call)
+          try {
+            const { value: cachedCat } = await Preferences.get({ key: 'cached_categories' });
+            if (cachedCat) {
+              const parsed = JSON.parse(cachedCat);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log("🚀 Init: Restoring", parsed.length, "cached categories");
+                setCategories(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("🚀 Init: Failed to restore cached categories:", e);
+          }
+
+          // 💾 Restore cached recent activities instantly (before any network call)
+          try {
+            const { value: cachedActs } = await Preferences.get({ key: 'cached_recent_activities' });
+            if (cachedActs) {
+              const parsed = JSON.parse(cachedActs);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log("🚀 Init: Restoring", parsed.length, "cached recent activities");
+                setRecentActivities(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("🚀 Init: Failed to restore cached recent activities:", e);
           }
 
           // 1. Critical Session Check - FIRST priority
@@ -1138,10 +1170,24 @@ const App = () => {
   // --- Real-time Local Persistence ---
   useEffect(() => {
     if (recentActivities.length > 0) {
-      console.log('💾 Saving recent activities to localStorage');
-      localStorage.setItem('app_recent_activities', JSON.stringify(recentActivities));
+      console.log('💾 Saving recent activities to Preferences');
+      Preferences.set({ key: 'cached_recent_activities', value: JSON.stringify(recentActivities) }).catch(() => {});
     }
   }, [recentActivities]);
+
+  // Automatically refresh recent activities when returning to Dashboard or Profile from Ride or Order tracking
+  const prevScreenRef = useRef<Screen>('splash');
+  useEffect(() => {
+    const prev = prevScreenRef.current;
+    prevScreenRef.current = screen;
+    
+    if ((screen === 'dashboard' || screen === 'profile') && (prev === 'ride' || prev === 'order-tracking')) {
+      if (user.id) {
+        console.log("🔄 Auto-refreshing activities on return from:", prev);
+        fetchActivities(user.id);
+      }
+    }
+  }, [screen, user.id]);
 
 
   const navigate = (scr: Screen, addToHistory = false) => {
@@ -1318,30 +1364,13 @@ const App = () => {
       </div>
       {showAssistant && <SmartAssistant onClose={() => setShowAssistant(false)} theme={theme} />}
 
-      {/* Connectivity Modal (Offline Only) */}
+      {/* Connectivity Banner (Offline) — slim top bar, non-blocking like Uber */}
       {isOffline && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md px-6 animate-fade-in">
-          <div className={`${theme === 'dark' ? 'bg-[#1C1C1E] border-white/10' : 'bg-white border-black/5'} border w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl animate-scale-in`}>
-            <div className={`mx-auto w-20 h-20 mb-6 rounded-full flex items-center justify-center bg-red-500/10`}>
-              <WifiOff className="w-10 h-10 text-red-500" />
-            </div>
-            
-            <h2 className={`text-2xl font-bold mb-3 ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
-              You are Offline
-            </h2>
-            
-            <p className={`text-sm mb-8 leading-relaxed ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              Please check your internet connection to continue using Dropoff.
-            </p>
-
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full h-16 bg-[#00E39A] text-black rounded-2xl font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
-            >
-              <RefreshCcw className="w-5 h-5" />
-              Refresh App
-            </button>
-          </div>
+        <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1C1C1E] border-b border-white/10 animate-slide-down">
+          <WifiOff size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-xs font-semibold text-white/80 tracking-wide">
+            You're not online — no activities can be done.
+          </p>
         </div>
       )}
 

@@ -7,17 +7,17 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen = ({ theme, isExiting = false }: SplashScreenProps) => {
-  const bg = theme === 'light' ? 'bg-[#F2F2F7]' : 'bg-black';
+  const bg = 'bg-black';
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black overflow-hidden transition-opacity duration-700 ease-in-out ${isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center ${bg} overflow-hidden transition-opacity duration-700 ease-in-out ${isExiting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
       <div className="relative flex flex-col items-center w-full px-6">
         {/* Main Logo Container */}
         <div className="relative flex flex-col items-center justify-center w-full max-w-sm">
           {/* Logo: Slide from above / Exit: Portal Zoom */}
           <div className={`relative z-10 will-change-transform ${isExiting ? 'animate-logo-exit' : 'animate-logo-drop'}`}>
             <img
-              src="/assets/Code_Generated_Image.png"
+              src="assets/Code_Generated_Image.png"
               alt="Logo"
               className="w-[50vw] h-[50vw] max-w-[320px] max-h-[320px] object-contain shadow-[0_0_60px_rgba(0,0,0,0.6)]"
             />
