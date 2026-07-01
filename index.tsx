@@ -291,14 +291,31 @@ const App = () => {
   // Foreground Notification Listener
   useEffect(() => {
     const handleForegroundPush = (e: any) => {
-      const { title, body } = e.detail;
+      const { title, body, data } = e.detail;
+
+      // On native the OS already displays the notification as a system tray banner,
+      // so we suppress the duplicative in-app alert for ride/delivery progression
+      // messages. Web keeps full in-app alerts because browsers silence notifications
+      // when the tab is in the foreground.
+      if (isNative) {
+        const type = (data?.type || '') as string;
+        const isRideOrDelivery =
+          type === 'RIDE_REQUEST' ||
+          type === 'ride_update' ||
+          type === 'order_update' ||
+          type === 'DELIVERY_UPDATE' ||
+          !!data?.ride_id ||
+          !!data?.order_id;
+        if (isRideOrDelivery) return;
+      }
+
       showAlert(title || "Notification", body || "", "info");
       triggerHaptic();
     };
 
     window.addEventListener('foreground_notification', handleForegroundPush);
     return () => window.removeEventListener('foreground_notification', handleForegroundPush);
-  }, []);
+  }, [isNative]);
 
   // Background/Tap Notification Listener
   useEffect(() => {

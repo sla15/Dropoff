@@ -931,17 +931,19 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             };
         };
 
-        const animateMarkerTo = (marker: any, endPos: { lat: number, lng: number }, duration = 1000) => {
+        const animateMarkerTo = (marker: any, endPos: { lat: number, lng: number }, duration = 1800) => {
             const startPos = { lat: marker.getPosition().lat(), lng: marker.getPosition().lng() };
             const dist = Math.abs(endPos.lat - startPos.lat) + Math.abs(endPos.lng - startPos.lng);
-            if (dist < 0.0001) { marker.setPosition(endPos); return; }
+            // ~0.5m threshold — snap only truly stationary markers, animate everything else
+            if (dist < 0.000005) { marker.setPosition(endPos); return; }
             const animId = markerAnimationsRef.current.get(marker.__animId);
             if (animId) cancelAnimationFrame(animId);
             const startTime = performance.now();
             const animate = (currentTime: number) => {
                 const elapsed = currentTime - startTime;
                 const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3);
+                // Sine ease-in-out: smooth acceleration + deceleration = natural vehicle movement
+                const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
                 marker.setPosition({
                     lat: startPos.lat + (endPos.lat - startPos.lat) * eased,
                     lng: startPos.lng + (endPos.lng - startPos.lng) * eased
@@ -955,7 +957,7 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             markerAnimationsRef.current.set(marker.__animId, requestAnimationFrame(animate));
         };
 
-        const refreshMarkers = (drivers: any[]) => {
+        const refreshMarkers = (drivers: any[], fullRefresh = false) => {
             const markersMap = driverMarkersRef.current;
             const isRequestActive = ['accepted', 'arrived', 'in-progress'].includes(status);
 
@@ -982,6 +984,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                     });
                 } else {
                     getVehicleIcon(d.vehicle_category || 'economic', Math.round(d.heading || 0), (icon) => {
+                        // Guard: a rapid second broadcast may have already created this marker
+                        // while the async icon was loading — animate that one instead.
+                        const existing = markersMap.get(d.id);
+                        if (existing) {
+                            animateMarkerTo(existing, position);
+                            return;
+                        }
                         const newMarker = new (window as any).google.maps.Marker({
                             position,
                             map: map,
@@ -1021,14 +1030,18 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
                 }
             });
 
-            // Cleanup offline drivers
-            const currentIds = new Set(drivers.map(d => d.id));
-            markersMap.forEach((m, id) => {
-                if (!currentIds.has(id)) {
-                    m.setMap(null);
-                    markersMap.delete(id);
-                }
-            });
+            // Cleanup offline drivers — only run when we have the full driver list.
+            // Single-driver broadcast updates must NOT trigger cleanup or they'd wipe
+            // every other driver's marker off the map.
+            if (fullRefresh) {
+                const currentIds = new Set(drivers.map(d => d.id));
+                markersMap.forEach((m, id) => {
+                    if (!currentIds.has(id)) {
+                        m.setMap(null);
+                        markersMap.delete(id);
+                    }
+                });
+            }
         };
 
         const fetchDrivers = async () => {
@@ -1037,13 +1050,13 @@ export const RideScreen = ({ theme, navigate, goBack, setRecentActivities, user,
             if (isRequestActive && assignedDriverId) {
                 // If a driver is assigned, discard all other drivers and ONLY fetch the assigned one
                 const { data } = await supabase.from('drivers').select('*').eq('id', assignedDriverId);
-                if (data) refreshMarkers(data);
+                if (data) refreshMarkers(data, true); // fullRefresh: clean up any stale non-assigned markers
             } else {
                 // Regular free-roam viewing
                 const { data } = await supabase.from('drivers').select('*').eq('is_online', true);
                 if (data) {
                     setOnlineDrivers(data);
-                    refreshMarkers(data);
+                    refreshMarkers(data, true); // fullRefresh: authoritative list, remove gone-offline markers
                 }
             }
         };
